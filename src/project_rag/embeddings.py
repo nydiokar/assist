@@ -133,6 +133,7 @@ class Qwen3Embedder:
         import torch  # noqa: PLC0415
         from sentence_transformers import SentenceTransformer  # noqa: PLC0415
 
+        torch.set_num_threads(self._cfg.threads)
         if self._q.device == "cuda" and not torch.cuda.is_available():
             # A01 §A2/§E/§J: fail visibly, do NOT silently fall back to CPU or another model.
             raise RuntimeError(
@@ -189,6 +190,7 @@ class E5Embedder:
     """Legacy comparator: intfloat/multilingual-e5-small. Not the A01 default."""
 
     def __init__(self, cfg: EmbeddingConfig) -> None:
+        self._cfg = cfg
         self._e = cfg.e5
         self._profile = cfg.profile()
         self._model = None
@@ -196,8 +198,10 @@ class E5Embedder:
     def _ensure(self) -> None:
         if self._model is not None:
             return
+        import torch  # noqa: PLC0415
         from sentence_transformers import SentenceTransformer  # noqa: PLC0415
 
+        torch.set_num_threads(self._cfg.threads)
         self._model = SentenceTransformer(self._e.model, revision=self._e.revision)
         self._model.max_seq_length = self._e.max_tokens
 
