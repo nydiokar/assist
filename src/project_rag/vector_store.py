@@ -154,17 +154,26 @@ class ChromaVectorStore:
             embedding_function=None,
         )
 
+    def _batches(self, n: int) -> range:
+        # v1 §4.6: stay within the installed client's batch limit (it is ~5.4k, below corpus size).
+        return range(0, n, max(1, self._client.get_max_batch_size()))
+
     def add(self, generation: str, chunks: list[Chunk], embeddings: np.ndarray) -> None:
-        self._col.add(
-            ids=[c.chunk_id for c in chunks],
-            embeddings=[v.tolist() for v in np.asarray(embeddings, dtype=np.float32)],
-            documents=[c.citation_text for c in chunks],
-            metadatas=[_payload(c, generation) for c in chunks],
-        )
+        mat = np.asarray(embeddings, dtype=np.float32)
+        step = max(1, self._client.get_max_batch_size())
+        for i in self._batches(len(chunks)):
+            part = chunks[i : i + step]
+            self._col.add(
+                ids=[c.chunk_id for c in part],
+                embeddings=[v.tolist() for v in mat[i : i + step]],
+                documents=[c.citation_text for c in part],
+                metadatas=[_payload(c, generation) for c in part],
+            )
 
     def delete_ids(self, ids: list[str]) -> None:
-        if ids:
-            self._col.delete(ids=ids)
+        step = max(1, self._client.get_max_batch_size())
+        for i in range(0, len(ids), step):
+            self._col.delete(ids=ids[i : i + step])
 
     def delete_generation(self, project_id: str, generation: str) -> None:
         self._col.delete(where={"$and": [{"project_id": project_id}, {"generation": generation}]})
