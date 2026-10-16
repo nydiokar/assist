@@ -39,3 +39,9 @@ A01 §D mismatch protection applies only to model/revision/dim/prompt, not to de
 2. 4B (~4 h) is launched only after the 0.6B run shows the pipeline is healthy (finite vectors,
    unit norm, Recall@5 not below lexical on the exact-match questions). Abort criteria: any
    non-finite vector, RSS > 24 GB, throughput < 60 tokens/s.
+
+## Pilot finding (2026-10-17): bf16 vectors are not exactly unit-norm
+The A01 §D output check aborted the first 0.6B run on batch 1 (norms 0.998). Measured: bf16 vs
+fp32 cosine = 0.9998–0.9999, so the vectors are faithful; only the norm drifts. The adapter now
+re-normalizes in FP32 before validation (`test_qwen3_lowprecision_norm.py`). The health gate worked
+as designed: a bad run died in seconds, not hours.

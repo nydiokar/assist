@@ -176,6 +176,10 @@ class Qwen3Embedder:
         if is_query and self._has_query_prompt:
             kwargs["prompt_name"] = self._q.query_prompt_name
         vecs = np.asarray(self._model.encode(texts, **kwargs), dtype=np.float32)
+        if self._q.normalize:
+            # bf16/fp16 inference leaves norms ~0.998 (measured, cosine to fp32 = 0.9998);
+            # re-normalize in FP32 so stored vectors are exactly unit-norm (A01 §D, A02).
+            vecs = _l2_normalize(vecs)
         _validate_matrix(vecs, self._q.dim, normalize=self._q.normalize)
         return vecs  # stored as FP32 (A01 §D)
 
