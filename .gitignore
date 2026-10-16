@@ -1,0 +1,12 @@
+# Derivative artifacts and raw corpus — never in git (v1 §8).
+local_data/
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.coverage
+htmlcov/
+eval/results/*.json
+# Real NGO files must never be committed; only synthetic fixtures under tests/fixtures/.
+
+*.egg-info/

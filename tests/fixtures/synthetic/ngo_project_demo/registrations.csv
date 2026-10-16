@@ -1,0 +1,7 @@
+participant_id,name,village,session,dietary
+P001,Ivan Petrov,Breza,March,none
+P002,Maria Ivanova,Breza,March,vegetarian
+P003,Georgi Dimitrov,Breza,March,vegetarian
+P004,Elena Koleva,Dabrava,April,none
+P002,Maria Ivanova,Breza,March,vegetarian
+P005,Petar Stoyanov,Dabrava,April,vegan

@@ -1,0 +1,55 @@
+# Versioned, reviewed tuning parameters (v2 spec §D5). Single source of provider selection.
+# Switching embedding.provider or embedding.model forces a NEW index generation (ADR-009).
+
+schema_version: 1
+
+embedding:
+  # provider: hash (cheap/offline/CI) | e5 (production baseline, ADR-003)
+  provider: hash
+  # --- hash provider ---
+  hash_dim: 384            # match E5 dim so store schema is identical across providers
+  # --- e5 provider (used only when provider: e5) ---
+  model: "intfloat/multilingual-e5-small"
+  revision: "main"         # pin to a concrete commit before any production run
+  dim: 384
+  max_tokens: 512          # E5 512-position limit; guard truncation
+  query_prefix: "query: "
+  passage_prefix: "passage: "
+  normalize: true
+  pooling: "mean"
+  batch_size: 32
+  threads: 8               # bounded CPU concurrency (measured 16-core box)
+
+parsing:
+  # backend: native (pypdf/python-docx/openpyxl/csv) | docling (optional extra, ADR-002)
+  backend: native
+  detect_scanned_pdf: true # report OCR_REQUIRED rather than index empty text
+
+vector_store:
+  # provider: memory (test/dev, numpy cosine) | chroma (production baseline, ADR-004)
+  provider: memory
+  collection: "rag_chunks_e5small_v1"
+  distance: cosine         # chosen at collection creation; never a default (v1 §4.6)
+  persist_path: "local_data/chroma"
+
+lexical_store:
+  # SQLite FTS5 BM25-like lexical channel (ADR-005)
+  path: "local_data/manifest.sqlite3"
+
+chunking:
+  target_tokens: 300       # v1 §4.4 initial hypothesis (250-350)
+  max_tokens: 480          # stay within embedder context
+  overlap_tokens: 40       # free-text only; tables repeat headers instead
+  table_rows_per_chunk: 20
+
+retrieval:
+  top_k: 8                 # returned after dedup
+  candidates_per_channel: 16
+  fusion:
+    method: rrf
+    k: 60                  # RRF constant (v2 §D6)
+  max_source_chars: 6000
+
+security:
+  max_query_chars: 2000
+  max_result_excerpt_chars: 1200

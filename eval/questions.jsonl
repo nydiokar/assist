@@ -1,0 +1,15 @@
+{"id": "q01", "lang": "en", "kind": "exact", "query": "What grant number is the Green Villages project under?", "expect_source_paths": ["proposal.md"], "expect_substrings": ["GV-2025-017"]}
+{"id": "q02", "lang": "en", "kind": "list", "query": "What indicators did the approved project define?", "expect_source_paths": ["proposal.md", "indicators.xlsx"], "expect_substrings": ["Target: 120", "8 sessions", "3 gardens"]}
+{"id": "q03", "lang": "en", "kind": "obligation", "query": "When is the final report due and what attachments are required?", "expect_source_paths": ["proposal.md"], "expect_substrings": ["31 January 2026", "participant lists"]}
+{"id": "q04", "lang": "en", "kind": "evidence", "query": "What evidence exists for the training held in March?", "expect_source_paths": ["progress_report.md"], "expect_substrings": ["attendance sheet", "photographs"]}
+{"id": "q05", "lang": "en", "kind": "numeric", "query": "What is the target and reported actual for people trained?", "expect_source_paths": ["progress_report.md", "indicators.xlsx"], "expect_substrings": ["74", "120"]}
+{"id": "q06", "lang": "en", "kind": "numeric", "query": "How many training sessions were delivered versus planned?", "expect_source_paths": ["progress_report.md", "indicators.xlsx"], "expect_substrings": ["5 sessions", "8"]}
+{"id": "q07", "lang": "bg", "kind": "paraphrase", "query": "Кога се проведе обучението по земеделие?", "expect_source_paths": ["memo_bg.md", "progress_report.md"], "expect_substrings": ["март 2025"]}
+{"id": "q08", "lang": "bg", "kind": "deadline", "query": "Докога трябва да се подаде крайният отчет?", "expect_source_paths": ["memo_bg.md", "proposal.md"], "expect_substrings": ["31 януари 2026"]}
+{"id": "q09", "lang": "en", "kind": "table", "query": "community gardens established target", "expect_source_paths": ["indicators.xlsx", "proposal.md"], "expect_substrings": ["gardens"]}
+{"id": "q10", "lang": "en", "kind": "no_answer", "query": "What is the project's annual carbon emissions reduction in tonnes?", "expect_source_paths": [], "expect_substrings": []}
+{"id": "q11", "lang": "en", "kind": "exact", "query": "Which village hosted the March training?", "expect_source_paths": ["progress_report.md"], "expect_substrings": ["Breza"]}
+{"id": "q12", "lang": "en", "kind": "paraphrase", "query": "what are the reporting obligations for the grantee", "expect_source_paths": ["proposal.md"], "expect_substrings": ["interim report", "final report"]}
+{"id": "q13", "lang": "cross", "kind": "cross_language", "query": "training in March Breza village", "expect_source_paths": ["progress_report.md", "memo_bg.md"], "expect_substrings": ["March", "Breza"]}
+{"id": "q14", "lang": "en", "kind": "aggregation_trap", "query": "How many vegetarians registered?", "expect_source_paths": ["registrations.csv"], "expect_substrings": ["vegetarian"]}
+{"id": "q15", "lang": "en", "kind": "numeric", "query": "reported actual for community gardens", "expect_source_paths": ["progress_report.md", "indicators.xlsx"], "expect_substrings": ["1 garden"]}
