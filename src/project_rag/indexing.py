@@ -14,9 +14,12 @@ from __future__ import annotations
 
 import hashlib
 
+import numpy as np
+
 from .chunking import CHUNKER_VERSION
 from .config import Config
 from .discovery import discover
+from .embedding_cache import EmbeddingCache, text_hash
 from .embeddings import EmbedderProtocol
 from .lexical_store import LexicalStore
 from .manifest import Manifest
@@ -149,7 +152,7 @@ class IndexingService:
 
         # Stage: embed + write new generation.
         if staged_chunks:
-            embeddings = self._embedder.embed_passages([c.embed_text for c in staged_chunks])
+            embeddings = self._embed_cached(staged_chunks, cache_root=self._cache_root)
             self._vs.add(new_gen, staged_chunks, embeddings)
             self._lx.add_chunks(new_gen, staged_chunks)
             self._manifest.record_chunks(
@@ -176,6 +179,30 @@ class IndexingService:
 
         report.warnings.append(f"stage_cache={cache.stats()}")
         return report
+
+    def _embed_cached(self, chunks: list[Chunk], *, cache_root: str,
+                      batch: int = 64) -> np.ndarray:
+        """Embed only chunks whose (text, profile) is not cached; commit each batch (resumable)."""
+        profile_key = self._embedder.profile.key()
+        dim = self._embedder.dim
+        cache = EmbeddingCache(f"{cache_root}/embeddings.sqlite3")
+        try:
+            hashes = [text_hash(c.embed_text) for c in chunks]
+            have = cache.get_many(profile_key, sorted(set(hashes)), dim)
+            todo = [(h, c.embed_text) for h, c in zip(hashes, chunks, strict=True)
+                    if h not in have]
+            seen: set[str] = set()
+            todo = [(h, t) for h, t in todo if not (h in seen or seen.add(h))]
+            for i in range(0, len(todo), batch):
+                part = todo[i : i + batch]
+                vecs = self._embedder.embed_passages([t for _, t in part])
+                new = {h: v for (h, _), v in zip(part, vecs, strict=True)}
+                cache.put_many(profile_key, new)
+                have.update(new)
+            return np.stack([have[h] for h in hashes]) if hashes else np.zeros((0, dim),
+                                                                               dtype=np.float32)
+        finally:
+            cache.close()
 
     def status(self, project_id: str):
         from .schema import StatusReport  # noqa: PLC0415
