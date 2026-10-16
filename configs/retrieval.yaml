@@ -1,53 +1,65 @@
-# Versioned, reviewed tuning parameters (v2 spec §D5). Single source of provider selection.
-# Switching embedding.provider or embedding.model forces a NEW index generation (ADR-009).
+# Versioned, reviewed tuning parameters (v2 §D5, Amendment A01). Single source of provider
+# selection. Switching embedding.provider / model / dim forces a NEW index generation (ADR-009).
 
 schema_version: 1
 
 embedding:
-  # provider: hash (cheap/offline/CI) | e5 (production baseline, ADR-003)
+  # provider: hash (cheap/offline/CI) | qwen3 (A01 production candidate) | e5 (legacy comparator)
   provider: hash
-  # --- hash provider ---
-  hash_dim: 384            # match E5 dim so store schema is identical across providers
-  # --- e5 provider (used only when provider: e5) ---
-  model: "intfloat/multilingual-e5-small"
-  revision: "main"         # pin to a concrete commit before any production run
-  dim: 384
-  max_tokens: 512          # E5 512-position limit; guard truncation
-  query_prefix: "query: "
-  passage_prefix: "passage: "
-  normalize: true
-  pooling: "mean"
-  batch_size: 32
-  threads: 8               # bounded CPU concurrency (measured 16-core box)
+  hash_dim: 2560           # match Qwen3-4B dim so store schema is provider-agnostic
+  threads: 8
+
+  qwen3:                   # A01 §D embedding-profile contract
+    model: "Qwen/Qwen3-Embedding-4B"
+    revision: "PIN_EXACT_RESOLVED_HF_COMMIT_AT_BOOTSTRAP"
+    dim: 2560
+    normalize: true
+    vector_storage_dtype: float32
+    inference_dtype: float16     # bf16 permitted after tested hardware compatibility
+    device: cuda                 # fail visibly if unavailable; no silent fallback
+    max_input_tokens: 2048       # operational cap, NOT the model's 32768 max
+    document_prompt: null        # no prefix for indexed passages
+    query_prompt_name: "query"
+    query_prompt_version: "qwen3_query_v1"
+    tokenizer_padding_side: left
+    batch_size: 4
+
+  e5:                      # legacy comparator (A01 supersedes E5 as default)
+    model: "intfloat/multilingual-e5-small"
+    revision: "main"
+    dim: 384
+    max_tokens: 512
+    query_prefix: "query: "
+    passage_prefix: "passage: "
+    normalize: true
+    pooling: "mean"
+    batch_size: 32
 
 parsing:
-  # backend: native (pypdf/python-docx/openpyxl/csv) | docling (optional extra, ADR-002)
-  backend: native
-  detect_scanned_pdf: true # report OCR_REQUIRED rather than index empty text
+  backend: native          # native (pypdf/python-docx/openpyxl/csv) | docling (optional, ADR-002)
+  detect_scanned_pdf: true
 
 vector_store:
-  # provider: memory (test/dev, numpy cosine) | chroma (production baseline, ADR-004)
-  provider: memory
-  collection: "rag_chunks_e5small_v1"
-  distance: cosine         # chosen at collection creation; never a default (v1 §4.6)
+  provider: memory         # memory (test/dev, numpy cosine) | chroma (production baseline, ADR-004)
+  collection: "rag_chunks_qwen3_4b_2560_v1"   # A01 §G rename
+  distance: cosine
   persist_path: "local_data/chroma"
 
 lexical_store:
-  # SQLite FTS5 BM25-like lexical channel (ADR-005)
   path: "local_data/manifest.sqlite3"
 
-chunking:
-  target_tokens: 300       # v1 §4.4 initial hypothesis (250-350)
-  max_tokens: 480          # stay within embedder context
-  overlap_tokens: 40       # free-text only; tables repeat headers instead
+chunking:                  # A01 §F
+  target_tokens: 500       # evidence-preserving target 350-700 (hypothesis)
+  max_tokens: 2048         # operational cap
+  overlap_tokens: 60
   table_rows_per_chunk: 20
 
 retrieval:
-  top_k: 8                 # returned after dedup
+  top_k: 8
   candidates_per_channel: 16
   fusion:
     method: rrf
-    k: 60                  # RRF constant (v2 §D6)
+    k: 60
   max_source_chars: 6000
 
 security:

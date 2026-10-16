@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import hashlib
 
-from .chunking import CHUNKER_VERSION, chunk_document
+from .chunking import CHUNKER_VERSION
 from .config import Config
 from .discovery import discover
 from .embeddings import EmbedderProtocol
@@ -22,6 +22,7 @@ from .lexical_store import LexicalStore
 from .manifest import Manifest
 from .parsers import ParserRegistry
 from .schema import Chunk, DocState, FileReport, IngestReport, ParsedDocument
+from .stages import StageCache
 from .vector_store import VectorStoreProtocol
 
 
@@ -42,13 +43,15 @@ def _generation_id(project_id: str, hashes: list[str]) -> str:
 class IndexingService:
     def __init__(self, cfg: Config, embedder: EmbedderProtocol,
                  vector_store: VectorStoreProtocol, lexical_store: LexicalStore,
-                 manifest: Manifest, registry: ParserRegistry) -> None:
+                 manifest: Manifest, registry: ParserRegistry,
+                 cache_root: str = "local_data/cache") -> None:
         self._cfg = cfg
         self._embedder = embedder
         self._vs = vector_store
         self._lx = lexical_store
         self._manifest = manifest
         self._registry = registry
+        self._cache_root = cache_root
 
     def ingest(self, project_id: str, root_path: str, *, dry_run: bool = False) -> IngestReport:
         profile = self._embedder.profile
@@ -86,6 +89,8 @@ class IndexingService:
                                                                        self._cfg.parsing.backend)))
             return report
 
+        cache = StageCache(self._cache_root, project_id)
+        token_counter = self._embedder.token_count
         staged_chunks: list[Chunk] = []
         for d in discovered:
             sid = _source_id(d.source_path)
@@ -106,20 +111,31 @@ class IndexingService:
                                                 diagnostics=[f"unsupported ext {d.ext}"]))
                 continue
 
-            doc: ParsedDocument = self._registry.parse(d.abs_path, d.source_path, d.ext)
+            parse_art = cache.get_or_parse(
+                abs_path=d.abs_path, source_path=d.source_path, ext=d.ext,
+                content_hash=d.content_hash, registry=self._registry,
+                parser_cfg=self._cfg.parsing)
+            doc: ParsedDocument = parse_art.doc
             if doc.state not in {DocState.PARSED}:
                 report.files.append(FileReport(source_path=d.source_path, state=doc.state,
                                                 source_id=sid, version_id=vid,
                                                 diagnostics=doc.diagnostics))
                 continue
 
-            chunks = chunk_document(doc, project_id=project_id, source_id=sid, version_id=vid,
-                                    source_type=d.ext.lstrip("."), cfg=self._cfg.chunking)
+            chunk_art = cache.get_or_chunk(
+                parse_art=parse_art, project_id=project_id, source_id=sid, version_id=vid,
+                source_type=d.ext.lstrip("."), chunk_cfg=self._cfg.chunking,
+                token_counter=token_counter)
+            chunks = chunk_art.chunks
             staged_chunks.extend(chunks)
+            diags = list(doc.diagnostics)
+            if any(c.truncated for c in chunks):  # A01 §F: silent truncation is a failed check
+                diags.append(f"TRUNCATION: {sum(c.truncated for c in chunks)} chunk(s) exceeded "
+                             f"max_tokens={self._cfg.chunking.max_tokens}")
             report.files.append(FileReport(source_path=d.source_path, state=DocState.READY,
                                             source_id=sid, version_id=vid,
                                             n_blocks=len(doc.blocks), n_chunks=len(chunks),
-                                            diagnostics=doc.diagnostics))
+                                            diagnostics=diags))
 
         deleted = set(prior_hashes) - {d.source_path for d in discovered}
         report.deleted = len(deleted)
@@ -155,6 +171,7 @@ class IndexingService:
             self._lx.delete_generation(project_id, prior_gen)
             self._manifest.delete_generation(project_id, prior_gen)
 
+        report.warnings.append(f"stage_cache={cache.stats()}")
         return report
 
     def status(self, project_id: str):

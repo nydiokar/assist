@@ -39,8 +39,9 @@ class ProjectRAG:
         self._lx = LexicalStore(self._cfg.lexical_store.path)
         self._manifest = Manifest(self._cfg.lexical_store.path)
         self._registry = ParserRegistry(self._cfg.parsing)
+        cache_root = str(Path(self._cfg.lexical_store.path).resolve().parent / "cache")
         self._indexer = IndexingService(self._cfg, self._embedder, self._vs, self._lx,
-                                        self._manifest, self._registry)
+                                        self._manifest, self._registry, cache_root=cache_root)
         self._retriever = Retriever(self._embedder, self._vs, self._lx, self._cfg.retrieval)
         self._roots: dict[str, str] = {}      # project_id -> server-side root
         self._last_traces: list[QueryTrace] = []

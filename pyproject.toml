@@ -18,7 +18,13 @@ dependencies = [
 
 [project.optional-dependencies]
 # Heavy production backends — installed only when validated on the real corpus.
-e5 = ["sentence-transformers>=3,<4"]
+# A01 production dense candidate: Qwen3-Embedding-4B (needs transformers>=4.51 per model card).
+qwen3 = [
+    "sentence-transformers>=3,<4",
+    "transformers>=4.51",
+    "torch>=2.1",
+]
+e5 = ["sentence-transformers>=3,<4"]        # legacy comparator (A01 supersedes as default)
 chroma = ["chromadb>=0.5,<2"]
 docling = ["docling>=2,<3"]
 dev = [

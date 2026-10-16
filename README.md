@@ -2,7 +2,9 @@
 
 Local, project-scoped document ingestion + hybrid (lexical + dense) retrieval with exact
 source inspection and query traces. Plugs into AI-Team as read-only tools; retrieval is
-independently testable without an LLM. Implements **spec v2** (`uploads/PROJECT_ASSISTANT_RAG_SPEC_v2.md`).
+independently testable without an LLM. Implements **spec v2**
+(`uploads/PROJECT_ASSISTANT_RAG_SPEC_v2.md`) as amended by **Amendment A01**
+(`docs/AMENDMENT_A01.md`): Qwen3-Embedding-4B dense candidate + reusable fingerprinted stages.
 
 ## Status
 
@@ -10,7 +12,10 @@ WP0 scaffold + WP1 (parsing/provenance) + WP2 (search-only MVP) + WP3 harness ar
 green on a synthetic bilingual fixture corpus** using a cheap offline embedder. The system is
 **waiting for two inputs** before further gates (see "Build stop line").
 
-- 30/30 tests pass. Fixture Recall@5 = 1.0, MRR = 0.92 (hash embedder — *not* a production SLA).
+- 39/39 tests pass. Fixture Recall@5 = 1.0, MRR = 0.96 (hash embedder — *not* a production SLA).
+- **A01 CUDA gate cannot pass on this machine** (no NVIDIA GPU on host or in WSL — measured).
+  `scripts/feasibility_smoke.py` fails visibly rather than silently falling back. See
+  `docs/AMENDMENT_A01.md` → "Measured environment deviation".
 
 ## Setup (Windows, PowerShell)
 
@@ -35,20 +40,37 @@ python -m venv .venv
 
 Single source of provider selection + tuning. Key switches:
 
-| Key | Test/dev default | Production baseline |
+| Key | Test/dev default | Production candidate (A01) |
 |---|---|---|
-| `embedding.provider` | `hash` (offline, deterministic) | `e5` (`intfloat/multilingual-e5-small`, install `.[e5]`) |
+| `embedding.provider` | `hash` (offline, deterministic, 2560-dim) | `qwen3` (`Qwen/Qwen3-Embedding-4B`, 2560-dim, CUDA, install `.[qwen3]`) |
 | `vector_store.provider` | `memory` (numpy cosine, JSON-persisted) | `chroma` (install `.[chroma]`) |
 | `parsing.backend` | `native` (pypdf/python-docx/openpyxl/csv) | `docling` (install `.[docling]`) |
 
-Switching `embedding.provider` or model forces a **new index generation** (ADR-009); the
-startup compatibility guard refuses writes on a mismatch. `Config.assert_release_safe()` rejects
-the `hash`/`memory` fakes for a release.
+`e5` remains an optional legacy comparator. Switching `embedding.provider`/model/dim forces a
+**new index generation** (ADR-009); the startup compatibility guard refuses writes on a mismatch.
+`Config.assert_release_safe()` rejects the `hash`/`memory` fakes and an unpinned Qwen3 revision.
+
+### Activating Qwen3-4B (requires CUDA, ~20 GB VRAM, WSL)
+
+```powershell
+.\.venv\Scripts\python.exe -m pip install -e ".[qwen3]"
+.\.venv\Scripts\python.exe scripts\feasibility_smoke.py   # A01 §E gate — must pass first
+# then pin the resolved HF revision into configs\retrieval.yaml -> embedding.qwen3.revision
+# and set embedding.provider: qwen3, vector_store.provider: chroma
+```
+
+### Reusable stages (A01 §C)
+
+`stages.py` caches `[1] PARSE` (shared across projects, keyed by content hash + parser config)
+and `[2] CHUNK` (per-project lineage, keyed by parsed-artifact + chunker config) under
+`local_data/cache/`. An unchanged source is not reparsed; changing the chunker re-chunks without
+reparsing; switching the embedding profile re-embeds without touching parse/chunk.
 
 ## Architecture (v1 §3.3)
 
-`discovery → parsers → chunking → embeddings + vector_store (dense) + lexical_store (FTS5) →
-retrieval (RRF fusion + dedup) → api (tool contracts) → ai_team_adapter (WP4 seam)`.
+`discovery → [stages: parse-cache → chunk-cache] → embeddings + vector_store (dense) +
+lexical_store (FTS5) → retrieval (RRF fusion + dedup) → api (tool contracts) →
+ai_team_adapter (WP4 seam)`.
 `manifest` (SQLite) holds document state, active index generation, and pinned embedding profile.
 `trace` records grounding diagnostics (hashed query, retrieved chunk IDs) with no raw PII.
 

@@ -75,18 +75,30 @@ class Chunk(BaseModel):
     source_id: str
     version_id: str
     document_id: str                 # == source_id; kept for response contract clarity
-    embed_text: str
-    citation_text: str
+    embed_text: str                  # alias: A01 retrieval_text (enriched, auditable)
+    citation_text: str               # verbatim original; citations refer to THIS, never embed_text
     block_type: BlockType
     heading: str | None = None
     location: SourceLocation = Field(default_factory=SourceLocation)
     chunk_ordinal: int = 0
     source_path: str = ""
     source_type: str = ""            # file extension without dot
+    token_count: int = 0             # measured tokens of embed_text (A01 §F)
+    truncated: bool = False          # True if embed_text was token-truncated (A01 §F fail check)
+
+    @property
+    def retrieval_text(self) -> str:
+        """A01 §F name for the enriched text used for embeddings."""
+        return self.embed_text
 
 
 class EmbeddingProfile(BaseModel):
-    """Pinned embedding identity (v1 §4.5 safeguard 1). Persisted per collection."""
+    """Pinned embedding identity (v1 §4.5 safeguard 1, A01 §D). Persisted per collection.
+
+    Supports two query-conditioning styles:
+      - prefix style (legacy E5): query_prefix/passage_prefix non-empty.
+      - prompt style (Qwen3): query_prompt_name/query_prompt_version set, no prefixes.
+    """
 
     provider: str
     model: str
@@ -94,11 +106,18 @@ class EmbeddingProfile(BaseModel):
     dim: int
     normalize: bool
     pooling: str
-    query_prefix: str
-    passage_prefix: str
+    query_prefix: str = ""
+    passage_prefix: str = ""
+    query_prompt_name: str | None = None
+    query_prompt_version: str | None = None
+    inference_dtype: str | None = None   # recorded for drift diagnosis (A01 §C)
+    device: str | None = None
+    max_input_tokens: int | None = None
 
     def key(self) -> str:
-        return f"{self.provider}:{self.model}:{self.revision}:{self.dim}:{self.pooling}:{int(self.normalize)}"
+        qp = self.query_prompt_version or self.query_prefix
+        return (f"{self.provider}:{self.model}:{self.revision}:{self.dim}:"
+                f"{self.pooling}:{int(self.normalize)}:{qp}")
 
 
 # ---- Tool response contracts (v1 §3.2) ----
