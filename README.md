@@ -3,7 +3,7 @@
 Local, project-scoped document ingestion + hybrid (lexical + dense) retrieval with exact
 source inspection and query traces. Plugs into AI-Team as read-only tools; retrieval is
 independently testable without an LLM. Implements **spec v2**
-(`uploads/PROJECT_ASSISTANT_RAG_SPEC_v2.md`) as amended by **Amendment A01**
+(`docs/PROJECT_ASSISTANT_RAG_SPEC_v2.md`) as amended by **Amendment A01**
 (`docs/AMENDMENT_A01.md`): Qwen3-Embedding-4B dense candidate + reusable fingerprinted stages.
 
 ## Status
