@@ -16,3 +16,17 @@ Each entry: date · corpus snapshot · config · questions · result · what it 
 
 - Same corpus/questions/config; 2,270 chunks (-5). Recall@5 0.714 (unchanged), evidence@5 0.429 → 0.500 (+yp03), MRR 0.643 → 0.595 (yp02 fell from rank 1 to 3).
 - Taught: one question moved each way — within noise at n=14. The boilerplate fix is justified by mechanism (shorter, cleaner chunks), not by this metric. Also found and fixed a real defect: the generation id ignored chunker/parser config, so a chunker change reported "no changes" and served a stale index (`test_chunking_config_change_forces_new_generation`).
+
+## 2026-10-17 — E5-small (legacy comparator), CPU, real corpus, chunk target 300 E5-tokens (6,118 chunks)
+
+Config `configs/yp_e5.yaml`; questions as above (n=14 scored). Chunking differs from the Baseline-B chunk set (confound, A02).
+
+| Channel | Recall@5 | evidence@5 | MRR |
+|---|---|---|---|
+| lexical (FTS5) | 0.714 | 0.500 | 0.714 |
+| dense (E5-small) | 0.643 | 0.286 | 0.643 |
+| hybrid (RRF k=60) | 0.786 | 0.500 | 0.679 |
+
+- Differences are ≤ 2 questions of 14: **no ranking between channels can be claimed.** What is solid: dense alone is not better than lexical on this question set; hybrid recovered the "conflict" (yp12) and reference (yp13) questions that one channel alone missed.
+- Still failing in all channels: yp06 (inflection), yp07/yp09 (English question → Bulgarian table), no_answer pair (no abstention policy yet).
+- Ingest note: E5 ingest first crashed at Chroma write (`Batch size 6118 > max 5461`); embeddings were cached so the retry took 12 s. Fixed in `ChromaVectorStore` (test `test_chroma_batching.py`).
