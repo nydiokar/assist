@@ -20,7 +20,7 @@ from collections.abc import Callable
 from .config import ChunkingConfig
 from .schema import Block, BlockType, Chunk, ParsedDocument, SourceLocation
 
-CHUNKER_VERSION = "structure_v3"  # v3: oversized blocks split; table groups token-bounded
+CHUNKER_VERSION = "structure_v4"  # v4: repeated page boilerplate dropped (ledger F9)
 
 
 def _approx_tokens(text: str) -> int:
@@ -28,6 +28,34 @@ def _approx_tokens(text: str) -> int:
     # Cyrillic costs ~1 token per 3 chars in modern BPE vocabularies; take the larger of the
     # word-based and char-based estimates so long Bulgarian words are not under-counted.
     return max(1, int(len(text.split()) * 1.3), len(text) // 3)
+
+
+_PAGE_COUNTER = re.compile(r"^\d+\s*/\s*\d+$")
+_BOILERPLATE_MIN_REPEATS = 5
+_BOILERPLATE_MAX_CHARS = 90
+
+
+def _drop_repeated_boilerplate(blocks: list[Block]) -> list[Block]:
+    """Drop short paragraphs repeated >= 5 times (digits normalized), e.g. per-page form
+    headers ("Form ID ... Deadline ...", "BG", "7 / 65"). They carry no evidence and dilute
+    chunks and BM25 statistics (ledger F9). Tables and headings are never dropped."""
+    def key(b: Block) -> str:
+        t = b.text.strip()
+        # page counters ("7 / 65") differ per page but are one kind of boilerplate; every
+        # other text must repeat verbatim (so templated rows with different numbers survive).
+        return "#PAGE#" if _PAGE_COUNTER.match(t) else t
+
+    paras = [b for b in blocks if b.block_type == BlockType.PARAGRAPH
+             and len(b.text) <= _BOILERPLATE_MAX_CHARS]
+    counts: dict[str, int] = {}
+    for b in paras:
+        counts[key(b)] = counts.get(key(b), 0) + 1
+    noisy = {k for k, n in counts.items() if n >= _BOILERPLATE_MIN_REPEATS}
+    if not noisy:
+        return blocks
+    return [b for b in blocks if not (b.block_type == BlockType.PARAGRAPH
+                                      and len(b.text) <= _BOILERPLATE_MAX_CHARS
+                                      and key(b) in noisy)]
 
 
 _SENTENCE_SPLIT = re.compile(r"(?<=[.!?;])\s+|\n+")
@@ -90,7 +118,8 @@ def chunk_document(doc: ParsedDocument, *, project_id: str, source_id: str,
                    version_id: str, source_type: str, cfg: ChunkingConfig,
                    token_counter: Callable[[str], int] | None = None) -> list[Chunk]:
     count_tokens = token_counter or _approx_tokens
-    all_blocks = _expand_oversized(doc.blocks, cfg.target_tokens, count_tokens)
+    all_blocks = _expand_oversized(_drop_repeated_boilerplate(doc.blocks), cfg.target_tokens,
+                                   count_tokens)
     text_blocks = [b for b in all_blocks if b.block_type in
                    {BlockType.PARAGRAPH, BlockType.LIST_ITEM, BlockType.HEADING}]
     table_blocks = [b for b in all_blocks if b.block_type in

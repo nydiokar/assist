@@ -38,8 +38,10 @@ def _version_id(content_hash: str, parser_backend: str) -> str:
     return "v_" + hashlib.sha256(raw.encode("utf-8")).hexdigest()[:20]
 
 
-def _generation_id(project_id: str, hashes: list[str]) -> str:
-    raw = project_id + "|" + "|".join(sorted(hashes))
+def _generation_id(project_id: str, hashes: list[str], pipeline: str) -> str:
+    """Identity of the whole derived index: sources AND the pipeline that produced it.
+    A chunker/parser/config change must yield a new generation (ADR-009), not 'no changes'."""
+    raw = project_id + "|" + pipeline + "|" + "|".join(sorted(hashes))
     return "g_" + hashlib.sha256(raw.encode("utf-8")).hexdigest()[:16]
 
 
@@ -71,7 +73,11 @@ class IndexingService:
                                 warnings=["REFUSED: embedder dim != profile dim"])
 
         discovered = discover(root_path)
-        new_gen = _generation_id(project_id, [d.content_hash + d.source_path for d in discovered])
+        pipeline = "|".join([CHUNKER_VERSION, self._cfg.parsing.backend,
+                             self._cfg.chunking.model_dump_json(),
+                             self._cfg.classification.model_dump_json()])
+        new_gen = _generation_id(project_id, [d.content_hash + d.source_path for d in discovered],
+                                 pipeline)
         prior_gen = self._manifest.active_generation(project_id)
         prior_hashes = (self._manifest.prior_hashes(project_id, prior_gen)
                         if prior_gen else {})

@@ -11,3 +11,8 @@ Each entry: date · corpus snapshot · config · questions · result · what it 
 - Failures → ledger: F9 (page boilerplate dilutes chunks), F10 (no Bulgarian stemming), F11 (no cross-language), F12 (right doc, wrong chunk).
 - Not measured: abstention (a lexical channel always returns something; needs a score/threshold policy), dense, hybrid.
 - Caveat: n=14; differences of one question are 7 points. Do not claim a ranking between methods from <±2 questions.
+
+## 2026-10-17 — Baseline B after F9 fix (boilerplate dropped, `structure_v4`)
+
+- Same corpus/questions/config; 2,270 chunks (-5). Recall@5 0.714 (unchanged), evidence@5 0.429 → 0.500 (+yp03), MRR 0.643 → 0.595 (yp02 fell from rank 1 to 3).
+- Taught: one question moved each way — within noise at n=14. The boilerplate fix is justified by mechanism (shorter, cleaner chunks), not by this metric. Also found and fixed a real defect: the generation id ignored chunker/parser config, so a chunker change reported "no changes" and served a stale index (`test_chunking_config_change_forces_new_generation`).

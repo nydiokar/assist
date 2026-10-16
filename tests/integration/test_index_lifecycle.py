@@ -82,3 +82,12 @@ def test_dry_run_writes_nothing(make_rag, corpus_root, tmp_path):
     report = rag.ingest_project("demo", str(root), dry_run=True)
     assert report.dry_run
     assert rag.get_ingestion_status("demo").index_generation is None
+
+
+def test_chunking_config_change_forces_new_generation(make_rag, corpus_root, tmp_path):
+    rag = make_rag()
+    g1 = rag.ingest_project("demo", corpus_root).index_generation
+    rag._cfg.chunking.target_tokens = 120
+    rag._indexer._cfg.chunking.target_tokens = 120
+    r2 = rag.ingest_project("demo", corpus_root)
+    assert r2.index_generation != g1 and "no changes" not in " ".join(r2.warnings)
