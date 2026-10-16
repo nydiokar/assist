@@ -104,7 +104,7 @@ class PdfParser:
                 _ = e
                 continue
             total_chars += len(text.strip())
-            for i, para in enumerate(_split_paragraphs(text)):
+            for i, para in enumerate(_split_paragraphs(text, strict_blank=True)):
                 if para.strip():
                     blocks.append(Block(block_type=BlockType.PARAGRAPH, text=para.strip(),
                                         location=SourceLocation(page=pageno, block_path=f"p{pageno}.{i}")))
@@ -285,11 +285,17 @@ class CsvParser:
                               diagnostics=[f"encoding={encoding}"])
 
 
-def _split_paragraphs(text: str) -> list[str]:
+def _split_paragraphs(text: str, strict_blank: bool = False) -> list[str]:
+    """Split on blank lines. `strict_blank` (PDF): only truly empty lines break paragraphs;
+    pypdf emits whitespace-only lines between justified words ("word \n \n word"), which
+    would otherwise shatter text into one block per word (seen on the real corpus)."""
     parts: list[str] = []
     buf: list[str] = []
     for line in text.splitlines():
-        if line.strip():
+        is_blank: bool = (line == "") if strict_blank else not line.strip()
+        if not is_blank:
+            if not line.strip():
+                continue
             buf.append(line.strip())
         elif buf:
             parts.append(" ".join(buf))
