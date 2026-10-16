@@ -1,0 +1,42 @@
+# Real-corpus lexical baseline (spec v1 §6.1 Baseline B). Dense channel is NOT evaluated with
+# this config: embedding.provider=hash with a tiny dim only satisfies the ingest contract.
+# Separate paths so synthetic dev state in local_data/ is untouched.
+schema_version: 1
+
+embedding:
+  provider: hash
+  hash_dim: 64
+  threads: 8
+
+parsing:
+  backend: native
+  detect_scanned_pdf: true
+
+vector_store:
+  provider: memory
+  collection: "yp_baseline_lexical_only"
+  distance: cosine
+  persist_path: "local_data/yp_baseline/store"
+
+lexical_store:
+  path: "local_data/yp_baseline/manifest.sqlite3"
+
+chunking:
+  target_tokens: 500
+  max_tokens: 2048
+  overlap_tokens: 60
+  table_rows_per_chunk: 20
+
+retrieval:
+  top_k: 8
+  candidates_per_channel: 16
+  fusion: {method: rrf, k: 60}
+  max_source_chars: 6000
+
+security:
+  max_query_chars: 2000
+  max_result_excerpt_chars: 4000
+
+classification:
+  reference_prefixes:
+    - "Youth Participation Resources/"

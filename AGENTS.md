@@ -30,27 +30,26 @@ executed**. The folder is a mixed dump of: (a) the funding application, (b) evid
 products of the project's activities (debate, webinars, youth studios, podcast, good-practice
 handbook, advocacy, invitations to institutions, communications, sponsors, monitoring &
 evaluation), (c) administration/finance. **Content is mostly Bulgarian, with English mixed in.**
-It contains personal data (names, contacts, participant feedback) — see "Hard rules".
+It contains personal data (names, contacts, participant feedback). **Owner decision 2026-10-17: keep it all in the index** (testing only, nothing leaves the machine); do not delete or exclude it. Third-party material under `Youth Participation Resources/` is tagged `doc_class=reference` (config `classification.reference_prefixes`) and filterable at search time.
 
 Measured (2026-10-16, WP0 inventory; re-measure rather than trust if the folder changes):
 
 | Fact | Value |
 |---|---|
-| Files / size | 337 files, 3.58 GB; longest path 277 chars (**exceeds Windows 260 limit** — use `\\?\` prefix) |
-| Text-bearing, in scope | 115 `.docx`, 30 `.xlsx`, 28 `.pdf`, 2 `.txt` |
+| Files / size | 334 files (2026-10-17), ~3.5 GB; longest path 277 chars (**exceeds Windows 260 limit** — use `\\?\` prefix) |
+| Text-bearing, in scope | 172 files: `.docx`, `.xlsx`, `.pdf`, `.txt` (115 / 30 / 25 / 2 after duplicate removal) |
 | Needs a decision | 4 legacy `.doc` (no native parser), 80 `.png` + 53 `.jpg` + 11 `.jpeg` (images, V1 reports coverage gap, no OCR), 1 `.conf` |
 | Out of scope (media) | 10 `.mp4` + 1 `.mov` (~3 GB), 2 `.m4a` — no transcription in V1 |
 | Heaviest folders | `Communications` 106 files, `04. Сборник с Добри практики` 65, `Покани` 48, `Уебинари` 40 |
-| Main proposal | `KA154-YOU-E2373104.pdf` — 65 pages, digital text layer present on every page |
+| Main proposal | `KA154-YOU-E2373104(1).docx` (the PDF export was deleted by the owner) |
 
-### The duplicate proposal files (resolved)
+### The proposal files (resolved by the owner)
 
-`KA154-YOU-E2373104.docx`, `...(1).docx`, `...(2).docx` and `.pdf` are the **same application
-form**. Verified by text diff: the three DOCX differ by a single stray prefix `мла` on one title
-line (`Call 2024 Round 3 YOU`); `(1)` and `(2)` are identical to each other. The PDF (Oct 8 2024,
-the submitted export) is the **canonical** version; DOCX copies (Feb 2025) are edited working
-copies. Treat as one logical document with several occurrences: dedupe by content hash but keep
-every source occurrence (spec v1 §4.1). Do not pick one silently in code.
+The application originally existed as a PDF and three near-identical DOCX copies. On 2026-10-17
+the owner deleted the duplicates; the only remaining copy is `KA154-YOU-E2373104(1).docx`
+(parsed text verified equal to the PDF export except a stray 3-character prefix on one line).
+Eval labels reference that file. Near-duplicate handling is therefore not needed for this corpus
+but stays a known limitation (ledger F4).
 
 ### The zip files at repo root
 
