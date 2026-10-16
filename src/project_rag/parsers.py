@@ -129,29 +129,83 @@ class DocxParser:
         except Exception as e:  # noqa: BLE001
             return ParsedDocument(source_path=source_path, state=DocState.FAILED,
                                   diagnostics=[f"docx open failed: {e}"])
+        from docx.table import Table  # noqa: PLC0415
+        from docx.text.paragraph import Paragraph  # noqa: PLC0415
+
         blocks: list[Block] = []
         heading: str | None = None
-        for i, para in enumerate(doc.paragraphs):
-            txt = para.text.strip()
-            if not txt:
-                continue
-            style = (para.style.name or "").lower() if para.style else ""
-            if style.startswith("heading") or style == "title":
-                heading = txt
-                blocks.append(Block(block_type=BlockType.HEADING, text=txt,
-                                    location=SourceLocation(block_path=f"para{i}")))
-            else:
-                blocks.append(Block(block_type=BlockType.PARAGRAPH, text=txt,
-                                    location=SourceLocation(heading=heading, block_path=f"para{i}")))
-        for ti, table in enumerate(doc.tables):
-            header = [c.text.strip() for c in table.rows[0].cells] if table.rows else []
-            for ri, row in enumerate(table.rows[1:], start=1):
-                cells = [c.text.strip() for c in row.cells]
-                pairs = ", ".join(f"{h}: {v}" for h, v in zip(header, cells, strict=False))
-                blocks.append(Block(block_type=BlockType.TABLE_ROW, text=pairs,
-                                    location=SourceLocation(heading=heading,
-                                                            block_path=f"table{ti}.row{ri}", row=ri)))
+        n_para: int = 0
+        n_table: int = 0
+        # Walk the body in document order so tables stay next to their surrounding text.
+        for child in doc.element.body.iterchildren():
+            tag: str = child.tag.rsplit("}", 1)[-1]
+            if tag == "p":
+                para = Paragraph(child, doc)
+                idx: int = n_para
+                n_para += 1
+                txt = para.text.strip()
+                if not txt:
+                    continue
+                style = (para.style.name or "").lower() if para.style else ""
+                if style.startswith("heading") or style == "title":
+                    heading = txt
+                    blocks.append(Block(block_type=BlockType.HEADING, text=txt,
+                                        location=SourceLocation(block_path=f"para{idx}")))
+                else:
+                    blocks.append(Block(block_type=BlockType.PARAGRAPH, text=txt,
+                                        location=SourceLocation(heading=heading,
+                                                                block_path=f"para{idx}")))
+            elif tag == "tbl":
+                blocks.extend(_docx_table_blocks(Table(child, doc), n_table, heading))
+                n_table += 1
         return ParsedDocument(source_path=source_path, state=DocState.PARSED, blocks=blocks)
+
+
+def _docx_table_blocks(table: object, ti: int, heading: str | None) -> list[Block]:
+    """Render a DOCX table as row blocks.
+
+    Merged cells are repeated by python-docx for every grid column they span; dedupe by the
+    underlying XML cell so a merged title is emitted once. The first row is used as a header
+    only when it looks like one (>=3 rows, as wide as the widest row, all cells distinct,
+    non-empty and short);
+    otherwise rows are rendered as plain ' | '-joined cells so form-style/layout tables
+    keep their first data row.
+    """
+    rows: list[list[str]] = []
+    for row in table.rows:  # type: ignore[attr-defined]
+        seen: set[int] = set()
+        cells: list[str] = []
+        for c in row.cells:
+            if id(c._tc) in seen:
+                continue
+            seen.add(id(c._tc))
+            cells.append(" ".join(c.text.split()))
+        rows.append(cells)
+    if not rows:
+        return []
+    head: list[str] = rows[0]
+    has_header: bool = (
+        len(rows) >= 3
+        and len(head) >= 2
+        and len(head) == max(len(r) for r in rows)
+        and all(head)
+        and len(set(head)) == len(head)
+        and max(len(h) for h in head) <= 60
+    )
+    out: list[Block] = []
+    start: int = 1 if has_header else 0
+    for ri in range(start, len(rows)):
+        cells = rows[ri]
+        if not any(cells):
+            continue
+        if has_header:
+            text = ", ".join(f"{h}: {v}" for h, v in zip(head, cells, strict=False) if v)
+        else:
+            text = " | ".join(v for v in cells if v)
+        out.append(Block(block_type=BlockType.TABLE_ROW, text=text,
+                         location=SourceLocation(heading=heading,
+                                                 block_path=f"table{ti}.row{ri + 1}", row=ri + 1)))
+    return out
 
 
 class XlsxParser:

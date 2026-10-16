@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import os
 from pathlib import Path
 
 from pydantic import BaseModel
@@ -37,6 +38,13 @@ def _sha256(path: Path) -> str:
     return h.hexdigest()
 
 
+def _long_path(path: str) -> str:
+    """Prefix absolute Windows paths with \\\\?\\ so >260-char paths open."""
+    if os.name == "nt" and not path.startswith("\\\\?\\"):
+        return "\\\\?\\" + path
+    return path
+
+
 def _is_ignored(path: Path) -> bool:
     name = path.name
     if any(name.startswith(p) for p in IGNORE_FILE_PREFIXES):
@@ -56,16 +64,19 @@ def discover(root_path: str | Path) -> list[DiscoveredFile]:
     if not root.is_dir():
         raise NotADirectoryError(f"root_path is not a directory: {root}")
 
+    # Long-path-safe walk: real corpora exceed Windows' 260-char MAX_PATH.
+    long_root = _long_path(str(root))
+    found: list[Path] = []
+    for dirpath, dirnames, filenames in os.walk(long_root):
+        dirnames[:] = [d for d in dirnames if d not in IGNORE_DIR_NAMES]
+        found.extend(Path(dirpath, name) for name in filenames)
+
     out: list[DiscoveredFile] = []
-    for p in sorted(root.rglob("*")):
-        if p.is_dir():
-            continue
-        if any(part in IGNORE_DIR_NAMES for part in p.relative_to(root).parts[:-1]):
-            continue
+    for p in sorted(found):
         if _is_ignored(p):
             continue
         ext = p.suffix.lower()
-        rel = p.relative_to(root).as_posix()
+        rel = p.relative_to(long_root).as_posix()
         stat = p.stat()
         out.append(
             DiscoveredFile(
