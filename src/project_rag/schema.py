@@ -83,6 +83,7 @@ class Chunk(BaseModel):
     chunk_ordinal: int = 0
     source_path: str = ""
     source_type: str = ""            # file extension without dot
+    doc_class: str = "project_record"   # project_record | reference (config classification)
     token_count: int = 0             # measured tokens of embed_text (A01 §F)
     truncated: bool = False          # True if embed_text was token-truncated (A01 §F fail check)
 

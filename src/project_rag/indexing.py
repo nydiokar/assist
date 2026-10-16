@@ -126,7 +126,10 @@ class IndexingService:
                 parse_art=parse_art, project_id=project_id, source_id=sid, version_id=vid,
                 source_type=d.ext.lstrip("."), chunk_cfg=self._cfg.chunking,
                 token_counter=token_counter)
-            chunks = chunk_art.chunks
+            prefixes = tuple(self._cfg.classification.reference_prefixes)
+            doc_class = "reference" if prefixes and d.source_path.startswith(prefixes) \
+                else "project_record"
+            chunks = [c.model_copy(update={"doc_class": doc_class}) for c in chunk_art.chunks]
             staged_chunks.extend(chunks)
             diags = list(doc.diagnostics)
             if any(c.truncated for c in chunks):  # A01 §F: silent truncation is a failed check

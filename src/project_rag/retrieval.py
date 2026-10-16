@@ -101,12 +101,18 @@ class Retriever:
         self._cfg = cfg
 
     def retrieve(self, project_id: str, generation: str, query: str,
-                 excerpt_limit: int) -> tuple[list[RetrievedResult], dict[str, int]]:
-        qvec = self._embedder.embed_queries([query])[0]
-        dense = self._vs.query(project_id, generation, np.asarray(qvec),
-                               self._cfg.candidates_per_channel)
-        lexical = self._lx.search(project_id, generation, query,
-                                  self._cfg.candidates_per_channel)
+                 excerpt_limit: int, *, doc_class: str | None = None,
+                 channels: tuple[str, ...] = ("dense", "lexical"),
+                 ) -> tuple[list[RetrievedResult], dict[str, int]]:
+        dense: list[tuple[str, float, dict]] = []
+        lexical: list[tuple[str, float, dict]] = []
+        if "dense" in channels:
+            qvec = self._embedder.embed_queries([query])[0]
+            dense = self._vs.query(project_id, generation, np.asarray(qvec),
+                                   self._cfg.candidates_per_channel, doc_class)
+        if "lexical" in channels:
+            lexical = self._lx.search(project_id, generation, query,
+                                      self._cfg.candidates_per_channel, doc_class)
         results = fuse_and_rank(dense, lexical, self._cfg)
         for r in results:
             if len(r.excerpt) > excerpt_limit:

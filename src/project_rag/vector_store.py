@@ -29,7 +29,7 @@ class VectorStoreProtocol(Protocol):
     def delete_generation(self, project_id: str, generation: str) -> None: ...
 
     def query(self, project_id: str, generation: str, query_embedding: np.ndarray,
-              limit: int) -> list[tuple[str, float, dict]]: ...
+              limit: int, doc_class: str | None = None) -> list[tuple[str, float, dict]]: ...
 
     def count(self, project_id: str, generation: str) -> int: ...
 
@@ -43,6 +43,7 @@ def _payload(c: Chunk, generation: str) -> dict:
         "source_path": c.source_path,
         "heading": c.heading or "",
         "source_type": c.source_type,
+        "doc_class": c.doc_class,
         "location_json": c.location.model_dump_json(),
         "citation_text": c.citation_text,
     }
@@ -113,13 +114,15 @@ class InMemoryVectorStore:
         self.delete_ids(drop)
 
     def query(self, project_id: str, generation: str, query_embedding: np.ndarray,
-              limit: int) -> list[tuple[str, float, dict]]:
+              limit: int, doc_class: str | None = None) -> list[tuple[str, float, dict]]:
         q = np.asarray(query_embedding, dtype=np.float32).ravel()
         qn = np.linalg.norm(q) or 1.0
         scored: list[tuple[str, float, dict]] = []
         for cid, v, m in zip(self._ids, self._vecs, self._meta, strict=True):
             if m["project_id"] != project_id or m["generation"] != generation:
                 continue  # project filter enforced BEFORE ranking (v1 §4.6)
+            if doc_class is not None and m.get("doc_class", "project_record") != doc_class:
+                continue
             vn = np.linalg.norm(v) or 1.0
             cos = float(np.dot(q, v) / (qn * vn))
             scored.append((cid, 1.0 - cos, _result_payload(m)))  # cosine distance
@@ -167,11 +170,14 @@ class ChromaVectorStore:
         self._col.delete(where={"$and": [{"project_id": project_id}, {"generation": generation}]})
 
     def query(self, project_id: str, generation: str, query_embedding: np.ndarray,
-              limit: int) -> list[tuple[str, float, dict]]:
+              limit: int, doc_class: str | None = None) -> list[tuple[str, float, dict]]:
+        clauses: list[dict] = [{"project_id": project_id}, {"generation": generation}]
+        if doc_class is not None:
+            clauses.append({"doc_class": doc_class})
         res = self._col.query(
             query_embeddings=[np.asarray(query_embedding, dtype=np.float32).ravel().tolist()],
             n_results=limit,
-            where={"$and": [{"project_id": project_id}, {"generation": generation}]},
+            where={"$and": clauses},
             include=["metadatas", "distances"],
         )
         ids = res["ids"][0]

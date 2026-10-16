@@ -69,8 +69,15 @@ class ProjectRAG:
             warnings.append("query truncated to max_query_chars")
         if as_of is not None:
             warnings.append("as_of ignored: source-effective dates not established (v1 §4.8)")
-        if filters:
-            warnings.append("filters beyond project scope not yet implemented in V1")
+        doc_class: str | None = None
+        channels: tuple[str, ...] = ("dense", "lexical")
+        for key, val in (filters or {}).items():
+            if key == "doc_class" and val in {"project_record", "reference"}:
+                doc_class = val
+            elif key == "channels" and val and set(val) <= {"dense", "lexical"}:
+                channels = tuple(val)  # evaluation baselines (v1 §6.1 B/C/D)
+            else:
+                warnings.append(f"unsupported filter ignored: {key}")
 
         gen = self._manifest.active_generation(project_id)
         qid = new_query_id(project_id, query, nonce=gen or "none")
@@ -86,7 +93,8 @@ class ProjectRAG:
         t = timer()
         with t.span("retrieve"):
             results, channels = self._retriever.retrieve(
-                project_id, gen, query, self._cfg.security.max_result_excerpt_chars)
+                project_id, gen, query, self._cfg.security.max_result_excerpt_chars,
+                doc_class=doc_class, channels=channels)
         if top_k is not None:
             results = results[:top_k]
 

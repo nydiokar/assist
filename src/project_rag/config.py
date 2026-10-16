@@ -120,6 +120,13 @@ class RetrievalConfig(BaseModel):
     max_source_chars: int = 6000
 
 
+class ClassificationConfig(BaseModel):
+    """Document class by path prefix. `reference` = third-party material (laws, guides) that
+    is not the project's own record; retrieval can filter on it (WP0 finding, owner-approved)."""
+
+    reference_prefixes: list[str] = Field(default_factory=list)
+
+
 class SecurityConfig(BaseModel):
     max_query_chars: int = 2000
     max_result_excerpt_chars: int = 1200
@@ -134,6 +141,7 @@ class Config(BaseModel):
     chunking: ChunkingConfig = Field(default_factory=ChunkingConfig)
     retrieval: RetrievalConfig = Field(default_factory=RetrievalConfig)
     security: SecurityConfig = Field(default_factory=SecurityConfig)
+    classification: ClassificationConfig = Field(default_factory=ClassificationConfig)
 
     def assert_release_safe(self) -> list[str]:
         """Release guard (v2 §D1/D3, A01): fakes are not valid production backends.

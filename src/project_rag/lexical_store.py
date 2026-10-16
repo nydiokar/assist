@@ -23,6 +23,7 @@ CREATE VIRTUAL TABLE IF NOT EXISTS chunk_fts USING fts5(
     heading UNINDEXED,
     location_json UNINDEXED,
     citation_text UNINDEXED,
+    doc_class UNINDEXED,
     body,
     tokenize = 'unicode61 remove_diacritics 0'
 );
@@ -60,10 +61,10 @@ class LexicalStore:
     def add_chunks(self, generation: str, chunks: list[Chunk]) -> None:
         self._conn.executemany(
             "INSERT INTO chunk_fts(chunk_id, project_id, generation, document_id, source_path, "
-            "heading, location_json, citation_text, body) VALUES(?,?,?,?,?,?,?,?,?)",
+            "heading, location_json, citation_text, doc_class, body) VALUES(?,?,?,?,?,?,?,?,?,?)",
             [
                 (c.chunk_id, c.project_id, generation, c.document_id, c.source_path,
-                 c.heading or "", c.location.model_dump_json(), c.citation_text, c.embed_text)
+                 c.heading or "", c.location.model_dump_json(), c.citation_text, c.doc_class, c.embed_text)
                 for c in chunks
             ],
         )
@@ -77,15 +78,16 @@ class LexicalStore:
         self._conn.commit()
 
     def search(self, project_id: str, generation: str, query: str,
-               limit: int) -> list[tuple[str, float, dict]]:
+               limit: int, doc_class: str | None = None) -> list[tuple[str, float, dict]]:
         """Return [(chunk_id, bm25_score_ascending, payload)]. Lower bm25 == better."""
         fts_query = _escape_fts_query(query)
         rows = self._conn.execute(
             "SELECT chunk_id, document_id, source_path, heading, location_json, citation_text, "
             "bm25(chunk_fts) AS score FROM chunk_fts "
             "WHERE chunk_fts MATCH ? AND project_id=? AND generation=? "
+            "AND (? IS NULL OR doc_class=?) "
             "ORDER BY score LIMIT ?",
-            (fts_query, project_id, generation, limit),
+            (fts_query, project_id, generation, doc_class, doc_class, limit),
         ).fetchall()
         out: list[tuple[str, float, dict]] = []
         for r in rows:
