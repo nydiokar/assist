@@ -228,21 +228,30 @@ class XlsxParser:
         blocks: list[Block] = []
         diagnostics: list[str] = []
         for ws in wb.worksheets:
-            rows = list(ws.iter_rows(values_only=False))
-            if not rows:
-                continue
-            header = [str(c.value).strip() if c.value is not None else "" for c in rows[0]]
-            for r_idx, row in enumerate(rows[1:], start=2):
+            rows = [r for r in ws.iter_rows(values_only=False)]
+            hdr_idx: int | None = _xlsx_header_index([[c.value for c in r] for r in rows])
+            if hdr_idx is None:
+                hdr_idx = -1  # no table-like header: every non-empty row is a plain row
+            header: list[str] = (
+                [str(c.value).strip() if c.value is not None else "" for c in rows[hdr_idx]]
+                if hdr_idx >= 0 else [])
+            for r_idx, row in enumerate(rows, start=1):
                 values = [c.value for c in row]
-                if all(v is None for v in values):
+                if all(v is None or str(v).strip() == "" for v in values):
+                    continue
+                if r_idx - 1 == hdr_idx:
                     continue
                 # None cached result must NOT be treated as 0 (v1 §4.2 XLSX rule).
-                pairs = []
-                for col_idx, (h, v) in enumerate(zip(header, values, strict=False), start=1):
-                    shown = "" if v is None else str(v)
-                    cell_ref = f"{get_column_letter(col_idx)}{r_idx}"
-                    pairs.append(f"{h}={shown}")
-                    _ = cell_ref
+                pairs: list[str] = []
+                tabular: bool = hdr_idx >= 0 and r_idx - 1 > hdr_idx
+                for col_idx, v in enumerate(values, start=1):
+                    shown = "" if v is None else str(v).strip()
+                    h: str = header[col_idx - 1] if tabular and col_idx <= len(header) else ""
+                    if tabular and h:
+                        pairs.append(f"{h}={shown}")
+                    elif shown:  # title/loose cell, or a column without a header
+                        pairs.append(f"{get_column_letter(col_idx)}{r_idx}={shown}" if tabular
+                                     else shown)
                 text = f"[{ws.title}] " + ", ".join(pairs)
                 blocks.append(Block(block_type=BlockType.TABLE_ROW, text=text,
                                     location=SourceLocation(sheet=ws.title, row=r_idx,
@@ -250,6 +259,31 @@ class XlsxParser:
         wb.close()
         return ParsedDocument(source_path=source_path, state=DocState.PARSED,
                               blocks=blocks, diagnostics=diagnostics)
+
+
+def _xlsx_header_index(grid: list[list[object]]) -> int | None:
+    """First row within the top 30 that looks like a column header: >=2 non-empty string cells,
+    covering at least half of the widest row seen, with distinct values. Sheets that are
+    titles/loose notes (e.g. one-cell rows) get None."""
+    top = grid[:30]
+    widths: list[int] = [sum(1 for v in r if v is not None and str(v).strip()) for r in top]
+    if not widths or max(widths) < 2:
+        return None
+    for i, r in enumerate(top):
+        cells = [str(v).strip() for v in r if v is not None and str(v).strip()]
+        strings = [c for c in cells if not _looks_numeric(c)]
+        if (len(cells) >= 2 and len(strings) == len(cells) and len(set(cells)) == len(cells)
+                and len(cells) * 2 >= max(widths)):
+            return i
+    return None
+
+
+def _looks_numeric(s: str) -> bool:
+    try:
+        float(s.replace(",", "."))
+    except ValueError:
+        return False
+    return True
 
 
 class CsvParser:
