@@ -30,3 +30,21 @@ Config `configs/yp_e5.yaml`; questions as above (n=14 scored). Chunking differs 
 - Differences are ≤ 2 questions of 14: **no ranking between channels can be claimed.** What is solid: dense alone is not better than lexical on this question set; hybrid recovered the "conflict" (yp12) and reference (yp13) questions that one channel alone missed.
 - Still failing in all channels: yp06 (inflection), yp07/yp09 (English question → Bulgarian table), no_answer pair (no abstention policy yet).
 - Ingest note: E5 ingest first crashed at Chroma write (`Batch size 6118 > max 5461`); embeddings were cached so the retry took 12 s. Fixed in `ChromaVectorStore` (test `test_chroma_batching.py`).
+
+## 2026-10-17 — Qwen3-Embedding-0.6B (bf16, CPU), chunk target 500 Qwen-tokens (5,496 chunks, 50 min)
+
+Config `configs/yp_qwen06.yaml`; same 16 questions.
+
+| Channel | Recall@5 | evidence@5 | MRR |
+|---|---|---|---|
+| lexical (this chunk set) | 0.714 | 0.500 | 0.679 |
+| dense (Qwen3-0.6B) | 0.714 | 0.500 | 0.554 |
+| hybrid (RRF k=60) | 0.643 | 0.643 | 0.643 |
+
+- Dense fixed the inflection question (yp06 `уебинара`≈`Уебинари`, F10) that lexical cannot; it lost yp11 (date).
+- Cross-language (yp07, yp09) still fails in every channel with Qwen too. Diagnosis (yp07/yp09 top hits): the target rows live in the `Резултати` sheet of `Overview_Debate 2025.xlsx`; dense retrieval returns long free-text survey chunks and proposal paragraphs instead. Hypothesis F14: small numeric table rows lose to long prose in embedding space.
+- Hybrid at n=14 is again within noise of both channels; it gained evidence@5 (more correct passages in the top 5) but lost Recall@5 by one question.
+
+## 2026-10-17 — Experiment: table granularity 20 → 3 rows/chunk (E5, 6,583 chunks)
+
+Result identical on every metric to the 20-row run (lexical .714/.500, dense .643/.286, hybrid .786/.500). **F14's "row-group blending" hypothesis is not supported** for E5; do not change `table_rows_per_chunk` on this evidence.

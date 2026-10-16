@@ -45,3 +45,12 @@ The A01 §D output check aborted the first 0.6B run on batch 1 (norms 0.998). Me
 fp32 cosine = 0.9998–0.9999, so the vectors are faithful; only the norm drifts. The adapter now
 re-normalizes in FP32 before validation (`test_qwen3_lowprecision_norm.py`). The health gate worked
 as designed: a bad run died in seconds, not hours.
+
+## Pilot gate outcome and decision on the 4B run (2026-10-17)
+0.6B pilot passed the health gate (finite, unit-norm after FP32 renorm, 5,496 vectors, 50 min,
+~900 tokens/s) and dense Recall@5 (0.714) was not below lexical (0.714). **The 4B run is
+deliberately NOT launched yet**: at 132 tokens/s the 5,496-chunk Qwen chunk set is ≈ 5 h, and
+(a) n=14 questions cannot show a 0.6B-vs-4B difference larger than one question, (b) chunking is
+still changing (any chunk-text change invalidates its cache entries and forces re-embedding),
+(c) F14/F16 are unresolved. Launch 4B after: ≥ 30 owner-reviewed questions, chunk set frozen,
+and a written hypothesis of what 4B should fix (e.g. cross-language yp07/yp09).

@@ -1,0 +1,40 @@
+# Real-corpus dense run: yp_e5_rows3. See docs/AMENDMENT_A02.md for why this is CPU, not CUDA.
+schema_version: 1
+
+embedding:
+  provider: e5
+  threads: 16
+  e5:
+    model: "intfloat/multilingual-e5-small"
+    revision: "614241f622f53c4eeff9890bdc4f31cfecc418b3"
+    dim: 384
+    max_tokens: 512
+    query_prefix: "query: "
+    passage_prefix: "passage: "
+    normalize: true
+    pooling: mean
+    batch_size: 16
+
+parsing: {backend: native, detect_scanned_pdf: true}
+
+vector_store:
+  provider: chroma
+  collection: "yp_e5_rows3"
+  distance: cosine
+  persist_path: "local_data/yp_e5_rows3/chroma"
+
+lexical_store:
+  path: "local_data/yp_e5_rows3/manifest.sqlite3"
+
+chunking: {target_tokens: 300, max_tokens: 500, overlap_tokens: 0, table_rows_per_chunk: 3}
+
+retrieval:
+  top_k: 8
+  candidates_per_channel: 16
+  fusion: {method: rrf, k: 60}
+  max_source_chars: 6000
+
+security: {max_query_chars: 2000, max_result_excerpt_chars: 4000}
+
+classification:
+  reference_prefixes: ["Youth Participation Resources/"]
