@@ -14,3 +14,5 @@
 {"id": "yp14", "lang": "en", "kind": "isolation", "query": "What does the project's own application say is the grant for individual support?", "expect_source_paths": ["KA154-YOU-E2373104(1).docx"], "expect_substrings": ["23 490,00"], "filters": {"doc_class": "project_record"}}
 {"id": "yp15", "lang": "en", "kind": "no_answer", "query": "What was the weather in Yambol on the opening day of the National Meeting?", "expect_source_paths": [], "expect_substrings": []}
 {"id": "yp16", "lang": "bg", "kind": "no_answer", "query": "Колко дрона бяха закупени за проекта?", "expect_source_paths": [], "expect_substrings": []}
+{"id": "yp17", "lang": "bg", "kind": "exact", "query": "Какви са заложените индикатори по проекта?", "expect_source_paths": ["KA154-YOU-E2373104(1).docx"], "expect_substrings": ["MAKE SURE TO FIND THIS!!!!!! "]}
+{"id": "yp19", "lang": "bg", "kind": "numeric", "query": "Колко вегетарианци имаше регистрирани за събитието?", "expect_source_paths": ["FIND IN SOME EXCEL FILE >>> IDK WHICH ONE"], "expect_substrings": []}
