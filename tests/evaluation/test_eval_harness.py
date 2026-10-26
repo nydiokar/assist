@@ -10,7 +10,7 @@ from pathlib import Path
 
 from project_rag.evaluation import evaluate, load_questions
 
-QUESTIONS = Path(__file__).resolve().parents[2] / "eval" / "questions.jsonl"
+QUESTIONS = Path(__file__).resolve().parents[2] / "eval" / "archive" / "questions_synthetic_gv.jsonl"
 
 
 def test_eval_harness_runs_and_meets_baseline(make_rag, corpus_root):

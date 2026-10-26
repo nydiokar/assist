@@ -13,9 +13,13 @@ green on a synthetic bilingual fixture corpus** using a cheap offline embedder. 
 **waiting for two inputs** before further gates (see "Build stop line").
 
 - 39/39 tests pass. Fixture Recall@5 = 1.0, MRR = 0.96 (hash embedder — *not* a production SLA).
-- **A01 CUDA gate cannot pass on this machine** (no NVIDIA GPU on host or in WSL — measured).
-  `scripts/feasibility_smoke.py` fails visibly rather than silently falling back. See
-  `docs/AMENDMENT_A01.md` → "Measured environment deviation".
+- **GPU path runs in WSL via ROCm, not on the Windows host.** The Windows host has no NVIDIA GPU
+  (A01). WSL Ubuntu-24.04 has an AMD Radeon RX 7900 XT (gfx1100) reachable through ROCm 7.2.4;
+  the real-corpus Qwen3-4B index was built and evaluated there (see `docs/EVAL_LOG.md` 2026-10-26).
+  The A01/A01-era "no GPU in WSL" note was a *driver-state measurement at that time*; the ROCm GPU
+  is available now **provided `HSA_ENABLE_DXG_DETECTION=1` is exported in the command** (see WSL
+  runbook below — ledger F18). The A01 CUDA gate stays fail-closed on any machine without a visible
+  device; `scripts/feasibility_smoke.py` fails visibly rather than falling back to CPU.
 
 ## Setup (Windows, PowerShell)
 
@@ -58,6 +62,27 @@ Single source of provider selection + tuning. Key switches:
 # then pin the resolved HF revision into configs\retrieval.yaml -> embedding.qwen3.revision
 # and set embedding.provider: qwen3, vector_store.provider: chroma
 ```
+
+### Running the Qwen3-4B index on the WSL ROCm GPU (real corpus)
+
+The real-corpus dense/hybrid pipeline runs in WSL against the ROCm venv. **`HSA_ENABLE_DXG_DETECTION=1`
+must be exported in the same command** — a non-interactive `wsl -- bash -c` shell does NOT source
+`~/.bashrc`, so without the var ROCm reports `hsa_init Failed` and `torch.cuda.is_available()` is
+False (ledger F18, closed). `/dev/kfd` is absent by design under WSL ROCm; do not use it as a
+health check. **Do not run `wsl --shutdown` / stop / terminate / unregister** — other workloads
+depend on WSL (a hook blocks it).
+
+```powershell
+# Verify the GPU is visible (expect: True, 1, "AMD Radeon RX 7900 XT")
+wsl.exe -d Ubuntu-24.04 -- bash -c 'export HSA_ENABLE_DXG_DETECTION=1; /home/gorila/venvs/tokens-ingest-rocm/bin/python -c "import torch; print(torch.cuda.is_available(), torch.cuda.device_count(), torch.cuda.get_device_name(0))"'
+
+# Evaluate all channels on the frozen v2 question set (query-embedding only, no re-ingest)
+wsl.exe -d Ubuntu-24.04 -- bash -c 'export HSA_ENABLE_DXG_DETECTION=1; cd /mnt/c/Users/Cicada38/Projects/assist && PYTHONPATH=src /home/gorila/venvs/tokens-ingest-rocm/bin/python -X utf8 scripts/eval_yp.py --config configs/yp_qwen4b_gpu.yaml --project ypq --root yspdb --questions eval/yp_questions_v2.jsonl --channels lexical dense lexical+dense --out eval/results/yp_v2_qwen4b_gpu.json'
+```
+
+`project_rag.gpu_env.prepare_gpu_env()` sets the var in-process for code paths that import torch,
+so Python entry points work; the explicit `export` above is still required for the `wsl -- bash -c`
+wrapper itself.
 
 ### Reusable stages (A01 §C)
 

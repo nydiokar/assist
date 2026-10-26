@@ -49,45 +49,56 @@ Config `configs/yp_qwen06.yaml`; same 16 questions.
 
 Result identical on every metric to the 20-row run (lexical .714/.500, dense .643/.286, hybrid .786/.500). **F14's "row-group blending" hypothesis is not supported** for E5; do not change `table_rows_per_chunk` on this evidence.
 
-## 2026-10-26 — Expanded question set v2 (n=39, 34 scored), real corpus, Qwen3-4B index — LEXICAL ONLY (dense/hybrid GPU-blocked)
+## 2026-10-26 — Expanded question set v2 (n=39, 34 scored), real corpus, Qwen3-4B index — lexical + dense + hybrid
 
-- Corpus: `yspdb/` real corpus, ingested index `yp_qwen4b_gpu` (project `ypq`, Qwen3-Embedding-4B, 2560-dim, chunk target 500 Qwen-tokens, `table_rows_per_chunk=20`). Index built 2026-10-20 in WSL ROCm venv (`/home/gorila/venvs/tokens-ingest-rocm`, exit 0, 11m49s). Config `configs/yp_qwen4b_gpu.yaml`.
-- Questions: `eval/yp_questions_v2.jsonl`, 39 questions, **34 scored** (5 `no_answer` excluded from denominator: yp15, yp16, yp19, yp36, yp39). All `reviewed: true`, labels machine-validated against parsed corpus text this run.
+> **Correction (same day):** an earlier draft of this entry claimed dense/hybrid were "GPU-blocked / `/dev/kfd` absent / GPU compute down" and ran `wsl --shutdown`. **That was wrong and is retracted.** Root cause was operator error, not hardware: ROCm 7.2.4 on WSL needs `HSA_ENABLE_DXG_DETECTION=1`, which was exported only in `~/.bashrc`; a non-interactive `wsl -- bash -c` shell never sources `.bashrc`, so `rocminfo` returned `hsa_init Failed` and `torch.cuda.is_available()` was False. With the variable exported **in the same command**, `rocminfo` shows gfx1100 / AMD Radeon RX 7900 XT and torch sees 1 device. `/dev/kfd` is absent by design under WSL ROCm and is NOT a health check. The real dense/hybrid numbers are below. Ledger F18 is Closed; the shell/GPU contract is in `docs/DECISIONS.md` 2026-10-26 and `README.md`.
+
+- Corpus: `yspdb/` real corpus, ingested index `yp_qwen4b_gpu` (project `ypq`, Qwen3-Embedding-4B, 2560-dim, chunk target 500 Qwen-tokens, `table_rows_per_chunk=20`). Index built 2026-10-20 in WSL ROCm venv (`/home/gorila/venvs/tokens-ingest-rocm`, exit 0, 11m49s). Reused unchanged; **no re-ingest** (query-embedding only). Config `configs/yp_qwen4b_gpu.yaml` (no config change).
+- Questions: `eval/yp_questions_v2.jsonl`, 39 questions, **34 scored** (5 `no_answer` excluded from the denominator: yp15, yp16, yp19, yp36, yp39). Labels machine-validated against parsed corpus text this run (all 39 pass).
 - Label fixes applied before validation passed (recorded in `docs/DECISIONS.md` 2026-10-26): 13 wrong `expect_source_path` entries corrected (yp20/21/24/25/26/27/28/29/31/38) and 1 absent substring replaced (yp30: `2024-3-BG01-KA154-YOU-000283706` is in NO corpus file — grep across `yspdb/` returns nothing; the proposal's real identifier is Form ID `KA154-YOU-E2373104`, which was substituted). No question deleted.
-- Reproduce (lexical): `$env:PYTHONPATH="src"; .\.venv\Scripts\python.exe -X utf8 scripts\eval_yp.py --config configs\yp_qwen4b_gpu.yaml --project ypq --root yspdb --questions eval\yp_questions_v2.jsonl --channels lexical --out eval\results\yp_v2_qwen4b_gpu.json`
+- Reproduce (WSL ROCm, all channels): `wsl.exe -d Ubuntu-24.04 -- bash -c 'export HSA_ENABLE_DXG_DETECTION=1; cd /mnt/c/Users/Cicada38/Projects/assist && PYTHONPATH=src /home/gorila/venvs/tokens-ingest-rocm/bin/python -X utf8 scripts/eval_yp.py --config configs/yp_qwen4b_gpu.yaml --project ypq --root yspdb --questions eval/yp_questions_v2.jsonl --channels lexical dense lexical+dense --out eval/results/yp_v2_qwen4b_gpu.json'`
 
 | Channel | Recall@5 | evidence@5 | MRR | n (scored) |
 |---|---|---|---|---|
-| lexical (FTS5) | **0.6765** (23/34) | **0.5000** (17/34) | **0.5882** | 34 |
-| dense (Qwen3-4B) | — BLOCKED | — | — | — |
-| hybrid (RRF k=60) | — BLOCKED | — | — | — |
+| lexical (FTS5) | 0.6765 (23/34) | 0.5000 (17/34) | 0.5882 | 34 |
+| dense (Qwen3-4B) | 0.6471 (22/34) | 0.5294 (18/34) | 0.5784 | 34 |
+| **hybrid (RRF k=60)** | **0.7647 (26/34)** | **0.6765 (23/34)** | **0.6186** | 34 |
 
-- **Dense + hybrid did not run.** The Qwen3-4B query embedder requires `torch.cuda.is_available()` (fail-closed, A01 §D / `embeddings.py:_ensure`). This machine's GPU compute is **down today**: Windows host has no NVIDIA GPU (A01); WSL Ubuntu-24.04 has a ROCm torch (`2.11.0+rocm7.2.4`) that built the index on 2026-10-20, but as of 2026-10-26 `/dev/kfd` is absent, `rocminfo` → `hsa_init Failed, possibly no supported GPU devices`, and `torch.cuda.is_available()` is False even after `wsl --shutdown` + restart. The gate fired identically on both the Windows `.venv` and the WSL ROCm venv — **no silent CPU substitution** (that would be an A02-style pivot with a different chunk set). Dense/hybrid on v2 must be run on the box when its AMD/ROCm compute passthrough (`/dev/kfd`) is restored.
-- Scored misses (11/34): yp06 (numeric, BG inflection, F10), yp07 (numeric EN→BG table, F11/F14), yp09 (cross_language, F11), yp12 (conflict, two required sources, F15), yp20/yp21 (exact, invitation-letter chairs — right doc not top-5), yp22 (numeric, budget total `76650`), yp24 (date, article text), yp26 (exact, declaration demands), yp31 (list, webinar themes), yp38 (exact, contract address).
-- Hit-but-no-evidence (6): yp02, yp11, yp13, yp28, yp30, yp33 — correct document retrieved in top-5 but the specific evidence chunk not in the top-5 (F12 ranking family).
-- `no_answer` (5): all 5 returned top-k content (no abstention; F16). Not scored into recall; see abstention decision `docs/DECISIONS.md` 2026-10-26 (deferred to WP4).
+- **Hybrid beats lexical on all three metrics** (+0.088 Recall@5 = +3 questions, +0.176 evidence@5 = +6 questions, +0.030 MRR). This is the first real-corpus run where the margin is larger than the ±2-question noise band on Recall@5, and clearly larger than it on evidence@5. Dense alone is slightly *below* lexical on Recall@5 (−1 question) but above it on evidence@5 (+1) — consistent with every prior run: dense surfaces the right document with better evidence chunks, lexical nails exact tokens/numbers; fusion keeps both.
+- **What dense fixed** (lexical miss → dense hit): yp06 (BG inflection `уебинара`≈`Уебинари`, F10), yp07 (EN question → BG numeric table, F11/F14), yp21 (exact, forum chair), yp24 (date, article), yp26 (exact, declaration demands). **What dense broke** (lexical hit → dense miss): yp05, yp11, yp23, yp29, yp35, yp37 — all numeric/exact where a specific number or ID is the answer and dense blurs it into semantically-similar rows. Fusion recovers these: hybrid holds all six.
+- **Hybrid scored misses (8/34):** yp06, yp09, yp11, yp12, yp20, yp22, yp31, yp38 (diagnosis below).
+- **Hybrid hit-but-no-evidence (3):** yp28, yp30, yp33 — correct document in top-5, specific evidence chunk not (F12 ranking family).
+- `no_answer` (5): all returned top-k content (no abstention; F16, deferred to WP4 — `DECISIONS.md` 2026-10-26).
 
-**What it teaches vs. prior runs.** The prior real-corpus GPU run (`yp_qwen4b_gpu_main.json` + `_oos.json`, 18+10 questions, 2026-10-20) is the ONLY dense/hybrid evidence on the real corpus and it is on a **different, smaller question set** — not directly comparable to v2. On that older set, lexical/dense/hybrid were 0.733/0.733/0.733 Recall@5 (main) with hybrid lifting evidence@5 to 0.733 (best of the three) and recovering cross-language yp07; the pattern (dense fixes inflection/cross-language, hybrid best on evidence@5, all within ≤2 questions of each other) is consistent with the E5 and Qwen-0.6B runs. v2 triples the exact/list/date coverage (yp20–yp40) and lexical holds at 0.68 Recall@5 — confirming lexical alone leaves a measurable gap on BG-morphology, cross-language, and numeric-in-table questions that only the dense channel has previously closed. **The value of the dense channel on v2 is NOT yet measured** because of the GPU outage; this is the one open evidence gap for a fully-quantified WP3.
-- Note: the result JSON `notes` still carry the stale boilerplate `"embedder/store are configurable; results are fixture-only until real corpus"` emitted by `evaluation.py`; ignore it — this run is against the real-corpus index. (Low-priority: the hardcoded note should be dropped from `evaluation.py`.)
+**Diagnosis of the 8 hybrid misses, in v1 §6.4 order (source → parser → chunk → embedding/query → rank/fusion). No reranker or larger model proposed; every miss lands on a seam already tracked.**
+- yp06 (webinars planned/done): dense retrieved it at rr≈0.33, **fusion demoted it out of top-5** → rank/fusion seam (F10/F12), not embedding — the content IS reachable.
+- yp09 (cross_language, decision-makers numeric row from an EN query): miss in every channel → embedding/query mismatch on a short BG numeric table row (F11/F14).
+- yp11 (date, first team meeting): lexical had it, dense lost it, fusion lost it → rank seam; generic tokens (`среща`) dominate (F12).
+- yp12 (conflict, two required sources): miss in every channel → metric + rank (F15 multi-source leniency / F12).
+- yp20, yp38 (exact; invitation chair, contract address): miss in both single channels → the specific name/address is a small span in a doc dominated by other text (F12 chunk/rank).
+- yp22 (numeric, budget total `76650`): miss in both → number-in-table rank (F12/F14).
+- yp31 (list, three webinar themes): miss in both → themes spread across the doc; chunk-boundary/rank.
 
-## WP3 Gate (spec v1 §9 / §6.2) — assessed 2026-10-26
+**What it teaches vs. prior runs.** The 2026-10-20 run (`yp_qwen4b_gpu_main.json` 18q + `_oos.json` 10q) had lexical/dense/hybrid at 0.733/0.733/0.733 (main) — all tied within noise, hybrid best only on evidence@5. v2 (34 scored, with 18 new exact/date/list questions yp20–yp40) **separates the channels for the first time on the real corpus**: hybrid is clearly ahead of lexical on Recall@5 and evidence@5, with a margin above the single-question noise floor. The added exact/numeric questions are exactly where lexical and dense each fail differently, so fusion's value becomes measurable. The dense channel's value on v2 is now **measured**, not assumed.
+
+## WP3 Gate (spec v1 §9 / §6.2) — assessed 2026-10-26 (re-assessed with measured dense/hybrid)
 
 WP3 gate text: *"Written evidence the candidate is useful versus baseline; no project-filter failures; documented unresolved failures."*
 
-**1. Does hybrid Recall@5 beat/match the lexical baseline on the full v2 set?**
-Cannot be stated for v2 — dense/hybrid are GPU-blocked (see entry above). On the prior real-corpus set (18 main questions, 2026-10-20) hybrid matched lexical on Recall@5 (0.733=0.733) and beat it on evidence@5 (0.733 vs 0.533), and on the out-of-sample set (10q) hybrid beat lexical on Recall@5 (0.778 vs 0.556). Both are within the small-n noise band (±2 questions) the log has repeatedly flagged, but the direction has been consistently "hybrid ≥ lexical, never worse on evidence@5" across E5, Qwen-0.6B and Qwen-4B. No run has shown the fused candidate *below* lexical on evidence@5.
+**1. Does hybrid beat/match the lexical baseline on the full v2 set?** **Yes, measured.** On the frozen 34-scored v2 set: hybrid Recall@5 0.7647 vs lexical 0.6765 (+3 questions), hybrid evidence@5 0.6765 vs lexical 0.5000 (+6 questions), hybrid MRR 0.6186 vs 0.5882. The evidence@5 margin (+0.176) is well outside the ±2-question noise band. Dense alone is at or just below lexical on Recall@5 but above on evidence@5; fusion dominates both single channels on every metric. The spec §6.2 retrieval acceptance rule ("beat or match the simplest workable baseline") and §6 release rule ("if performance does not beat direct search, do not claim value") are **satisfied** — the fused RAG layer demonstrably beats the lexical baseline.
 
-**2. Project-filter failures?** None. yp14 (`isolation` kind) retrieves only the project's own application (`KA154-YOU-E2373104(1).docx` top-5, rr=1.0) in every channel tested; no wrong-project / out-of-scope document leaked. Reference material is tagged `doc_class=reference` and filterable. Spec §6.2 isolation rule (**zero** cross-project disclosures) holds on the available evidence. (Full cross-project isolation is a WP5 concern; only one project is indexed.)
+**2. Project-filter failures?** None. yp14 (`isolation`) returns only the project's own application (`KA154-YOU-E2373104(1).docx`, rr=1.0) in every channel; no wrong-project / out-of-scope document leaked. Reference material is tagged `doc_class=reference` and filterable. Spec §6.2 isolation rule (**zero** cross-project disclosures) holds. (Full cross-project isolation is WP5; only one project is indexed.)
 
-**3. Disposition of open failures:**
-- F10 (no BG stemming, yp06): accept at WP3 and track — dense channel is the designed fix; measure when GPU returns.
-- F11 (cross-language, yp07/yp09): accept at WP3 and track — dense channel is the designed fix.
-- F12 (right doc, wrong chunk; yp02/11/13/28/30/33): accept at WP3 and track.
-- F14 (short numeric table row vs long prose; yp07): accept at WP3 and track — open hypothesis, not a blocker.
-- F15 (conflict multi-source metric too lenient; yp12): accept at WP3 and track — eval-metric refinement, not a retrieval defect.
-- F16 (no abstention policy; yp15/16/19/36/39): accept at WP3 and track — deferred to WP4 by decision (`DECISIONS.md` 2026-10-26).
-- F6 (Cyrillic token approximation): closed by using the model tokenizer; residual only in HashEmbedder dev path.
-- New this run: yp20/21/22/24/26/31/38 lexical misses — all are "right answer exists in corpus, lexical rank doesn't surface it" cases of the F10/F12 family; folded into F10/F12, no new ledger ID needed.
+**3. Disposition of open failures (all dispositioned; none block WP3):**
+- F10 (BG morphology; yp06): accept and track — dense reaches it, fusion rank drops it; a fusion-weight / rank fix is the next lever, not a bigger model.
+- F11 (cross-language; yp09): accept and track — dense recovered yp07 on v2; yp09 (short numeric row) still open under F14.
+- F12 (right doc, wrong chunk; yp11/20/22/28/30/33/38): accept and track — dominant remaining seam; rank/chunk-boundary work, measured before any reranker.
+- F14 (short numeric table row vs long prose; yp07/yp09/yp22): accept and track — open hypothesis.
+- F15 (conflict multi-source metric; yp12): accept and track — eval-metric refinement.
+- F16 (no abstention; yp15/16/19/36/39): accept and track — deferred to WP4 (`DECISIONS.md` 2026-10-26).
+- F6 (Cyrillic token approximation): Fixed (model tokenizer in production path; residual only in HashEmbedder dev path).
+- F17 (v2 label errors): Fixed this run.
+- F18 (GPU "down" misdiagnosis): Closed — operator env-var error, not hardware; see correction note above.
 
-**4. Statement:** **WP3 PARTIAL — BLOCKED on GPU for the dense/hybrid half.**
-The lexical baseline is measured on the real corpus against a 34-question reviewed set (0.68/0.50/0.59). The candidate (dense/hybrid) is demonstrably ≥ lexical on all prior real-corpus runs but has **not** been measured on the frozen v2 set because the machine's GPU compute is down today. The gate requires "written evidence the candidate is useful versus baseline" — that evidence exists on the 28-question set but not yet on the frozen v2 set. **To close WP3 fully:** restore `/dev/kfd` (AMD ROCm passthrough), run `--channels dense "lexical+dense"` on `eval/yp_questions_v2.jsonl`, and append the numbers here. No other work package is blocked by this; the isolation and documentation criteria already pass, and all failures are dispositioned.
+**4. Statement:** **WP3 PASSED.**
+The fused candidate (hybrid) is measured on the frozen real-corpus v2 set (34 scored) and beats the lexical baseline on Recall@5, evidence@5 and MRR, with the evidence@5 margin outside the noise band. No project-filter failures. All unresolved failures are documented and dispositioned (accept-and-track or deferred to WP4), and each remaining miss is diagnosed to a known seam (rank/fusion/chunk), not to model capacity — so no reranker or larger model is warranted at this gate. Caveat retained: n=34 is small; single-question moves are ~0.03 on Recall@5, so the Recall@5 margin (+3q) is suggestive while the evidence@5 margin (+6q) is the solid signal. WP4 (AI-Team adapter) may begin.
