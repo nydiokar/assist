@@ -63,3 +63,15 @@ is not the real corpus and is not ingested in any real-corpus index. Keeping it 
 synthetic unit/integration tests). Active real-corpus question sets are `eval/yp_questions.jsonl`
 (original 16), `eval/yp_questions_oos.jsonl` (out-of-sample 10), and `eval/yp_questions_v2.jsonl`
 (expanded 39).
+
+## 2026-10-26 — GPU env is set by code, not by the shell (ROCm-on-WSL)
+
+Evidence: dense/hybrid eval was reported "GPU down" (F18). Real cause: ROCm 7.2.4 under WSL needs
+`HSA_ENABLE_DXG_DETECTION=1`; it was exported only in `~/.bashrc`, which non-interactive
+`wsl -- bash -c` shells never read, so `rocminfo` → `hsa_init Failed` and
+`torch.cuda.is_available()` → False. Same shell with the var: gfx1100 (RX 7900 XT) visible, torch
+True. Decision: `project_rag.gpu_env.prepare_gpu_env()` (called before `import torch` in the Qwen3
+embedder and `scripts/feasibility_smoke.py`) sets the var when running in WSL with `/dev/dxg`;
+`describe_gpu_env()` is appended to the CUDA-gate error so the failure names its own cause. The
+gate stays fail-closed (no CPU fallback). Reversible: delete the two calls. Touches A01 §E only as
+diagnostics; no behavior change when the GPU is truly absent.

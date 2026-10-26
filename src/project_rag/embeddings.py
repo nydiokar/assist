@@ -17,6 +17,7 @@ from typing import Protocol, runtime_checkable
 import numpy as np
 
 from .config import EmbeddingConfig
+from .gpu_env import describe_gpu_env, prepare_gpu_env
 from .schema import EmbeddingProfile
 
 
@@ -130,6 +131,7 @@ class Qwen3Embedder:
     def _ensure(self) -> None:
         if self._model is not None:
             return
+        prepare_gpu_env()  # must precede `import torch` (ROCm-on-WSL needs HSA_ENABLE_DXG_DETECTION)
         import torch  # noqa: PLC0415
         from sentence_transformers import SentenceTransformer  # noqa: PLC0415
 
@@ -138,7 +140,8 @@ class Qwen3Embedder:
             # A01 §A2/§E/§J: fail visibly, do NOT silently fall back to CPU or another model.
             raise RuntimeError(
                 "Qwen3 profile requires CUDA but torch.cuda.is_available() is False. "
-                "Run scripts/feasibility_smoke.py; do not silently substitute device/model.")
+                + describe_gpu_env(torch.version.hip, torch.version.cuda)
+                + " Run scripts/feasibility_smoke.py; do not silently substitute device/model.")
         dtype = {"float16": torch.float16, "bfloat16": torch.bfloat16,
                  "float32": torch.float32}.get(self._q.inference_dtype, torch.float16)
         self._model = SentenceTransformer(

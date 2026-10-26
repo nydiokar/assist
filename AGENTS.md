@@ -73,6 +73,19 @@ shards. **Never ingest them, never commit them.** Source of truth for ingestion 
 
 **Precedence: A01 > v2 > v1.** Anything not changed by a higher document stands.
 
+## GPU / WSL rules (mandatory — a false "GPU down" cost a day)
+
+- Dense/embedding work runs in **WSL Ubuntu-24.04**, venv `/home/gorila/venvs/tokens-ingest-rocm` (ROCm torch,
+  AMD RX 7900 XT via `/dev/dxg` + librocdxg). The Windows `.venv` has no GPU torch by design.
+- Run as `wsl.exe -d Ubuntu-24.04 -- bash -c 'cd /mnt/c/Users/Cicada38/Projects/assist && PYTHONPATH=src /home/gorila/venvs/tokens-ingest-rocm/bin/python -X utf8 ...'`.
+  `project_rag.gpu_env.prepare_gpu_env()` sets `HSA_ENABLE_DXG_DETECTION=1` itself; raw tools (`rocminfo`, ad-hoc torch)
+  need it exported explicitly because `~/.bashrc` is NOT read by `wsl -- bash -c`.
+- `/dev/kfd` is absent on WSL by design; it is not a health check. Health check = `scripts/feasibility_smoke.py`
+  (its failure text includes the GPU env diagnosis).
+- **Never** shut down, terminate, unregister or stop the service of WSL (other workloads depend on it; a user hook blocks
+  these). Never record "GPU down" in docs or the ledger unless the gate error's diagnosis shows `dxg_present: false`, or
+  `dxg_env: "1"` with CUDA still False.
+
 ## Pivot rule (mandatory)
 
 The owner wants the process to be reproducible and every deviation defensible. Where the specs

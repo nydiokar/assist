@@ -19,6 +19,8 @@ import sys
 import time
 from pathlib import Path
 
+from project_rag.gpu_env import describe_gpu_env, prepare_gpu_env
+
 REPORT = Path(__file__).resolve().parents[1] / "eval" / "results" / "feasibility_smoke.json"
 
 EN_PASSAGE = "The approved project defines a target of 120 people trained in sustainable farming."
@@ -40,6 +42,7 @@ def main() -> int:
     report: dict = {"passed": False, "stage": "start"}
 
     # 1) environment capture
+    prepare_gpu_env()  # must precede `import torch`
     try:
         import torch  # noqa: PLC0415
     except ImportError as e:
@@ -48,8 +51,9 @@ def main() -> int:
     report["torch_version"] = torch.__version__
     report["cuda_available"] = bool(torch.cuda.is_available())
     if not torch.cuda.is_available():
-        return _fail(report, "torch.cuda.is_available() is False — no CUDA device. "
-                             "Do NOT silently fall back to CPU/0.6B; provision a CUDA GPU (A01 §E).")
+        return _fail(report, "torch.cuda.is_available() is False — no CUDA/ROCm device. "
+                             + describe_gpu_env(torch.version.hip, torch.version.cuda)
+                             + " Do NOT silently fall back to CPU/0.6B (A01 §E).")
 
     dev = torch.cuda.current_device()
     free, total = torch.cuda.mem_get_info(dev)
