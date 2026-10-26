@@ -1,0 +1,49 @@
+# Real-corpus dense run: Qwen3-Embedding-4B on CUDA GPU.
+# A02: CPU path exists in yp_qwen06.yaml / yp_qwen4b_cpu.yaml.
+# batch_size=16: safe for >=20 GB VRAM at avg ~500-600 tok/chunk; reduce to 8 if OOM.
+schema_version: 1
+
+embedding:
+  provider: qwen3
+  threads: 8           # GPU run — CPU threads only needed for tokenization
+  qwen3:
+    model: "Qwen/Qwen3-Embedding-4B"
+    revision: "5cf2132abc99cad020ac570b19d031efec650f2b"
+    dim: 2560
+    normalize: true
+    vector_storage_dtype: float32
+    inference_dtype: bfloat16    # A02: bf16 infer, FP32 stored, renorm applied
+    device: cuda
+    max_input_tokens: 2048
+    query_prompt_name: query
+    query_prompt_version: qwen3_query_v1
+    tokenizer_padding_side: left
+    batch_size: 16               # tune down to 8 on <20 GB VRAM
+
+parsing: {backend: native, detect_scanned_pdf: true}
+
+vector_store:
+  provider: chroma
+  collection: "yp_qwen4b_gpu"
+  distance: cosine
+  persist_path: "local_data/yp_qwen4b_gpu/chroma"
+
+lexical_store:
+  path: "local_data/yp_qwen4b_gpu/manifest.sqlite3"
+
+chunking:
+  target_tokens: 500
+  max_tokens: 2048
+  overlap_tokens: 0
+  table_rows_per_chunk: 20
+
+retrieval:
+  top_k: 8
+  candidates_per_channel: 16
+  fusion: {method: rrf, k: 60}
+  max_source_chars: 6000
+
+security: {max_query_chars: 2000, max_result_excerpt_chars: 4000}
+
+classification:
+  reference_prefixes: ["Youth Participation Resources/"]

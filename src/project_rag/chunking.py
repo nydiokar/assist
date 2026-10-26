@@ -20,14 +20,15 @@ from collections.abc import Callable
 from .config import ChunkingConfig
 from .schema import Block, BlockType, Chunk, ParsedDocument, SourceLocation
 
-CHUNKER_VERSION = "structure_v4"  # v4: repeated page boilerplate dropped (ledger F9)
+CHUNKER_VERSION = "structure_v5"  # v5: approx-token floor raised (ledger F6, 1.3→1.4 x words)
 
 
 def _approx_tokens(text: str) -> int:
-    # Interim proxy until the chosen model's tokenizer is injected (A01 §F, ledger F6).
-    # Cyrillic costs ~1 token per 3 chars in modern BPE vocabularies; take the larger of the
-    # word-based and char-based estimates so long Bulgarian words are not under-counted.
-    return max(1, int(len(text.split()) * 1.3), len(text) // 3)
+    # Interim proxy — used only when a real tokenizer is not injected (e.g. hash-embedder in tests).
+    # Cyrillic BPE: ~1 token per 3 chars; Latin: ~1 token per 4 chars.  Take the max of three
+    # estimates to avoid under-counting either script (ledger F6 — real tokenizer injected for
+    # Qwen3/E5 runs via token_counter=embedder.token_count in indexing.py).
+    return max(1, int(len(text.split()) * 1.4), len(text) // 3)
 
 
 _PAGE_COUNTER = re.compile(r"^\d+\s*/\s*\d+$")
