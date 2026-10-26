@@ -1,0 +1,65 @@
+# Decisions log
+
+Short, dated, unspecified-step design choices (AGENTS.md "Pivot rule"). Spec-contradicting
+changes go in `docs/AMENDMENT_A0N.md`, not here. Failures go in `docs/FAILURE_LEDGER.md`.
+
+## 2026-10-26 — v2 question-label fixes (WP3, Task 1)
+
+The eval validator (`scripts/eval_yp.py:validate_labels`, which checks every `expect_substring`
+against the parsed text of its `expect_source_path`) rejected 14 labels in the first author draft
+of `eval/yp_questions_v2.jsonl`. Diagnosed each in source→substring order; no question deleted.
+
+- **Path errors (substring present, path wrong)** — corrected to the real `yspdb/` location:
+  - yp20, yp21: `Покани/ПОКАНА-АДЕЛА-БОЗМАРОВА.docx` → `Покани/Адела Бозмарова/ПОКАНА-АДЕЛА-БОЗМАРОВА.docx`
+  - yp24, yp25: bare filename → `Communications/Статии/Поглед към Национална среща „Младежко участие“ в Ямбол.docx`
+  - yp26: bare filename → `Communications/Прессъобщения/ПРЕССЪОБЩЕНИЕ-Декларация.docx`
+  - yp27, yp28: `АНАЛИЗ_ММП.docx` → `Проучване някакво___/АНАЛИЗ_ММП.docx`
+  - yp29, yp38: `05-YP-2025_Tsveti.docx` → `Administration YP/05-YP-2025_Tsveti.docx`
+  - yp31: `Уебинари/Уебинар 2.docx` (does not exist) → `Communications/Постове/Уебинар 2.docx` (contains `Младежкото участие на практика`)
+  - All corrected substrings verified present in the parsed text of the corrected source.
+- **Absent substring (fabricated value)** — yp30 expected `2024-3-BG01-KA154-YOU-000283706`.
+  `grep -rl 000283706 yspdb` returns nothing; the string is in NO parsed corpus file. The
+  proposal's actual identifier is the application Form ID `KA154-YOU-E2373104` (present on every
+  page). Query reworded to "application form ID" and the substring replaced with
+  `KA154-YOU-E2373104`. The grant-agreement number is simply not in this corpus.
+
+After fixes the validator passes all 39 questions. Tracked as ledger **F17** (labels authored
+from assumption, not from parsed text — the exact anti-pattern the validator exists to catch).
+
+## 2026-10-26 — Abstention policy for `no_answer` questions (F16) — DEFERRED to WP4
+
+**Current behavior (measured, v2 run 2026-10-26):** retrieval always returns top-k regardless of
+relevance. All 5 `no_answer` questions (yp15, yp16, yp19, yp36, yp39 — weather, drones, vegetarians,
+buses, vegetarian meals: none in the corpus) returned a full top-5 of plausible-but-irrelevant
+chunks. There is no "no evidence" signal. These are excluded from the recall denominator so they
+do not distort retrieval metrics, but that is a measurement convenience, not a policy.
+
+**Two candidate policies considered:**
+- **(a) Score-threshold cutoff** — abstain when the top fused score (or per-channel best) is below
+  a calibrated threshold. Pure-retrieval, no LLM, testable now. Risk: BM25/cosine scores are not
+  calibrated across query types or languages; a single threshold that abstains correctly on the 5
+  no-answer questions without suppressing the hard-but-answerable ones (yp06/yp07/yp09) is unlikely
+  on n=5 negatives — would overfit. Choosing the threshold needs many more negative examples.
+- **(b) Evidence-sufficiency check by the LLM at WP4** — the agent inspects the retrieved passages
+  and states "no supporting evidence found" rather than answering. Matches the spec's own
+  abstention gate (§6.2: "Explicit no-evidence response, not plausible fabricated answer") and the
+  retrieval-first/generation-second rule (the retriever is not supposed to decide truth; v1 §2.2).
+
+**Decision:** Defer to **WP4**, policy **(b)**. Reasons, kept brief for a WP3 log:
+1. WP3 is retrieval-only; abstention is fundamentally a generation-layer behavior (the retriever
+   returning candidates and the answerer declining to answer are different concerns).
+2. n=5 negatives cannot calibrate a score threshold without overfitting; a threshold added now
+   would be unjustified tuning (AGENTS.md: every deviation defensible with evidence).
+3. The spec's abstention acceptance criterion is written against the *answer*, not the ranked list.
+Until WP4, `no_answer` questions stay out of the recall denominator and are tracked under F16.
+A score-threshold experiment (a) remains a fallback if WP4 evidence-sufficiency proves insufficient.
+
+## 2026-10-26 — Retire the synthetic question file (WP3, Task 7)
+
+`eval/questions.jsonl` held 15 questions against a synthetic "Green Villages" fixture corpus that
+is not the real corpus and is not ingested in any real-corpus index. Keeping it beside the real
+`yp_questions*.jsonl` sets invites running it against the wrong index. Moved to
+`eval/archive/questions_synthetic_gv.jsonl` (kept, not deleted — it is still the fixture for the
+synthetic unit/integration tests). Active real-corpus question sets are `eval/yp_questions.jsonl`
+(original 16), `eval/yp_questions_oos.jsonl` (out-of-sample 10), and `eval/yp_questions_v2.jsonl`
+(expanded 39).
