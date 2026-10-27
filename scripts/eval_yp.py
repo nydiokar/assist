@@ -44,6 +44,8 @@ def main() -> None:
     ap.add_argument("--questions", default="eval/yp_questions.jsonl")
     ap.add_argument("--channels", nargs="*", default=["lexical"],
                     help="channel sets to run, e.g. lexical dense lexical+dense")
+    ap.add_argument("--top-k", type=int, default=5,
+                    help="k for Recall@k / evidence@k / MRR (default 5)")
     ap.add_argument("--out", default="eval/results/yp_eval.json")
     args = ap.parse_args()
 

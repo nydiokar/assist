@@ -32,7 +32,16 @@ def fuse_and_rank(
     dense: list[tuple[str, float, dict]],
     lexical: list[tuple[str, float, dict]],
     cfg: RetrievalConfig,
+    limit: int | None = None,
 ) -> list[RetrievedResult]:
+    """Fuse channels by RRF and apply file-diversity dedup, returning up to `limit` results.
+
+    `limit` defaults to `cfg.top_k`. When a reranker is active the caller passes a larger limit
+    so the reranker reorders the whole candidate pool before the final top_k cut (otherwise the
+    reranker would only ever see the 8 the dedup already picked). The file-diversity cap scales
+    with `limit` so it does not over-dedup a large rerank window.
+    """
+    cap = limit if limit is not None else cfg.top_k
     cands: dict[str, _Candidate] = {}
 
     for rank, (cid, _score, payload) in enumerate(dense, start=1):
@@ -52,27 +61,31 @@ def fuse_and_rank(
         scored.append((fused, c))
     scored.sort(key=lambda t: (-t[0], t[1].chunk_id))  # stable deterministic tie-break
 
-    # File-diversity dedup: cap to top_k, prefer spreading across source files.
+    # File-diversity dedup: at most `per_file` chunks from one source in the window, so sibling
+    # chunks of the right doc cannot crowd out its evidence chunk (WP3 2026-10-27; evidence@5
+    # peaks at per_file=3). Over-cap chunks go to overflow and only refill if the window would
+    # otherwise be short — so we never return fewer than `cap` when candidates exist.
+    per_file = cfg.per_file_cap if cfg.per_file_cap is not None else max(1, cap // 2)
     results: list[RetrievedResult] = []
     seen_files: dict[str, int] = {}
     overflow: list[tuple[float, _Candidate]] = []
     for fused, c in scored:
         path = c.payload.get("source_path", "")
-        if seen_files.get(path, 0) >= max(1, cfg.top_k // 2) and len(scored) > cfg.top_k:
+        if seen_files.get(path, 0) >= per_file:
             overflow.append((fused, c))
             continue
         _append(results, c, fused)
         seen_files[path] = seen_files.get(path, 0) + 1
-        if len(results) >= cfg.top_k:
+        if len(results) >= cap:
             break
     for fused, c in overflow:
-        if len(results) >= cfg.top_k:
+        if len(results) >= cap:
             break
         _append(results, c, fused)
 
     for i, r in enumerate(results, start=1):
         r.rank = i
-    return results[: cfg.top_k]
+    return results[:cap]
 
 
 def _append(results: list[RetrievedResult], c: _Candidate, fused: float) -> None:
@@ -99,6 +112,11 @@ class Retriever:
         self._vs = vector_store
         self._lx = lexical_store
         self._cfg = cfg
+        self._reranker = None
+        if cfg.rerank.enabled:
+            from .rerank import CrossEncoderReranker  # noqa: PLC0415
+
+            self._reranker = CrossEncoderReranker(cfg.rerank)
 
     def retrieve(self, project_id: str, generation: str, query: str,
                  excerpt_limit: int, *, doc_class: str | None = None,
@@ -113,7 +131,13 @@ class Retriever:
         if "lexical" in channels:
             lexical = self._lx.search(project_id, generation, query,
                                       self._cfg.candidates_per_channel, doc_class)
-        results = fuse_and_rank(dense, lexical, self._cfg)
+        if self._reranker is not None:
+            # Fuse a wider window, rerank it by content, then cut to top_k.
+            pool = fuse_and_rank(dense, lexical, self._cfg, limit=self._cfg.rerank.top_n)
+            pool = self._reranker.rerank(query, pool)
+            results = pool[: self._cfg.top_k]
+        else:
+            results = fuse_and_rank(dense, lexical, self._cfg)
         for r in results:
             if len(r.excerpt) > excerpt_limit:
                 r.excerpt = r.excerpt[:excerpt_limit] + "…"

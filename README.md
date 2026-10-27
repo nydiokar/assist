@@ -49,10 +49,13 @@ Single source of provider selection + tuning. Key switches:
 | `embedding.provider` | `hash` (offline, deterministic, 2560-dim) | `qwen3` (`Qwen/Qwen3-Embedding-4B`, 2560-dim, CUDA, install `.[qwen3]`) |
 | `vector_store.provider` | `memory` (numpy cosine, JSON-persisted) | `chroma` (install `.[chroma]`) |
 | `parsing.backend` | `native` (pypdf/python-docx/openpyxl/csv) | `docling` (install `.[docling]`) |
+| `retrieval.per_file_cap` | `3` | max chunks from one source in the result window; WP3 2026-10-27 measured evidence@5 peak at 3 (`null` = legacy `top_k//2`) |
+| `retrieval.rerank.enabled` | `false` | cross-encoder reranker over the fused pool (spec §7; install `.[rerank]`, pin revision) — staged, see EVAL_LOG 2026-10-27 / ledger F19 |
 
 `e5` remains an optional legacy comparator. Switching `embedding.provider`/model/dim forces a
 **new index generation** (ADR-009); the startup compatibility guard refuses writes on a mismatch.
 `Config.assert_release_safe()` rejects the `hash`/`memory` fakes and an unpinned Qwen3 revision.
+`retrieval.per_file_cap` and `retrieval.rerank` are **query-time only** — no reindex.
 
 ### Activating Qwen3-4B (requires CUDA, ~20 GB VRAM, WSL)
 

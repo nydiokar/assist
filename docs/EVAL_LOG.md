@@ -102,3 +102,57 @@ WP3 gate text: *"Written evidence the candidate is useful versus baseline; no pr
 
 **4. Statement:** **WP3 PASSED.**
 The fused candidate (hybrid) is measured on the frozen real-corpus v2 set (34 scored) and beats the lexical baseline on Recall@5, evidence@5 and MRR, with the evidence@5 margin outside the noise band. No project-filter failures. All unresolved failures are documented and dispositioned (accept-and-track or deferred to WP4), and each remaining miss is diagnosed to a known seam (rank/fusion/chunk), not to model capacity — so no reranker or larger model is warranted at this gate. Caveat retained: n=34 is small; single-question moves are ~0.03 on Recall@5, so the Recall@5 margin (+3q) is suggestive while the evidence@5 margin (+6q) is the solid signal. WP4 (AI-Team adapter) may begin.
+
+## 2026-10-27 — WP3→WP4 readiness study: k-sweep, candidate/k knobs, per-file cap, reranker (localize before optimize)
+
+Goal: push evidence@5 toward "ready to put an LLM behind it" and record *which lever moved the needle and why*. Principle applied: do not optimize what you have not localized. First a diagnostic, then only the fix the diagnostic points to.
+
+### Step 1 — k-sweep (`scripts/sweep_k.py`, raw RRF, dedup bypassed, pool=50/channel)
+
+| level | recall@5 | @10 | @20 | in-pool |
+|---|---|---|---|---|
+| document | 0.706 | 0.735 | 0.853 | **0.941** |
+| evidence | 0.588 | 0.706 | 0.794 | **0.824** |
+
+**Verdict: this is a RANKING problem, not a retrieval problem.** The right file is retrieved 94% of the time and the right chunk 82%, but we only surface them at @5 in 71% / 59%. ~23 points of both metrics are lost to ordering, not to the embedder/chunker. Only **2 of 34** questions are true retrieval misses (yp09 cross-language short numeric row, yp31 list) — not in the pool at any depth → the only genuine chunking/embedding gap.
+
+Per-question fused rank of the evidence chunk (None = absent from pool): yp28=6, yp33=7, yp35=6, yp29=8 (just outside @5); yp22/yp23/yp37≈12-14, yp06=13, yp11=24, yp24=30, yp12=33 (deep); yp09/yp31=None. By eye (`_probe_rank`, since deleted): for yp28/yp35 the top-4 are *sibling chunks of the correct file* that do not contain the answer, and the answer chunk sits at rank 6 — the mechanism the per-file cap targets.
+
+### Step 2 — cheap knobs (measured on the real harness, @5)
+
+- **candidates_per_channel 16→32:** hybrid evidence@5 **0.676→0.647** (worse). More candidates inject distractors RRF can float above the true evidence chunk. **Reverted.** Lesson: more retrieval ≠ better top-k.
+- **serve top_k 8→10/12:** no change at the production pipeline (0.676) — the file-diversity dedup flattens the gain that raw RRF showed at @10. Serving more did not help here. **Not adopted.**
+
+### Step 3 — per-file cap (the lever that worked; zero download, query-time, reversible)
+
+The dedup already existed but capped one file at `top_k//2 = 4`, too loose to stop sibling-chunk crowding. Swept the hard per-file cap (raw fused order, window=5):
+
+| per-file cap | evidence@5 |
+|---|---|
+| ∞ (uncapped = old behavior) | 0.6765 |
+| **3** | **0.7059** |
+| 2 | 0.6176 |
+| 1 | 0.5882 |
+
+Clear peak at **3**: looser lets siblings crowd out the evidence chunk; tighter (1-2) kills genuine 2-3-chunk-evidence questions. Added `retrieval.per_file_cap` (default 3) and wired it into `fuse_and_rank`. **Real-harness result, all channels, @5 (this is the new canonical `eval/results/yp_v2_qwen4b_gpu.json`):**
+
+| Channel | Recall@5 | evidence@5 | MRR | Δ evidence@5 |
+|---|---|---|---|---|
+| lexical | 0.7059 | 0.5294 | 0.5941 | +0.029 |
+| dense (Qwen3-4B) | 0.6471 | 0.5294 | 0.5784 | 0 |
+| **hybrid (RRF k=60, per_file_cap=3)** | **0.7647** | **0.7059** | **0.6186** | **+0.029 (0.676→0.706)** |
+
+Nothing regressed; hybrid evidence@5 +1 question (yp33 and yp35 moved from hit-no-evidence to full hit). Hybrid scored misses now: yp06, yp09, yp11, yp12, yp20, yp22, yp31, yp38. Hit-no-evidence: yp28, yp30.
+
+### Step 4 — cross-encoder reranker (implemented, NOT measured — download blocked)
+
+The sweep satisfied the spec §7 precondition for a reranker ("candidate in top-20 but ranked too low" — measured: evidence in pool 0.82 vs shown 0.59). RRF is rank-only and content-blind, so it cannot fix intra-document ordering (which sibling chunk of the right doc ranks first); a cross-encoder scoring (query, chunk) jointly can. Implemented as an optional query-time stage (`src/project_rag/rerank.py`, `retrieval.rerank` config, **off by default**): it fuses a wider window (`rerank.top_n`), reorders by the cross-encoder, then cuts to `top_k`.
+
+**It could not be measured on 2026-10-27:** both candidate models (`BAAI/bge-reranker-v2-m3` 2.3 GB, then `cross-encoder/mmarco-mMiniLMv2-L12-H384-v1` 0.47 GB) stalled on download — the HF LFS/CDN was blocked (homepage returned 200 in 0.2 s, but `*.incomplete` blobs stayed at 0-256 MB and did not grow). No egress rule was violated; this is a network-availability gap, not a policy block. The stage is inert (`enabled: false`) and the full suite stays green. **Open as F19.** To measure: on a box with HF CDN access, `pip install -e ".[rerank]"`, pin the model revision, set `retrieval.rerank.enabled: true`, re-run the v2 harness, and record the before/after here. Expectation (hypothesis, not a claim): the deep-ranked misses (yp06@13, yp11@24, yp22, yp24@30) are the ones a content reranker should recover; yp09/yp31 will not move (they are not in the pool — a chunking/embedding problem, not a ranking one).
+
+### What this teaches (the transferable shape of building a RAG)
+
+1. **Measure where the loss is before fixing it.** The k-sweep (recall@k curve + in-pool recall) is the single most informative cheap experiment: a steep curve = ranking problem (fusion/rerank); a flat curve = retrieval problem (chunking/embedding). Here it was overwhelmingly ranking.
+2. **Bigger/more is not better by default.** More candidates and larger k both failed to help and one regressed — because they add distractors a rank-only fusion can misorder.
+3. **The cheap, correct lever first.** A one-parameter dedup cap (no model, no download) bought the only measured gain available today. The reranker is the bigger lever but is heavier and was blocked; it is staged and justified, not hand-waved.
+4. **evidence@5 is the number that matters for an LLM** (right *chunk* in a small set), not recall@5 (right *file*). We moved it 0.676→0.706. Honest status: still below the ~0.85 a grounded assistant wants (see "elephant" notes — coverage of the 162 un-parsed files and abstention are the larger unmodeled gaps), so the reranker measurement and those two items are the real WP4-adjacent work.

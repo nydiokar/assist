@@ -113,10 +113,34 @@ class FusionConfig(BaseModel):
     k: int = 60
 
 
+class RerankConfig(BaseModel):
+    """Cross-encoder reranker over the fused candidate pool (spec v1 §7, deferred until measured).
+
+    Enabled only after the WP3 k-sweep (2026-10-27) showed answers sit in the candidate pool
+    (doc 0.94 / evidence 0.82) but are mis-ranked at @5 (0.71 / 0.59) — the exact precondition
+    the spec requires before adopting a reranker. Rank-only RRF cannot fix this; a content-aware
+    scorer can. Off by default; query-time only (no reindex). Offline model from local HF cache.
+    """
+
+    enabled: bool = False
+    model: str = "BAAI/bge-reranker-v2-m3"   # multilingual (BG+EN); pin revision when enabling
+    revision: str = "main"
+    device: str = "cpu"
+    top_n: int = 20                          # rerank this many fused candidates
+    batch_size: int = 16
+    max_length: int = 512
+
+
 class RetrievalConfig(BaseModel):
     top_k: int = 8
     candidates_per_channel: int = 16
+    # Max chunks from one source file allowed in the result window. WP3 2026-10-27 measured the
+    # sweet spot at 3: looser (4=old top_k//2) lets sibling chunks crowd out the evidence chunk
+    # (yp28/yp35), tighter (1-2) kills genuine multi-chunk-evidence questions. evidence@5 peaks
+    # at cap=3 (0.706 vs 0.676 uncapped). None = fall back to legacy top_k//2.
+    per_file_cap: int | None = 3
     fusion: FusionConfig = Field(default_factory=FusionConfig)
+    rerank: RerankConfig = Field(default_factory=RerankConfig)
     max_source_chars: int = 6000
 
 

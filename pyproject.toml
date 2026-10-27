@@ -25,6 +25,8 @@ qwen3 = [
     "torch>=2.1",
 ]
 e5 = ["sentence-transformers>=3,<4"]        # legacy comparator (A01 supersedes as default)
+# Cross-encoder reranker (spec v1 §7), enabled via retrieval.rerank. Reuses sentence-transformers.
+rerank = ["sentence-transformers>=3,<4"]
 chroma = ["chromadb>=0.5,<2"]
 docling = ["docling>=2,<3"]
 dev = [

@@ -75,3 +75,26 @@ embedder and `scripts/feasibility_smoke.py`) sets the var when running in WSL wi
 `describe_gpu_env()` is appended to the CUDA-gate error so the failure names its own cause. The
 gate stays fail-closed (no CPU fallback). Reversible: delete the two calls. Touches A01 §E only as
 diagnostics; no behavior change when the GPU is truly absent.
+
+## 2026-10-27 — Retrieval ranking tuning (WP3→WP4 readiness; all evidence in EVAL_LOG 2026-10-27)
+
+Context: the k-sweep localized the loss to *ranking* (answer in pool 0.82–0.94, shown at @5 only
+0.59–0.71), not retrieval. Three tuning choices followed, each measured on the frozen v2 set:
+
+- **candidates_per_channel 16→32: REJECTED.** Hybrid evidence@5 regressed 0.676→0.647 — extra
+  candidates are distractors a rank-only fusion can float above the true chunk. Kept at 16.
+- **serve top_k 8→10/12: NOT ADOPTED.** No change in the production pipeline (the file-diversity
+  dedup flattens the gain raw RRF showed at @10).
+- **per_file_cap = 3: ADOPTED** (`retrieval.per_file_cap`, default 3, query-time, reversible).
+  Swept {∞,3,2,1}; evidence@5 peaks at 3 (0.706 vs 0.676 uncapped; 2→0.618, 1→0.588). Mechanism:
+  caps how many chunks of one source file may occupy the result window so sibling chunks cannot
+  crowd out the file's evidence chunk (yp28/yp35). Moved yp33/yp35 to full hit, nothing regressed.
+  Reversible: set `per_file_cap: null` to restore the legacy `top_k//2` behavior. Design choice
+  under spec §4.7 (file-diversity dedup existed; this parameterizes its cap), not a spec change.
+
+- **Cross-encoder reranker: STAGED, not enabled, not measured.** Implemented (`rerank.py` +
+  `retrieval.rerank`, off by default) because the k-sweep met the spec §7 precondition
+  ("candidate in top-20 but ranked too low"). Could not be measured — HF CDN blocked both model
+  downloads (F19). Default-off so it changes nothing until a box with model access enables and
+  measures it. This is the next real lever and the one most likely to move evidence@5 further;
+  it is deliberately left justified-but-unverified rather than claimed to work.
