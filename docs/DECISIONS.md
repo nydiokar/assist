@@ -91,6 +91,55 @@ relitigation of retrieval-first.
 **Reversibility:** `retrieval.abstention.enabled: false` restores exact prior behavior; the verdict
 is additive to the response contract (default `enabled=False`, `sufficient=True`).
 
+## 2026-10-28 — Filesystem-presence evidence for unparseable files (owner-requested; Task 3)
+
+**Problem.** 162 of 334 corpus files are unparseable (80 png, 53 jpg, 11 jpeg, 10 mp4, 4 legacy
+.doc, …) and OCR/transcription are out of scope. Discovery already walks them (`supported=False`)
+but their **filenames and folder paths are discarded** — yet those carry Bulgarian event/topic
+names (`Уебинари/2. Младежко участие на практика`, `Communications/Видеа - Декларация_`,
+`…/Качете снимки (File responses)`) that are the only trace an activity or artefact exists. Owner
+asked (explicitly NOT OCR) to make that trace retrievable as circumstantial evidence.
+
+**Design (unspecified by the specs — a new doc_class).** `src/project_rag/filesystem.py` builds one
+synthetic chunk **per folder that contains ≥1 unparseable file** (37 folders in this corpus):
+- granularity is folder, not file — most image names are opaque hashes that would only add noise;
+  the signal is the folder name + that it is non-empty. Parseable-only folders are skipped (already
+  covered by real content chunks).
+- each chunk is tagged `doc_class="filesystem"` (new, filterable; allowlisted in `api.search_project`
+  and in the stores' generic doc_class metadata filter) and its text opens with an explicit
+  `[FILESYSTEM PRESENCE — NOT DOCUMENT CONTENT]` banner + "contents are NOT indexed (no OCR, no
+  transcription)" — so the future LLM can **never** mistake a filename for confirmed content.
+- text lists folder path, parseable/unparseable counts with an extension breakdown, and up to 12
+  representative filenames.
+- ids are deterministic (v1 §4.3) and the version id hashes the folder inventory, so re-ingest is
+  idempotent and a changed folder forces a new chunk.
+- gated by `classification.filesystem_evidence` (**off by default**); it is in the pipeline
+  fingerprint, so toggling it forces a new index generation (ADR-009). Synthesized from the
+  discovery walk (no parse/chunk cache) because it is cheap and derived purely from the inventory.
+
+**Measured (real corpus, reranked+abstain pipeline, separate index `yp_qwen4b_gpu_fs` so the frozen
+index is untouched; EVAL_LOG 2026-10-28).**
+- *It helps the intended questions.* 3 new `filesystem`-kind eval questions (yp52 photos folder,
+  yp53 declaration videos, yp54 webinar-2 files) all retrieve the correct folder in top-5 (yp52
+  rr=1.0, yp53 rr=1.0, yp54 rr=0.5). With a `doc_class: filesystem` filter the right folder is
+  top-1 for photo/video/webinar queries that previously returned nothing citable.
+- *It does not pollute normal retrieval.* On the 39 content questions the fs index scores
+  Recall@5 0.769 / evidence@5 0.641 / MRR 0.714 vs the no-fs index 0.795 / 0.667 / 0.719 — a single
+  question moved (yp21, exact, a borderline rank-5 hit). Probed: yp21's evidence chunk is **absent
+  from both the dense and lexical top-16 and from the rerank window on the fs index, and no
+  filesystem chunk appears anywhere in yp21's pool** — so the move is the known fresh-collection
+  Chroma HNSW rebuild variance (v2 §D3), not fs chunks competing. The 37 fs chunks never entered a
+  content question's result window. Net: the feature adds a new, honestly-labelled evidence class
+  with no demonstrated cost to content retrieval.
+
+**Validation note.** `filesystem`-kind questions reference a *folder* (the synthetic chunk's
+source_path), not a parseable file, so `eval_yp.py:validate_labels` skips them — their labels are
+correct by construction (the folder exists in discovery; the substrings are generated banner/count
+text).
+
+**Reversibility:** `classification.filesystem_evidence: false` (the default) removes the chunks
+entirely on the next ingest; the frozen `yp_qwen4b_gpu` index never had them.
+
 ## 2026-10-26 — v2 question-label fixes (WP3, Task 1)
 
 The eval validator (`scripts/eval_yp.py:validate_labels`, which checks every `expect_substring`

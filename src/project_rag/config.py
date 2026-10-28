@@ -180,6 +180,10 @@ class ClassificationConfig(BaseModel):
     is not the project's own record; retrieval can filter on it (WP0 finding, owner-approved)."""
 
     reference_prefixes: list[str] = Field(default_factory=list)
+    # Synthesize `doc_class=filesystem` presence chunks for folders holding unparseable files
+    # (owner-requested 2026-10-28; DECISIONS). Off by default — a change forces a new generation
+    # (it is folded into the pipeline fingerprint, ADR-009).
+    filesystem_evidence: bool = False
 
 
 class SecurityConfig(BaseModel):

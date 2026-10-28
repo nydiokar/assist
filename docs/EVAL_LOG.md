@@ -299,3 +299,46 @@ Reproduce: `wsl.exe -d Ubuntu-24.04 -- bash -c 'export HSA_ENABLE_DXG_DETECTION=
    topic-plausible but evidence-irrelevant → the score caught them. The 11th (yp47) needs *counting*
    ("there were only three webinars"), which is a generation-layer judgement. Drawing that line is
    what keeps the gate honest rather than overclaiming.
+
+## 2026-10-28 — Filesystem-presence evidence for unparseable files (Task 3; DECISIONS 2026-10-28)
+
+Owner-requested (NOT OCR): make the 162 unparseable files (images/video/audio/legacy .doc)
+retrievable by their folder/filenames as circumstantial evidence. Built `filesystem.py` → one
+`doc_class=filesystem` presence chunk per folder holding an unparseable file (37 folders), tagged
+with an explicit "[FILESYSTEM PRESENCE — NOT DOCUMENT CONTENT]" banner. Measured on a SEPARATE index
+`yp_qwen4b_gpu_fs` (reranked+abstain pipeline, `configs/yp_qwen4b_gpu_fs.yaml`) so the frozen
+`yp_qwen4b_gpu` index is untouched. Ingest reused the parse cache (172 parse hits, 0 misses) and the
+copied embedding cache; only the 37 fs chunks embedded fresh → 5717 chunks total.
+
+Reproduce: ingest with `classification.filesystem_evidence: true` into the fs index, then
+`scripts/eval_yp.py --config configs/yp_qwen4b_gpu_fs.yaml --project ypq --root yspdb --questions eval/yp_questions_v2.jsonl --channels lexical+dense --out eval/results/yp_v2_fs.json`.
+
+### It helps the intended questions (3 new `filesystem`-kind questions, yp52–54)
+
+| id | question | folder surfaced | result |
+|---|---|---|---|
+| yp52 | collected photos for the good-practices questionnaire? | `…/Качете снимки (File responses)` (53 img) | HIT rr=1.0, EV |
+| yp53 | video materials for the political declaration? | `Communications/Видеа - Декларация_` (4 mp4) | HIT rr=1.0, EV |
+| yp54 | saved files for the "Youth participation in practice" webinar? | `Уебинари/2. Младежко участие на практика` | HIT rr=0.5, EV |
+
+With a `doc_class: filesystem` filter these folders are top-1 for photo/video/webinar presence
+questions that previously returned nothing citable. The banner + "contents NOT indexed" text travels
+in the excerpt, so the answerer sees it is presence, not content.
+
+### It does not pollute normal retrieval (39 content questions, fs index vs no-fs index)
+
+| set | Recall@5 | evidence@5 | MRR |
+|---|---|---|---|
+| no-fs index (`yp_v2_abstain.json`) | 0.7949 | 0.6667 | 0.7188 |
+| fs index (`yp_v2_fs.json`, same 39) | 0.7692 | 0.6410 | 0.7137 |
+
+One question moved: **yp21** (exact; chair of NYF) HIT→miss. Probed and attributed, not hand-waved:
+yp21's evidence chunk (`Покани/Адела Бозмарова/…`) is **absent from the dense top-16, sits at
+lexical rank 10, and is not in the rerank top_n=12 window** on the fs index — and **no filesystem
+chunk appears anywhere in yp21's candidate pool**. yp21 was a borderline rank-5 hit on the no-fs
+index, crowded by ~15 near-identical `Покани` invitation letters that all contain "Атанас Г. Радев";
+rebuilding the Chroma collection (fresh HNSW graph — v2 §D3 nondeterminism) reorders those identical-
+scoring siblings and tips yp21 from rank 5 to 6. The fs chunks are not the cause. Net: new evidence
+class, no demonstrated cost to content retrieval. Off by default (`classification.filesystem_evidence`).
+
+Regression: `tests/unit/test_filesystem_evidence.py` (5 cases, pure builder, no index). 77 tests green.

@@ -96,7 +96,7 @@ class ProjectRAG:
         doc_class: str | None = None
         channels: tuple[str, ...] = ("dense", "lexical")
         for key, val in (filters or {}).items():
-            if key == "doc_class" and val in {"project_record", "reference"}:
+            if key == "doc_class" and val in {"project_record", "reference", "filesystem"}:
                 doc_class = val
             elif key == "channels" and val and set(val) <= {"dense", "lexical"}:
                 channels = tuple(val)  # evaluation baselines (v1 §6.1 B/C/D)

@@ -149,6 +149,17 @@ class IndexingService:
                                             n_blocks=len(doc.blocks), n_chunks=len(chunks),
                                             diagnostics=diags))
 
+        # Filesystem-presence evidence for unparseable files (DECISIONS 2026-10-28). Synthesized
+        # from the discovery walk (no parse/chunk cache — it is cheap and derived purely from the
+        # file inventory). doc_class=filesystem keeps it filterable and unmistakable for content.
+        if self._cfg.classification.filesystem_evidence:
+            from .filesystem import build_filesystem_chunks  # noqa: PLC0415
+
+            fs_chunks = build_filesystem_chunks(project_id, discovered)
+            staged_chunks.extend(fs_chunks)
+            if fs_chunks:
+                report.warnings.append(f"filesystem_evidence: {len(fs_chunks)} presence chunk(s)")
+
         deleted = set(prior_hashes) - {d.source_path for d in discovered}
         report.deleted = len(deleted)
 

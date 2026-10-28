@@ -25,6 +25,10 @@ def validate_labels(questions: list[EvalQuestion], root: Path) -> list[str]:
     cache: dict[str, str] = {}
     problems: list[str] = []
     for q in questions:
+        # filesystem-presence questions reference a FOLDER (synthetic doc_class=filesystem chunk),
+        # not a parseable file — their labels are validated by construction, not by parsing.
+        if q.kind == "filesystem":
+            continue
         for sp in q.expect_source_paths:
             if sp not in cache:
                 full = _long_path(str((root / sp).resolve()))
