@@ -389,3 +389,39 @@ this corpus/pipeline.**
 Negative result is first-class (AGENTS.md): the 500-token chunking stays canonical, the 250-token
 index/config are kept only as the reproducible record of a tested-and-rejected lever. No regression
 test needed (config-only experiment; the chunker is unchanged).
+
+## 2026-10-28 — Latency + memory benchmark for the reranked pipeline (Task 5; spec v1 §6.2 Efficiency gate)
+
+First measurement of the Efficiency gate for the hybrid+reranker pipeline (never benchmarked before —
+2026-10-27 noted it as unmeasured). `scripts/bench_latency.py`: one cold-start query (pays model
+load + first CUDA kernels, timed separately), a warmup pass, then 3 timed passes over the 53-question
+v2 set (159 timed queries) through `search_project`. Peak process RSS (ru_maxrss) and peak GPU VRAM
+(`torch.cuda.max_memory_allocated`) recorded. WSL ROCm, RX 7900 XT. **No SLA invented** (v1 §6.2:
+"Measured and acceptable to stakeholder; no premature numeric SLA invented").
+
+Reproduce: `wsl.exe -d Ubuntu-24.04 -- bash -c 'export HSA_ENABLE_DXG_DETECTION=1; cd /mnt/c/Users/Cicada38/Projects/assist && PYTHONPATH=src /home/gorila/venvs/tokens-ingest-rocm/bin/python -X utf8 scripts/bench_latency.py --config configs/yp_qwen4b_gpu_rerank.yaml --project ypq --root yspdb --questions eval/yp_questions_v2.jsonl --out eval/results/yp_v2_latency.json'` (and `--config configs/yp_qwen4b_gpu.yaml` for the no-rerank row).
+
+| pipeline | cold start | warm p50 | warm p95 | warm mean | warm range | peak VRAM | peak RSS |
+|---|---|---|---|---|---|---|---|
+| hybrid only (Qwen3-4B dense + FTS5, RRF, cap=3) | 26.3 s | 2.53 s | 2.68 s | 2.23 s | 1.38–3.11 s | 8.1 GB | 6.1 GB |
+| **hybrid + reranker (bge-reranker-v2-m3, top_n=12)** | 31.3 s | **2.73 s** | **2.92 s** | 2.49 s | 1.74–3.24 s | 10.7 GB | 6.1 GB |
+
+### What it measures / teaches
+
+- **Steady-state ≈ 2.7 s/query (p50) at the full reranked pipeline; p95 2.9 s.** Tight spread
+  (p95 only ~7% above p50) — latency is dominated by a fixed GPU forward pass, not by query-dependent
+  branching, so it is predictable.
+- **The reranker is cheap here.** It adds only ~0.2 s (p50) / ~0.24 s (p95) and +2.5 GB VRAM over
+  hybrid-only. The dominant cost in BOTH is the **Qwen3-4B query embedding** (~2.3–2.5 s for a single
+  short query — the price of a 4B embedder doing a batch-1 forward pass on a consumer GPU). So if
+  query latency ever needs to drop, the lever is the embedder (smaller model / batching / caching
+  frequent queries), not the reranker.
+- **Memory fits the box comfortably:** 10.7 GB peak VRAM of 21.4 GB (RX 7900 XT), 6.1 GB RSS. No
+  memory pressure; headroom for a larger rerank batch if needed.
+- **Cold start ~30 s** is a one-time per-process model load (Qwen3-4B + reranker weights). For a
+  long-lived WP4 service this is paid once at startup, not per query. A per-request process would pay
+  it every call — so WP4 should keep the retriever warm (persistent process), which the
+  `ProjectRAG` object already supports.
+
+Caveat: n=53 distinct queries ×3; single machine (ROCm WSL, RX 7900 XT). These are this-box numbers,
+not a portable SLA. CPU-only latency would be far higher (the A01 CUDA gate exists for this reason).
