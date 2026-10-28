@@ -1,14 +1,42 @@
 # WP4-readiness close-out — the retrieval layer, measured against every applicable gate
 
-**Date:** 2026-10-28 · **Verdict:** the retrieval layer is **ready for an LLM to be wired (WP4)**,
-with two items accepted-and-tracked, not blocking. · **Scope:** this document assesses the
-*retrieval* subsystem only. It does **not** cross the stop line — no LLM is called, no AI-Team tool
-is registered, no generation/grounding/citation-answer path is built. Those are WP4, the next
-person's job.
+**Date:** 2026-10-28; **round-2 refresh 2026-10-29** · **Verdict:** the retrieval layer is
+**ready for an LLM to be wired (WP4)**, with items accepted-and-tracked, not blocking. · **Scope:**
+this document assesses the *retrieval* subsystem only. It does **not** cross the stop line — no LLM
+is called, no AI-Team tool is registered, no generation/grounding/citation-answer path is built.
+Those are WP4, the next person's job.
+
+## Round-2 refresh (2026-10-29) — what A–E changed, and the honest go/no-go
+
+A targeted round of retrieval polish + a trust-the-eval push, then stop (the push-vs-diminishing-
+returns decision was already made: one round, no chasing the metric). Verify with `git log` +
+`pytest` (90 green at this refresh), not this prose.
+
+| Task | Result | Adopted? |
+|---|---|---|
+| **A — parent-section context expansion** (v1 §7, query-time, no reindex) | span@5 **0.667→0.718** (+2q: yp28/yp33) on the 39-scored set; attaches surrounding-section text per served chunk for the LLM | **Yes** — on in `yp_qwen4b_gpu_rerank.yaml`; `tests/integration/test_context_expansion.py` |
+| **B — cross-language query-expansion glossary** (F11/F14) | **NEGATIVE**: evidence@5 0.619→0.595, yp09 unmoved, yp02 regressed (word-sense miss + common-phrase distractors) | **No** — kept off-by-default as the reproducible record; `tests/unit/test_query_expansion.py` |
+| **C — owner-drivable retrieval session** (`scripts/ask.py`) | Warm-retriever CLI: owner asks his own questions, sees citations + evidence verdict + section context, logs a 1–5 usefulness rating to JSONL. The honest eval when there is no gold set, and the demo backbone. | **Yes** — `tests/unit/test_ask_session_log.py` |
+| **D — holdout report-section eval** (12 questions from `holdout-report/`, validated vs parsed `yspdb/`) | The better-trusted eval: recall@5 **0.417**, evidence@5 **0.083** — far below the self-authored 0.795/0.667. Exposes the real report-drafting gap (reference-material bleed → use `doc_class` filter; multi-document synthesis → LLM's job). Held for owner review, **not merged**. | artifact `eval/yp_report_questions_candidate.jsonl` |
+| **E — this refresh** | A–D folded into the go/no-go below; WP4 wiring investigated in `docs/WP4_WIRING_OPTIONS.md` (no wiring done) | — |
+
+**Updated go/no-go.** **GO for WP4 wiring, unchanged** — the retrieval layer still clears every
+applicable §6.2 gate (below), and round 2 added (A) richer LLM-facing context and (C) the honest
+owner-eval surface. The **sobering, honest** addition is Task D: on independently-derived
+report-section questions the pinpoint-fact strength (recall@5 0.82 on the self-authored set) does
+**not** carry to diffuse multi-document synthesis (recall@5 0.42, evidence@5 0.08). That is **not a
+retrieval regression and not a wiring blocker** — it localizes the remaining work to the *answerer*:
+(i) scope with `doc_class: project_record` to stop reference-material bleed (verified to fix the
+rp10/rp11 bleed), (ii) read the whole retrieved doc + parent-section `expanded_context` (Task A), and
+(iii) synthesize across the multiple docs retrieval does surface. All three are WP4 answerer
+concerns. The retrieval *ranking/chunking* levers are exhausted and documented; the correct next
+move is wiring the LLM (see `docs/WP4_WIRING_OPTIONS.md`), with the single owner decision being
+egress (local Ollama vs hosted Claude). **Do not spend another round chasing the report-set number
+by tuning retrieval — it is a synthesis gap, not a ranking gap.**
 
 Read alongside: `docs/EVAL_LOG.md` (the measured runs, newest entries 2026-10-26→28),
-`docs/FAILURE_LEDGER.md` (F1–F19), `docs/DECISIONS.md`. Verify with `git log` and `pytest` (77 green),
-not this prose.
+`docs/FAILURE_LEDGER.md` (F1–F19), `docs/DECISIONS.md`. Verify with `git log` and `pytest` (90 green
+at the 2026-10-29 refresh), not this prose.
 
 ## The pipeline being handed off
 
@@ -86,7 +114,12 @@ and are explicitly out of scope here.
   returns the verdict *instead of* passages — the LLM should surface "Not established from accessible
   project documents" (v1 §5.2), not answer.
 - `open_source(...)` for exact-span verification; `get_ingestion_status(...)` for coverage health.
-- `filters={"doc_class": "reference"|"project_record"|"filesystem"}` to scope by material class.
+- Each result carries `expanded_context` (parent section around the chunk; Task A) when
+  `retrieval.context_expansion.enabled` — give the answerer this, not just the top-chunk excerpt,
+  to recover answers the chunk alone did not hold.
+- `filters={"doc_class": "reference"|"project_record"|"filesystem"}` to scope by material class —
+  **use `project_record` for report-drafting** to stop third-party reference material bleeding into
+  answers (measured fix for the Task D rp10/rp11 bleed).
 - Every query emits a `QueryTrace` (hashed query, retrieved chunk ids, channels, timings) — the
   substrate the WP4 grounding gate (v1 §5.2) will assert against.
 - Keep the retriever **warm** (persistent `ProjectRAG` process): cold start is ~31 s of model load,

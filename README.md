@@ -15,7 +15,11 @@ is deliberately NOT built (stop line).
 - Real-corpus reranked pipeline (Qwen3-4B dense + FTS5 + RRF + cross-encoder reranker): recall@5
   **0.82**, evidence@5 **0.71**, MRR **0.74** (34-scored v2 set); evidence-sufficiency/abstention
   gate withholds 10/11 no_answer; warm latency p50 2.7 s. See `docs/EVAL_LOG.md`.
-- 77 tests pass (offline hash embedder + in-memory store; fixture metrics are *not* a production SLA).
+- Round 2 (2026-10-29): parent-section context expansion adopted (span@5 0.667→0.718), a
+  cross-language glossary tested and rejected (negative), an owner-drivable session (`scripts/ask.py`),
+  and a holdout report-section eval that honestly exposes the report-drafting gap (recall@5 0.42).
+  WP4 wiring investigated in `docs/WP4_WIRING_OPTIONS.md` — no wiring done (stop line).
+- 90 tests pass (offline hash embedder + in-memory store; fixture metrics are *not* a production SLA).
 - **GPU path runs in WSL via ROCm, not on the Windows host.** The Windows host has no NVIDIA GPU
   (A01). WSL Ubuntu-24.04 has an AMD Radeon RX 7900 XT (gfx1100) reachable through ROCm 7.2.4;
   the real-corpus Qwen3-4B index was built and evaluated there (see `docs/EVAL_LOG.md` 2026-10-26).
