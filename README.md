@@ -8,11 +8,14 @@ independently testable without an LLM. Implements **spec v2**
 
 ## Status
 
-WP0 scaffold + WP1 (parsing/provenance) + WP2 (search-only MVP) + WP3 harness are **built and
-green on a synthetic bilingual fixture corpus** using a cheap offline embedder. The system is
-**waiting for two inputs** before further gates (see "Build stop line").
+WP0→WP3 complete; the retrieval layer is **measured on the real corpus and proven ready for WP4**
+(wiring an LLM) — see **`docs/HANDOFF_WP4_READY.md`** for the gate-by-gate verdict. WP4 generation
+is deliberately NOT built (stop line).
 
-- 39/39 tests pass. Fixture Recall@5 = 1.0, MRR = 0.96 (hash embedder — *not* a production SLA).
+- Real-corpus reranked pipeline (Qwen3-4B dense + FTS5 + RRF + cross-encoder reranker): recall@5
+  **0.82**, evidence@5 **0.71**, MRR **0.74** (34-scored v2 set); evidence-sufficiency/abstention
+  gate withholds 10/11 no_answer; warm latency p50 2.7 s. See `docs/EVAL_LOG.md`.
+- 77 tests pass (offline hash embedder + in-memory store; fixture metrics are *not* a production SLA).
 - **GPU path runs in WSL via ROCm, not on the Windows host.** The Windows host has no NVIDIA GPU
   (A01). WSL Ubuntu-24.04 has an AMD Radeon RX 7900 XT (gfx1100) reachable through ROCm 7.2.4;
   the real-corpus Qwen3-4B index was built and evaluated there (see `docs/EVAL_LOG.md` 2026-10-26).
@@ -112,4 +115,7 @@ Until then no production gate requiring real data is marked passed, and no unsaf
 ## What is intentionally NOT built yet
 
 Chat backend, scheduler, agent teams, indicator aggregation engine, knowledge graph, OCR,
-reranker, cloud hosting (v1 §2.4 / §7). These are deferred/V2 by the spec.
+cloud hosting (v1 §2.4 / §7). The **LLM/generation path (WP4)** is the stop line: no LLM is called,
+no AI-Team tool is registered, no grounded-answer/citation synthesis exists. The retrieval layer is
+handed off *ready* for it — `docs/HANDOFF_WP4_READY.md`. (The cross-encoder reranker, once "deferred",
+is now built and measured — F19.)
