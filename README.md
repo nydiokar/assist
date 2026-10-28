@@ -90,6 +90,17 @@ wsl.exe -d Ubuntu-24.04 -- bash -c 'export HSA_ENABLE_DXG_DETECTION=1; cd /mnt/c
 so Python entry points work; the explicit `export` above is still required for the `wsl -- bash -c`
 wrapper itself.
 
+### Owner-drivable retrieval session (demo / honest eval, no LLM)
+
+The corpus owner can interrogate retrieval with his own questions (BG or EN). Per question it shows
+the citations, the evidence-sufficiency verdict (sufficient / abstain + top relevance score) and the
+parent-section context, then logs it plus a 1–5 usefulness rating to a JSONL session — the honest
+eval when there is no gold set (Round-2 Task C). Retriever stays warm for the session.
+
+```powershell
+wsl.exe -d Ubuntu-24.04 -- bash -c 'export HSA_ENABLE_DXG_DETECTION=1; cd /mnt/c/Users/Cicada38/Projects/assist && PYTHONPATH=src /home/gorila/venvs/tokens-ingest-rocm/bin/python -X utf8 scripts/ask.py --config configs/yp_qwen4b_gpu_rerank.yaml --project ypq --root yspdb'
+```
+
 ### Reusable stages (A01 §C)
 
 `stages.py` caches `[1] PARSE` (shared across projects, keyed by content hash + parser config)

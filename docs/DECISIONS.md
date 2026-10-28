@@ -3,6 +3,35 @@
 Short, dated, unspecified-step design choices (AGENTS.md "Pivot rule"). Spec-contradicting
 changes go in `docs/AMENDMENT_A0N.md`, not here. Failures go in `docs/FAILURE_LEDGER.md`.
 
+## 2026-10-28 — Round-2 Task A/B/C design choices (parent-section expansion · cross-lang · owner eval)
+
+**Task A — parent-section context expansion (ADOPTED, on in prod config).** Spec v1 §7 names
+"parent-section expansion" but not its mechanism. Chose to reuse the already path-safe
+`open_source`: re-read the retrieved chunk's source filtered to its coarsest provenance anchor
+(heading → sheet → page) and return the sibling blocks of that section as `expanded_context`.
+Query-time, additive (the verbatim `excerpt` is never replaced), off by default. Rationale: the
+evidence@5 miss is chunk-granularity (localized by the k-sweep + the rejected smaller-chunk
+experiment), and the production move for that is more context to the answerer, not a reindex.
+Measured span@5 0.667→0.718 (+yp28/yp33); honest limit recorded (cannot recover boilerplate-stripped
+IDs or questions whose doc isn't retrieved). On in `yp_qwen4b_gpu_rerank.yaml` for WP4/demo.
+
+**Task B — cross-language query-expansion glossary (REJECTED, off by default).** Built but measured
+NEGATIVE (EVAL_LOG 2026-10-28): the general EN↔BG domain glossary misses word-sense (query
+"attended" vs header `постигнати`=achieved) and over-triggers on common phrases (`Национална среща`
+floods invitation letters), net −1 evidence@5, yp09 unmoved. Kept in tree default-off as the
+reproducible record. Not adopted — tuning it to pass yp09 would be fitting to n=1, which the owner
+explicitly said to avoid. Honest fix (index-time bilingual header enrichment) is out of the
+no-reindex scope this round.
+
+**Task C — owner-drivable retrieval session (`scripts/ask.py`).** The automated eval is
+self-authored; its credibility is the bottleneck, not its score. Built a dead-simple warm-retriever
+CLI (no service, no LLM) where the corpus OWNER types his own questions and the tool logs, per
+question, the citations + evidence verdict + top relevance score + his own 1–5 usefulness rating to
+a JSONL session. That logged session is the honest eval when there is no gold set, and is the
+backbone of the demo surface. Retriever kept warm for the session (cold start ~30 s paid once).
+Design is unspecified by the specs (a demo/eval surface), recorded here; reversible (a standalone
+script, touches no index). Log-row schema pinned by `tests/unit/test_ask_session_log.py`.
+
 ## 2026-10-28 — Expand the v2 eval set where it was too thin to tune (WP4 prep, Task 1)
 
 **Motivation.** The frozen v2 set (39q) is numeric-heavy (17) and too thin on the kinds that gate
