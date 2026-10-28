@@ -207,3 +207,95 @@ The 2026-10-27 reranker was staged but unmeasured (HF CDN stall). This run the C
 
 5. **A reranker is a corrective, not a replacement.** Its win and its damage come from the same action (reordering by content). Scope it to the mis-ranked tail (small `top_n`) so it fixes the deep misses without overruling the confident head fusion already got right. The `top_n` sweep is the experiment that finds that line — and it has a real peak, not a monotone curve.
 6. **recall and evidence can diverge, and that tells you the next lever.** Here recall climbed (0.76→0.82) while evidence stalled (0.71): the reranker found the right *files* it had been mis-ordering, but the right *chunk* inside them is a chunking limit it cannot touch. When your two curves split like that, stop tuning ranking and go to chunking.
+
+## 2026-10-28 — Eval set expanded to 50q (F16 prep) + abstention gate MEASURED (the reranker score IS the signal)
+
+Two linked changes this session, both gating WP4. First the eval set was grown where it was too
+thin to tune (Task 1); then the evidence-sufficiency gate was built and measured on it (Task 2).
+Same frozen index `yp_qwen4b_gpu`, same reranked pipeline (Qwen3-4B dense + FTS5 lexical, RRF
+k=60, per_file_cap=3, cross-encoder `bge-reranker-v2-m3` top_n=12). Query-time only, no reindex.
+
+### Eval set: 39 → 50 questions (Task 1; DECISIONS 2026-10-28)
+
+The 39-set was numeric-heavy (17) and thin on the kinds that gate WP4: 5 `no_answer`, 2 `date`,
+1 `conflict`. Appended 11 (yp41–yp51), **no existing question touched**: +6 `no_answer`
+(adversarial near-misses — plausible-for-this-corpus but the specific answer is verified absent by
+parsed-text grep), +3 `date`, +2 `conflict`. All 50 pass `validate_labels` against parsed corpus
+text. Now: `no_answer` 11, `date` 5, `conflict` 3. The 6 new negatives share vocabulary with real
+content (catering budget, 4th webinar, meeting hotel, prize fund, satisfaction survey, registration
+fee) — they test whether the gate rejects on *relevance*, not on topic unfamiliarity.
+
+### The signal: top-1 cross-encoder rerank_score (not Chroma distance, not RRF)
+
+v1 §4.6 warns Chroma distances and rank-fusion scores are NOT calibrated confidence — confirmed
+here: raw `fusion_score` maxes at ~0.033 (= 2/(60+1)) and does not separate relevant from
+irrelevant. The **cross-encoder relevance score already computed by the reranker** is the right
+signal: `bge-reranker-v2-m3` emits a sigmoid 0–1 relevance probability per (query, chunk). It is a
+free by-product of a stage we already run — no new model, no new compute. Probe:
+`scripts/probe_abstain.py` dumps top-1/top-2/margin/mean per question (`eval/results/abstain_probe_rerank.json`).
+
+**Measured separation (top-1 rerank_score), sorted:** the 11 `no_answer` questions all score
+top-1 ≤ 0.381, ten of them ≤ 0.26. Answerable questions mostly score high (median ≈ 0.96), with a
+short low-scoring tail (yp45 0.001, yp11 0.043, yp22 0.056, yp14 0.098). So a single threshold
+separates the bulk cleanly; the overlap is a handful of genuinely-hard answerables + one stubborn
+negative.
+
+### Threshold sweep (the operating-point decision, not a guess) — `/tmp/sweep_thresh.py` style, @top1
+
+| threshold | no_answer withheld | answerable wrongly withheld | …of which real hits |
+|---|---|---|---|
+| 0.10 | 6/11 | 4/39 | 3/31 |
+| 0.20 | 8/11 | 4/39 | 3/31 |
+| **0.26** | **10/11** | **4/39** | **3/31** |
+| 0.30 | 10/11 | 4/39 | 3/31 |
+| 0.34 | 10/11 | 5/39 | 3/31 |
+| 0.40 | 11/11 | 6/39 | 4/31 |
+
+**0.26 adopted.** It sits on a flat plateau (0.26–0.32: identical tradeoff), so the choice is
+robust to ±0.03 drift. It abstains on 10/11 negatives while the answerable cost is 4 questions,
+only **3 of them real recall hits** (yp14 isolation, yp22 budget-total, yp45 identifier-conflict;
+yp11 was already a retrieval miss, so withholding it costs nothing). Pushing to 0.40 would catch
+the last negative (yp47) but at the price of a 4th real hit — not worth it.
+
+### Full real-corpus run, reranked pipeline + gate, 50q (`configs/yp_qwen4b_gpu_rerank_abstain.yaml`, suppression OFF for honest recall)
+
+Reproduce: `wsl.exe -d Ubuntu-24.04 -- bash -c 'export HSA_ENABLE_DXG_DETECTION=1; cd /mnt/c/Users/Cicada38/Projects/assist && PYTHONPATH=src /home/gorila/venvs/tokens-ingest-rocm/bin/python -X utf8 scripts/eval_yp.py --config configs/yp_qwen4b_gpu_rerank_abstain.yaml --project ypq --root yspdb --questions eval/yp_questions_v2.jsonl --channels lexical+dense --out eval/results/yp_v2_abstain.json'`
+
+- **Retrieval (39 scored answerable): Recall@5 0.7949, evidence@5 0.6667, MRR 0.7188.** These are
+  *lower* than the 34-scored numbers (0.8235 / 0.7059 / 0.7363) for one reason only: the
+  denominator grew from 34 → 39 by adding 5 deliberately-hard answerables (yp43/44/45 conflict/
+  cross-document-date miss or partial-hit, yp41/42 hit). Same pipeline, harder set — not a
+  regression. The 34-set numbers remain the canonical ranking result; the 50-set is the
+  abstention-measurement set.
+- **Abstention @ 0.26: no_answer withheld 10/11 (0.909); answerable wrongly withheld 4/39, of which
+  3 real hits.** The one leaked negative is yp47 ("when was the *fourth* webinar") — the reranker
+  scores a real webinar chunk 0.381 because the chunk genuinely discusses webinars; distinguishing
+  "there is no fourth" is a counting/reasoning job for the LLM, not a retrieval-score job. This is
+  the correct division of labor: the gate removes the easy 10, the answerer handles the subtle one.
+
+### Design (what shipped)
+
+- `retrieval.abstention` config: `enabled`, `signal` (rerank_score | fusion_score), `min_top_score`
+  (0.26), `suppress_on_insufficient`. Pure decision in `api.assess_evidence` (no LLM, no mutation).
+- `SearchResponse.evidence: EvidenceVerdict` (enabled/sufficient/signal/top_score/threshold) is
+  **always attached**. When `suppress_on_insufficient` is true, an insufficient verdict returns the
+  verdict *instead of passages* (the spec's "explicit no-evidence response") and warns; when false
+  (eval mode) passages are kept and the verdict is advisory — honoring retrieval-first/generation-
+  second (v1 §2.2: the retriever flags, the answerer decides).
+- The gate deactivates + warns if `signal: rerank_score` but no reranker ran (never silently treats
+  a missing calibrated score as "insufficient"; v1 §4.6).
+- Prod/WP4 config `yp_qwen4b_gpu_rerank.yaml` ships the gate enabled with suppression ON.
+- Regression: `tests/unit/test_abstention.py` (pure decision logic, 6 cases) +
+  `tests/integration/test_abstention_wiring.py` (suppression wired through search_project, 4 cases).
+  Full suite 72 green.
+
+### What it teaches
+
+7. **Reuse the score you already paid for.** The abstention signal is not a new model or a new
+   knob — it is the cross-encoder relevance the reranker already computes. The uncalibrated
+   fusion/distance scores the spec explicitly distrusts (§4.6) are useless for this; the calibrated
+   cross-encoder score is exactly what an evidence-sufficiency gate needs.
+8. **A retrieval-side gate removes the easy negatives, not the subtle ones.** 10/11 no_answer were
+   topic-plausible but evidence-irrelevant → the score caught them. The 11th (yp47) needs *counting*
+   ("there were only three webinars"), which is a generation-layer judgement. Drawing that line is
+   what keeps the gate honest rather than overclaiming.

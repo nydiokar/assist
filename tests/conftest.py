@@ -21,8 +21,11 @@ def _config(tmp_path: Path, **overrides) -> Config:
     cfg.lexical_store.path = str(tmp_path / "manifest.sqlite3")
     cfg.vector_store.persist_path = str(tmp_path / "store")
     for k, v in overrides.items():
-        section, _, field = k.partition(".")
-        setattr(getattr(cfg, section), field, v)
+        *parents, field = k.split(".")   # supports nested e.g. retrieval.abstention.enabled
+        obj = cfg
+        for p in parents:
+            obj = getattr(obj, p)
+        setattr(obj, field, v)
     return cfg
 
 

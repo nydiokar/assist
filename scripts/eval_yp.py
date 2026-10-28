@@ -66,10 +66,16 @@ def main() -> None:
             results[cs] = rep.model_dump()
             print(f"\n== {cs}: Recall@5={rep.recall_at_5} evidence@5={rep.evidence_recall_at_5} "
                   f"MRR={rep.mrr} (n={rep.n})")
+            if rep.abstention_enabled:
+                print(f"   abstention: no_answer withheld {rep.noanswer_abstained}/{rep.noanswer_total}; "
+                      f"answerable wrongly withheld {rep.answerable_abstained}/{rep.answerable_total} "
+                      f"(of which real hits: {rep.answerable_hit_abstained})")
             for r in rep.per_question:
                 mark = "HIT " if r.hit_at_5 else "miss"
                 ev = "EV" if r.evidence_hit_at_5 else "--"
-                print(f"  {r.id} {r.kind:15} {mark} {ev} rr={r.reciprocal_rank:.2f}")
+                ab = " ABSTAIN" if r.abstained else ""
+                ts = f" ts={r.top_score:.3f}" if r.top_score is not None else ""
+                print(f"  {r.id} {r.kind:15} {mark} {ev} rr={r.reciprocal_rank:.2f}{ts}{ab}")
     finally:
         rag.close()
     out = Path(args.out)

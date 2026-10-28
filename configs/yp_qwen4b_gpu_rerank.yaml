@@ -53,6 +53,11 @@ retrieval:
                               # short-chunk head); <10 loses the deep-pool recall recoveries.
     batch_size: 16
     max_length: 512
+  abstention:               # evidence-sufficiency gate (v1 §6.2, F16); measured 2026-10-28
+    enabled: true
+    signal: rerank_score    # calibrated cross-encoder relevance; needs rerank.enabled: true
+    min_top_score: 0.26     # measured knee: abstains 10/11 no_answer, 2 real-hit false abstains
+    suppress_on_insufficient: true   # return explicit no-evidence verdict to the LLM (WP4)
 
 security: {max_query_chars: 2000, max_result_excerpt_chars: 4000}
 

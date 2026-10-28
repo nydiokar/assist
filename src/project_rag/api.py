@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from .config import Config, load_config
+from .config import AbstentionConfig, Config, load_config
 from .embeddings import build_embedder
 from .indexing import IndexingService
 from .lexical_store import LexicalStore
@@ -18,7 +18,9 @@ from .manifest import Manifest
 from .parsers import ParserRegistry
 from .retrieval import Retriever
 from .schema import (
+    EvidenceVerdict,
     IngestReport,
+    RetrievedResult,
     SearchResponse,
     SourceLocation,
     SourceResponse,
@@ -26,6 +28,28 @@ from .schema import (
 )
 from .sources import open_source as _open_source
 from .trace import QueryTrace, new_query_id, query_hash, timer
+
+
+def assess_evidence(results: list[RetrievedResult],
+                    cfg: AbstentionConfig) -> tuple[EvidenceVerdict, list[str]]:
+    """Decide evidence sufficiency from the top-1 relevance score (v1 §6.2 abstention, F16).
+
+    Pure function, no LLM. Reads the configured `signal` from the top result's `score_details`;
+    `sufficient = top_score >= min_top_score`. Returns the verdict plus any warnings (e.g. the
+    reranker is off so only the uncalibrated fusion score is available — v1 §4.6). The caller
+    decides whether to suppress passages; this function never mutates `results`.
+    """
+    warnings: list[str] = []
+    if not cfg.enabled:
+        return EvidenceVerdict(enabled=False, sufficient=True), warnings
+    top_score = results[0].score_details.get(cfg.signal) if results else None
+    if cfg.signal == "rerank_score" and top_score is None and results:
+        warnings.append("abstention: rerank_score absent (reranker off); evidence gate inactive")
+        return EvidenceVerdict(enabled=False, sufficient=True, signal=cfg.signal), warnings
+    sufficient = top_score is not None and top_score >= cfg.min_top_score
+    return (EvidenceVerdict(enabled=True, sufficient=sufficient, signal=cfg.signal,
+                            top_score=top_score, threshold=cfg.min_top_score),
+            warnings)
 
 
 class ProjectRAG:
@@ -98,14 +122,27 @@ class ProjectRAG:
         if top_k is not None:
             results = results[:top_k]
 
+        # Evidence-sufficiency gate (v1 §6.2 abstention, F16). Computed from the top-1 relevance
+        # score; the verdict is always attached. If configured, insufficient evidence suppresses
+        # the passages so a downstream LLM gets an explicit no-evidence signal (v1 §5.2) rather
+        # than plausible-but-irrelevant chunks to confabulate over.
+        verdict, ev_warnings = assess_evidence(results, self._cfg.retrieval.abstention)
+        warnings.extend(ev_warnings)
+        served = results
+        if verdict.enabled and not verdict.sufficient \
+                and self._cfg.retrieval.abstention.suppress_on_insufficient:
+            served = []
+            warnings.append("insufficient evidence: top relevance "
+                            f"{verdict.top_score:.3f} < {verdict.threshold:.3f}; passages withheld")
+
         trace = QueryTrace(query_id=qid, tool="search_project", project_id=project_id,
                            query_hash=query_hash(query), index_generation=gen,
-                           retrieved_chunk_ids=[r.chunk_id for r in results],
-                           channels=channels, result_count=len(results),
+                           retrieved_chunk_ids=[r.chunk_id for r in served],
+                           channels=channels, result_count=len(served),
                            timings_ms=t.timings_ms, warnings=warnings)
         self._last_traces.append(trace)
         return SearchResponse(query_id=qid, project_id=project_id, index_generation=gen,
-                              results=results, warnings=warnings)
+                              results=served, evidence=verdict, warnings=warnings)
 
     def open_source(self, project_id: str, document_id: str, *,
                     source_path: str | None = None, location: SourceLocation | None = None,

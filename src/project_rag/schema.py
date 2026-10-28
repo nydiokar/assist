@@ -135,12 +135,30 @@ class RetrievedResult(BaseModel):
     score_details: dict[str, float] = Field(default_factory=dict)
 
 
+class EvidenceVerdict(BaseModel):
+    """Retrieval-side evidence-sufficiency decision (v1 §6.2 abstention gate, F16).
+
+    `sufficient=False` means the best retrieved passage is not relevant enough to ground an
+    answer; a downstream answerer should say "Not established from accessible project documents"
+    (v1 §5.2) rather than answer from the returned chunks. `enabled=False` means no gate was
+    applied (verdict is informational only). Scores are ranking/relevance evidence, never a
+    probability of factual correctness (v1 §3.2).
+    """
+
+    enabled: bool = False
+    sufficient: bool = True
+    signal: str = ""                 # score_details key used (rerank_score | fusion_score)
+    top_score: float | None = None   # top-1 relevance score observed
+    threshold: float | None = None   # min_top_score the signal was compared against
+
+
 class SearchResponse(BaseModel):
     query_id: str
     project_id: str
     index_generation: str
     retriever_version: str = "hybrid_v1"
     results: list[RetrievedResult] = Field(default_factory=list)
+    evidence: EvidenceVerdict = Field(default_factory=EvidenceVerdict)
     warnings: list[str] = Field(default_factory=list)
 
 

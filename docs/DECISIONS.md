@@ -3,6 +3,94 @@
 Short, dated, unspecified-step design choices (AGENTS.md "Pivot rule"). Spec-contradicting
 changes go in `docs/AMENDMENT_A0N.md`, not here. Failures go in `docs/FAILURE_LEDGER.md`.
 
+## 2026-10-28 — Expand the v2 eval set where it was too thin to tune (WP4 prep, Task 1)
+
+**Motivation.** The frozen v2 set (39q) is numeric-heavy (17) and too thin on the kinds that gate
+WP4 to tune against: only 5 `no_answer`, 2 `date`, 1 `conflict`, 1 `cross_language`. An abstention
+threshold (Task 2) cannot be calibrated against 5 negatives without overfitting — exactly the
+objection raised in the 2026-10-26 abstention-deferral note. So the set is grown *before* building
+abstention. **No existing question was edited or deleted** (the 39 stay frozen, labels unchanged);
+11 were appended (yp41–yp51), lifting the set to 50 (now: `no_answer` 11, `date` 5, `conflict` 3).
+
+**New questions and their verified labels** (all validated by `scripts/eval_yp.py:validate_labels`
+against *parsed* corpus text — not raw files; the whole set now passes, 50/50):
+
+- **date (3), each a distinct fact from yp11/yp24:**
+  - yp41 — official opening day of the National Meeting → article, `На 18 юни`.
+  - yp42 — end of the validity period of civil contract 05-YP-2025 → contract, `30.06.2026`.
+  - yp43 — National-Meeting dates *as stated in the civil contract* → contract, `17-22 юни 2025`
+    (same fact as yp24 but a different source document, to test cross-document date agreement).
+- **conflict (2), each a genuine two-source documentary tension, distinct source pair from yp12:**
+  - yp44 — National-Meeting dates: the official timetable says `04-07.07.2025` (the *planned*
+    Erasmus activity window) while the civil contract and all post-event material say
+    `17-22 юни 2025` (when it *actually* ran). Source pair = timetable + contract (yp12 used
+    timetable + programme).
+  - yp45 — the project's identifier: the application form carries Form ID `KA154-YOU-E2373104`
+    while the civil contract cites grant number `2024-3-BG01-KA154-YOU-000283706`. Both are
+    "the number" depending on the document; an answerer must distinguish them.
+    *Incidental correction of the record:* the 2026-10-26 note said `grep -rl 000283706 yspdb`
+    returns nothing and the grant number "is simply not in this corpus." That was a **raw-file**
+    grep; `.docx` is a zip, so raw grep cannot see its text. The string **is** present in the
+    parsed text of `Administration YP/05-YP-2025_Tsveti.docx` (and 11 other files). yp30 is left
+    exactly as-is (it asks for the Form ID, which is correct); yp45 is the question that uses the
+    now-confirmed grant number. Lesson reinforced: validate labels against *parsed* text, never raw.
+- **no_answer (6), adversarial near-misses — plausible for this corpus but the specific answer is
+  genuinely absent (absence verified by parsed-text grep across all 169 READY files, 0 hits for the
+  operative term):**
+  - yp46 — "budget for catering (`кетъринг`)": the budget has food/`храноден` lines but no catering
+    line; `кетъринг` = 0 files.
+  - yp47 — "when was the *fourth* webinar": only three webinars exist (yp06/yp31); `четвърти
+    уебинар` = 0.
+  - yp48 — "which hotel accommodated the participants": no hotel is named for the meeting
+    (`Хотел ` appears only in an unrelated survey-responses sheet).
+  - yp49 — "prize fund for competition winners": no prize/award exists; `наградн*` = 0.
+  - yp50 — "results of the participant satisfaction survey": there is входящо/изходящо измерване
+    but no satisfaction survey; `анкета за удовлетвореност` / its results = 0.
+  - yp51 — "registration fee participants paid": the event was Erasmus-funded and free; all
+    fee terms (`такса за участие`, `регистрационна такса`, `participation fee`) = 0.
+  These are deliberately *harder* than the original 5 (weather/drones/vegetarians/buses/meals):
+  each shares vocabulary and context with real corpus content, so a retriever WILL return
+  plausible-looking chunks — the right test for an abstention signal that must reject on evidence
+  *relevance*, not on topic familiarity.
+
+**Reversibility.** Additive to one fixture file; the 39 frozen labels are untouched. Tracked
+under ledger F16 (abstention) as the dataset the Task-2 threshold is tuned and reported on.
+
+## 2026-10-28 — Abstention is a RETRIEVAL-side gate on the reranker score (resolves the 2026-10-26 deferral)
+
+**Supersedes the 2026-10-26 "defer to WP4, policy (b)" decision.** That note deferred abstention
+to the LLM because (i) WP3 was retrieval-only and (ii) n=5 negatives could not calibrate a
+threshold without overfitting. Both objections are now removed: the task is explicitly a *WP4
+precondition* (build a retrieval-side evidence-sufficiency verdict before wiring the LLM), and the
+negative set was grown to 11 first (entry above). So the gate is built now, at the retrieval layer,
+and the earlier "score-threshold is unjustified tuning" concern is answered by *measuring* the
+threshold rather than guessing it.
+
+**What was built (unspecified-step design; spec names the gate in §6.2 but not its mechanism):**
+- The signal is the **top-1 cross-encoder `rerank_score`** — a calibrated 0–1 relevance already
+  produced by the reranker stage. The uncalibrated alternatives the spec distrusts (Chroma
+  distance, RRF fusion score; v1 §4.6) were measured and do not separate relevant from irrelevant,
+  so they are only a weak fallback (`signal: fusion_score`) and the gate warns when forced onto it.
+- Threshold **0.26**, chosen by a sweep (EVAL_LOG 2026-10-28), on a flat 0.26–0.32 plateau:
+  abstains 10/11 no_answer, 3 real-hit false abstains. Not a round-number guess — the knee.
+- `SearchResponse.evidence` (an `EvidenceVerdict`) is **always attached**. `suppress_on_insufficient`
+  decides behavior: true → return the verdict *instead of* passages (the spec's "explicit
+  no-evidence response", used by the WP4/prod config); false → keep passages, verdict advisory
+  (eval mode + retrieval-first discipline, v1 §2.2 — the retriever flags, it does not decide truth).
+- The gate is **off by default** (`AbstentionConfig.enabled=False`) so it changes nothing unless a
+  config opts in; the reranked prod config `yp_qwen4b_gpu_rerank.yaml` opts in with suppression on.
+
+**Why retrieval-side and not purely the LLM's job.** The 2026-10-26 note was right that the final
+abstention *statement* is a generation behavior — but a retrieval-side gate is the honest place to
+catch the easy negatives (topic-plausible, evidence-irrelevant) deterministically and cheaply,
+before any token is spent, and to hand the LLM an explicit "insufficient evidence" signal instead
+of plausible-but-wrong chunks to confabulate over. The subtle residual (yp47: "there was no fourth
+webinar" needs counting) is correctly left to the LLM. This is a division of labor, not a
+relitigation of retrieval-first.
+
+**Reversibility:** `retrieval.abstention.enabled: false` restores exact prior behavior; the verdict
+is additive to the response contract (default `enabled=False`, `sufficient=True`).
+
 ## 2026-10-26 — v2 question-label fixes (WP3, Task 1)
 
 The eval validator (`scripts/eval_yp.py:validate_labels`, which checks every `expect_substring`

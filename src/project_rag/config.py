@@ -131,6 +131,36 @@ class RerankConfig(BaseModel):
     max_length: int = 512
 
 
+class AbstentionConfig(BaseModel):
+    """Retrieval-side evidence-sufficiency gate (spec v1 §6.2 "Abstention", WP4 precondition; F16).
+
+    Emits an explicit "insufficient evidence" verdict when the best retrieved passage is not
+    actually relevant to the query, so a downstream LLM returns "Not established from accessible
+    project documents" (v1 §5.2) instead of confabulating over plausible-but-irrelevant chunks.
+
+    Signal: the top-1 relevance score of the active ranker. `rerank_score` (cross-encoder, a
+    calibrated 0-1 relevance probability) is the trustworthy signal — measured 2026-10-28 it
+    cleanly separates the 11 no_answer questions (top1 ≤ 0.38, 10 of them ≤ 0.26) from answerable
+    ones. `fusion_score` (raw RRF) is NOT calibrated (v1 §4.6: Chroma distances / rank-fusion
+    scores are not confidence) and is only a weak fallback when the reranker is off; the gate
+    warns when it has to use it.
+
+    `min_top_score` is the measured operating point, not a guess: a threshold sweep (DECISIONS /
+    EVAL_LOG 2026-10-28) put the knee on a flat 0.26-0.32 plateau — 0.26 abstains on 10/11
+    no_answer while wrongly abstaining on only 2 real answerable hits (yp14, yp22).
+
+    `suppress_on_insufficient` makes the response return the verdict INSTEAD of passages (the
+    spec's "explicit no-evidence response"); off = passages are still returned and the verdict is
+    advisory metadata (retrieval-first discipline, v1 §2.2 — the retriever flags, the answerer
+    decides). Either way `SearchResponse.evidence` always carries the computed verdict.
+    """
+
+    enabled: bool = False
+    signal: str = "rerank_score"          # rerank_score (calibrated) | fusion_score (weak fallback)
+    min_top_score: float = 0.26           # measured knee (F19 reranker, 2026-10-28)
+    suppress_on_insufficient: bool = True  # return verdict instead of passages when insufficient
+
+
 class RetrievalConfig(BaseModel):
     top_k: int = 8
     candidates_per_channel: int = 16
@@ -141,6 +171,7 @@ class RetrievalConfig(BaseModel):
     per_file_cap: int | None = 3
     fusion: FusionConfig = Field(default_factory=FusionConfig)
     rerank: RerankConfig = Field(default_factory=RerankConfig)
+    abstention: AbstentionConfig = Field(default_factory=AbstentionConfig)
     max_source_chars: int = 6000
 
 
