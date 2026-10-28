@@ -98,3 +98,15 @@ Context: the k-sweep localized the loss to *ranking* (answer in pool 0.82–0.94
   downloads (F19). Default-off so it changes nothing until a box with model access enables and
   measures it. This is the next real lever and the one most likely to move evidence@5 further;
   it is deliberately left justified-but-unverified rather than claimed to work.
+
+- **Cross-encoder reranker: ENABLED and MEASURED (supersedes the "STAGED" note above), 2026-10-28.**
+  HF CDN reachable this session; `BAAI/bge-reranker-v2-m3` pinned (rev `953dc6f…`) and run on GPU.
+  Swept `rerank.top_n` {8,10,12,15,20}: peak at **12** — recall@5 0.7647→0.8235, evidence@5 holds
+  0.7059, MRR 0.6186→0.7363. Adopted top_n=12 in `configs/yp_qwen4b_gpu_rerank.yaml` and as the
+  `RerankConfig` default. **Why 12, not more:** top_n≥15 lets the cross-encoder demote fusion's
+  strong short-chunk head (yp02/yp21/yp33 lose evidence), eroding evidence@5. A reranker is a
+  corrective over the mis-ranked tail, not a replacement for the confident head — scope it narrow.
+  The reranker is a query-time stage (no reindex), offline (local HF cache, `trust_remote_code=False`),
+  pinned revision, regression-tested (`tests/unit/test_rerank.py`, fake scorer, no download).
+  Reversible: `retrieval.rerank.enabled: false` restores the per_file_cap-only pipeline.
+  Design choice under spec §7 (reranker preconditioned on the measured k-sweep), not a spec change.

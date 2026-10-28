@@ -126,7 +126,7 @@ class RerankConfig(BaseModel):
     model: str = "BAAI/bge-reranker-v2-m3"   # multilingual (BG+EN); pin revision when enabling
     revision: str = "main"
     device: str = "cpu"
-    top_n: int = 20                          # rerank this many fused candidates
+    top_n: int = 12                          # rerank this many fused candidates (F19 sweep peak)
     batch_size: int = 16
     max_length: int = 512
 

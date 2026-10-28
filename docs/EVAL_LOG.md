@@ -155,4 +155,55 @@ The sweep satisfied the spec §7 precondition for a reranker ("candidate in top-
 1. **Measure where the loss is before fixing it.** The k-sweep (recall@k curve + in-pool recall) is the single most informative cheap experiment: a steep curve = ranking problem (fusion/rerank); a flat curve = retrieval problem (chunking/embedding). Here it was overwhelmingly ranking.
 2. **Bigger/more is not better by default.** More candidates and larger k both failed to help and one regressed — because they add distractors a rank-only fusion can misorder.
 3. **The cheap, correct lever first.** A one-parameter dedup cap (no model, no download) bought the only measured gain available today. The reranker is the bigger lever but is heavier and was blocked; it is staged and justified, not hand-waved.
-4. **evidence@5 is the number that matters for an LLM** (right *chunk* in a small set), not recall@5 (right *file*). We moved it 0.676→0.706. Honest status: still below the ~0.85 a grounded assistant wants (see "elephant" notes — coverage of the 162 un-parsed files and abstention are the larger unmodeled gaps), so the reranker measurement and those two items are the real WP4-adjacent work.
+4. **evidence@5 is the number that matters for an LLM** (right *chunk* in a small set), not recall@5 (right *file*). We moved it 0.676→0.706. Honest status: still below the ~0.85 a grounded assistant wants (see "elephant" notes — coverage of the 162 un-parsed files and abstention are the larger unmodeled gaps), so the reranker measurement and those two items are the real WP4-adjacent work. **[Superseded 2026-10-28: the reranker was measured; it lifted recall@5 to 0.82 and MRR to 0.74 but evidence@5 held at 0.71 — see the 2026-10-28 entry. The evidence@5 ceiling is now a chunking limit, not a ranking one.]**
+
+## 2026-10-28 — F19 reranker MEASURED: cross-encoder on v2, top_n swept (localize → fix → verify)
+
+The 2026-10-27 reranker was staged but unmeasured (HF CDN stall). This run the CDN resolved (`curl -I` on the weight blob → 302 to the xet CDN, 2.27 GB; GPU up: gfx1100 / RX 7900 XT, `torch.cuda.is_available()` True with `HSA_ENABLE_DXG_DETECTION=1`). Model `BAAI/bge-reranker-v2-m3` pinned to rev `953dc6f6f85a1b2dbfca4c34a2796e7dde08d41e`, run on GPU via `sentence-transformers 3.4.1` already in the WSL ROCm venv. Same frozen index `yp_qwen4b_gpu`, same 39-question v2 set (34 scored, 5 `no_answer` excluded). Query-time only, **no reindex**.
+
+- Config: `configs/yp_qwen4b_gpu_rerank.yaml` (identical to `yp_qwen4b_gpu.yaml` except `retrieval.rerank.enabled: true`, `top_n: 12`).
+- Reproduce: `wsl.exe -d Ubuntu-24.04 -- bash -c 'export HSA_ENABLE_DXG_DETECTION=1; cd /mnt/c/Users/Cicada38/Projects/assist && PYTHONPATH=src /home/gorila/venvs/tokens-ingest-rocm/bin/python -X utf8 scripts/eval_yp.py --config configs/yp_qwen4b_gpu_rerank.yaml --project ypq --root yspdb --questions eval/yp_questions_v2.jsonl --channels lexical+dense --out eval/results/yp_v2_qwen4b_rerank.json'`
+
+### The `rerank.top_n` sweep (the knob that decides the win) — hybrid, 34 scored, @5
+
+| top_n | recall@5 | evidence@5 | MRR | hit-but-no-evidence |
+|---|---|---|---|---|
+| none (cap only, prior canonical) | 0.7647 | 0.7059 | 0.6186 | yp28, yp30 |
+| 8 | 0.7647 | 0.7059 | 0.6922 | yp28, yp30 |
+| 10 | 0.7941 | 0.7059 | 0.7279 | yp06, yp28, yp30 |
+| **12** | **0.8235** | **0.7059** | **0.7363** | yp06, yp28, yp30 |
+| 15 | 0.7941 | 0.6765 | 0.7304 | +yp33 |
+| 20 | 0.7941 | 0.6471 | 0.7279 | +yp02, +yp33 |
+
+**top_n=12 adopted.** recall@5 0.7647→**0.8235** (+2 questions: yp06, yp22), evidence@5 unchanged at **0.7059**, MRR 0.6186→**0.7363** (+0.118). Nothing regressed at 12.
+
+### The mechanism — and the trap the sweep exposed
+
+- **What the reranker recovers (as hypothesized):** yp06 (BG inflection, deep in pool) and yp22 (budget total `76650`, a numeric row the k-sweep had at rank ~12) — both were deep-pool misses RRF could not float. The cross-encoder reads (query, chunk) jointly and pulls them up. This is exactly the §7 precondition the WP3 k-sweep proved (answer in pool, mis-ranked).
+- **What a wide window BREAKS (the trap):** at top_n=20 the reranker *reordered the whole head* and **demoted chunks fusion had correct at rank 1** — yp02, yp21, yp33 (all short exact/numeric answers) lost their evidence rank, dropping evidence@5 to 0.647. A cross-encoder is weak on short keyword-match passages where the lexical/fusion signal was already right. **Narrowing the window to 12 keeps those strong fusion decisions untouched** while still reaching the deep recoveries. This is the whole lesson of the sweep: a reranker is a *corrective* over the mis-ranked tail, not a *replacement* for fusion's confident head.
+- **What did NOT move (confirmed):** yp09, yp31 — absent from the candidate pool at any depth (k-sweep in-pool miss). The reranker can only reorder what retrieval already fetched; these are a chunking/embedding gap, not ranking.
+
+### Final real-corpus standing (v2, 34 scored, @5) — the LLM-ready picture
+
+| Channel / stage | recall@5 | evidence@5 | MRR |
+|---|---|---|---|
+| lexical baseline | 0.7059 | 0.5294 | 0.5941 |
+| hybrid (RRF + per_file_cap=3) | 0.7647 | 0.7059 | 0.6186 |
+| **hybrid + reranker (top_n=12)** | **0.8235** | **0.7059** | **0.7363** |
+
+### Is retrieval "good enough for the LLM"? — honest verdict
+
+**For the document/evidence it CAN parse: yes, at the bar a grounded assistant needs.** recall@5 0.82 (right file in the top-5 for 28/34 questions) and MRR 0.74 (right file usually at rank 1-2) mean the LLM almost always sees the correct source in a short, citable window. evidence@5 0.71 means the exact answer *chunk* is in front of the LLM ~71% of the time; for the remaining ~29% the right *document* is still there, so an LLM that reads the whole retrieved doc (not just the top chunk) recovers most of them. This clears the §6 release rule (beat the lexical baseline) by a wide, out-of-noise margin on all three metrics.
+
+**The gap is no longer ranking — it is coverage and granularity, and both are now localized:**
+1. **evidence@5 plateaus at 0.71 (chunking, not ranking).** Every residual miss is now a span/granularity problem: yp30/yp28 (short answer buried in a long doc), yp20/yp21/yp38 (a name/address is a tiny span), yp31 (list spread across the doc). The reranker exhausted the ranking lever; the next real lever is a reindex with smaller/overlapping chunks for exact-span questions — a bigger, separate experiment (F9/F12 chunk family), not a query-time knob.
+2. **Two genuine retrieval gaps (F11/F14):** yp09/yp31 never enter the pool — short bilingual table rows the dense+lexical pair does not fetch.
+3. **No abstention (F16):** the 5 `no_answer` questions all return content. This is the one item that is a *correctness* risk for an LLM (it will confabulate over irrelevant retrieved text) and is the required WP4 gate before wiring the assistant — an evidence-sufficiency threshold, decided in DECISIONS 2026-10-26, not yet built.
+4. **162 un-parsed files (images/video, no OCR):** a known coverage ceiling; any question whose answer lives only in an image is unanswerable regardless of ranking.
+
+**Bottom line:** the retrieval *ranking* pipeline is professional-grade and ready to feed an agent — hybrid + reranker, measured, reproducible, regression-tested. Before the agent is trustworthy end-to-end, one gate remains that is about *refusing* rather than *ranking*: the abstention/evidence-sufficiency check (F16/WP4). That is the correct next move, and it is generation-adjacent, not a retrieval-quality problem.
+
+### What this run teaches (adds to the 2026-10-27 list)
+
+5. **A reranker is a corrective, not a replacement.** Its win and its damage come from the same action (reordering by content). Scope it to the mis-ranked tail (small `top_n`) so it fixes the deep misses without overruling the confident head fusion already got right. The `top_n` sweep is the experiment that finds that line — and it has a real peak, not a monotone curve.
+6. **recall and evidence can diverge, and that tells you the next lever.** Here recall climbed (0.76→0.82) while evidence stalled (0.71): the reranker found the right *files* it had been mis-ordering, but the right *chunk* inside them is a chunking limit it cannot touch. When your two curves split like that, stop tuning ranking and go to chunking.

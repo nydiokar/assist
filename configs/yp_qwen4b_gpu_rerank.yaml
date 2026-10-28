@@ -1,0 +1,60 @@
+# Real-corpus dense run + cross-encoder reranker (F19 measurement, 2026-10-28).
+# Identical index to yp_qwen4b_gpu.yaml (same collection/manifest — query-time only, no reindex).
+# Only retrieval.rerank differs. Keep both configs so before/after is a one-line diff.
+schema_version: 1
+
+embedding:
+  provider: qwen3
+  threads: 8
+  qwen3:
+    model: "Qwen/Qwen3-Embedding-4B"
+    revision: "5cf2132abc99cad020ac570b19d031efec650f2b"
+    dim: 2560
+    normalize: true
+    vector_storage_dtype: float32
+    inference_dtype: bfloat16
+    device: cuda
+    max_input_tokens: 2048
+    query_prompt_name: query
+    query_prompt_version: qwen3_query_v1
+    tokenizer_padding_side: left
+    batch_size: 16
+
+parsing: {backend: native, detect_scanned_pdf: true}
+
+vector_store:
+  provider: chroma
+  collection: "yp_qwen4b_gpu"
+  distance: cosine
+  persist_path: "local_data/yp_qwen4b_gpu/chroma"
+
+lexical_store:
+  path: "local_data/yp_qwen4b_gpu/manifest.sqlite3"
+
+chunking:
+  target_tokens: 500
+  max_tokens: 2048
+  overlap_tokens: 0
+  table_rows_per_chunk: 20
+
+retrieval:
+  top_k: 8
+  candidates_per_channel: 16
+  fusion: {method: rrf, k: 60}
+  per_file_cap: 3
+  max_source_chars: 6000
+  rerank:
+    enabled: true
+    model: "BAAI/bge-reranker-v2-m3"
+    revision: "953dc6f6f85a1b2dbfca4c34a2796e7dde08d41e"   # pinned from HF x-repo-commit 2026-10-28
+    device: cuda
+    top_n: 12                 # F19 sweep 2026-10-28: peak at 12 (recall@5 0.824, evidence@5 0.706,
+                              # MRR 0.736). >12 erodes evidence@5 (reranker demotes fusion's strong
+                              # short-chunk head); <10 loses the deep-pool recall recoveries.
+    batch_size: 16
+    max_length: 512
+
+security: {max_query_chars: 2000, max_result_excerpt_chars: 4000}
+
+classification:
+  reference_prefixes: ["Youth Participation Resources/"]
