@@ -140,6 +140,19 @@ text).
 **Reversibility:** `classification.filesystem_evidence: false` (the default) removes the chunks
 entirely on the next ingest; the frozen `yp_qwen4b_gpu` index never had them.
 
+## 2026-10-28 — Chunking stays at target_tokens=500 (smaller tested, rejected; Task 4)
+
+Pre-registered experiment (heavy-run-governor G0): `target_tokens 500→250` to lift evidence@5 by
+isolating short exact-span answers. Measured on a separate reindexed generation (11,223 chunks,
+GPU re-embed): recall@5 0.795→0.744, evidence@5 0.667→0.615, MRR flat — **every metric down or
+flat**. Smaller chunks fragment the context the embedder and cross-encoder use to score relevance
+(EVAL_LOG 2026-10-28). Decision rule was fixed before the run (adopt only if evidence@5 improves);
+it did not, so **the 500-token chunking is kept** and the negative is recorded. `overlap_tokens` was
+NOT exercised (it is unimplemented in `chunking.py` — a known limitation, not a tested lever). The
+`chunk250` config + result JSON are kept as the reproducible record; the heavy derived index data
+is regenerable from the config and is not retained. No spec change (chunking params are explicitly
+"initial, not sacred", v1 §4.4); this is the measured tuning the spec asks for.
+
 ## 2026-10-26 — v2 question-label fixes (WP3, Task 1)
 
 The eval validator (`scripts/eval_yp.py:validate_labels`, which checks every `expect_substring`

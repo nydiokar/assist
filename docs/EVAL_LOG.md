@@ -342,3 +342,50 @@ scoring siblings and tips yp21 from rank 5 to 6. The fs chunks are not the cause
 class, no demonstrated cost to content retrieval. Off by default (`classification.filesystem_evidence`).
 
 Regression: `tests/unit/test_filesystem_evidence.py` (5 cases, pure builder, no index). 77 tests green.
+
+## 2026-10-28 — Chunking experiment: target_tokens 500→250 — NEGATIVE, reverted (Task 4; F9/F12 chunk family)
+
+The 2026-10-27/28 analysis localized the evidence@5 plateau (0.71) to *chunk granularity*: short
+exact-span answers (names/addresses/IDs — yp20/21/30/38) buried in large chunks. Pre-registered
+hypothesis (G0, heavy-run-governor): a smaller `target_tokens` isolates those spans into their own
+chunk, lifting evidence@5 without regressing recall@5/MRR beyond the ±1-question (~0.03) noise band.
+Decision rule fixed before the run: **adopt only if evidence@5 improves and recall/MRR don't
+regress; else record the negative and revert.**
+
+New index generation by design (chunk params → ADR-009), SEPARATE location
+`yp_qwen4b_gpu_chunk250` so the frozen index is untouched. Config
+`configs/yp_qwen4b_gpu_chunk250.yaml`: only `chunking.target_tokens 500→250` differs (overlap left
+0 — overlap is NOT implemented in `chunking.py`, so this A/B honestly isolates the target-size
+lever, not overlap). GPU preflight passed (RX 7900 XT, 19.9 GB free; `torch.version.hip` set,
+`cuda` None — genuine ROCm). Re-chunk + full re-embed: **11,223 chunks** (vs ~2,500 at 500-tok),
+11.3 min on GPU. Same reranked+abstain pipeline.
+
+Reproduce: ingest with `configs/yp_qwen4b_gpu_chunk250.yaml`, then
+`scripts/eval_yp.py --config configs/yp_qwen4b_gpu_chunk250.yaml --project ypq --root yspdb --questions eval/yp_questions_v2.jsonl --channels lexical+dense --out eval/results/yp_v2_chunk250.json`.
+
+### Result (39 content questions, same frozen labels, @5)
+
+| chunking | recall@5 | evidence@5 | MRR |
+|---|---|---|---|
+| 500-tok (frozen, `yp_v2_abstain.json`) | **0.7949** | **0.6667** | **0.7188** |
+| 250-tok (`yp_v2_chunk250.json`) | 0.7436 | 0.6154 | 0.7137 |
+
+**Every metric moved down or flat. Hypothesis NOT supported → reverted.** Per-question deltas
+(500→250): yp06 hit lost, yp21 hit+ev lost, yp02 ev lost, yp42 ev lost; yp28 ev *gained* (the one
+case where isolation helped). Net −2 recall, −2 evidence, flat MRR.
+
+**Mechanism (why smaller was worse, not just noise).** Halving the chunk fragments the surrounding
+context the embedder and the cross-encoder use to judge relevance. yp02 (participant + facilitation
+counts) and yp42 (contract validity date) lost their evidence because the answer token got split
+from the context that made its chunk rank; yp06 and yp21 fell out of the retrieved file set
+entirely. Only yp28 benefited from a tighter chunk. The reranker already recovers mis-ranked
+answers from *within* a well-formed larger chunk (that is what lifted recall 0.76→0.82 on 2026-10-28);
+shrinking the chunk removes the context that recovery depends on. So the evidence@5 ceiling is NOT
+a "span too big" problem solvable by smaller chunks — the residual misses are genuinely-hard spans
+(tiny name/address in a doc dominated by other text) and a couple of true retrieval gaps
+(yp09/yp31). **The cheap chunking lever is exhausted; evidence@5 ≈ 0.71 is the accepted ceiling for
+this corpus/pipeline.**
+
+Negative result is first-class (AGENTS.md): the 500-token chunking stays canonical, the 250-token
+index/config are kept only as the reproducible record of a tested-and-rejected lever. No regression
+test needed (config-only experiment; the chunker is unchanged).
