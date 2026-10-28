@@ -124,12 +124,21 @@ class Retriever:
                  ) -> tuple[list[RetrievedResult], dict[str, int]]:
         dense: list[tuple[str, float, dict]] = []
         lexical: list[tuple[str, float, dict]] = []
+        # Cross-language query expansion (F11/F14): append counterpart-language domain anchors so
+        # a short BG table row is reachable from an EN query. Additive; same expanded text feeds
+        # both channels. Original query is unchanged upstream (trace hashes the original).
+        search_query = query
+        if self._cfg.query_expansion.enabled:
+            from .query_expansion import expand_query  # noqa: PLC0415
+
+            search_query = expand_query(
+                query, corpus_script=self._cfg.query_expansion.corpus_script)
         if "dense" in channels:
-            qvec = self._embedder.embed_queries([query])[0]
+            qvec = self._embedder.embed_queries([search_query])[0]
             dense = self._vs.query(project_id, generation, np.asarray(qvec),
                                    self._cfg.candidates_per_channel, doc_class)
         if "lexical" in channels:
-            lexical = self._lx.search(project_id, generation, query,
+            lexical = self._lx.search(project_id, generation, search_query,
                                       self._cfg.candidates_per_channel, doc_class)
         if self._reranker is not None:
             # Fuse a wider window, rerank it by content, then cut to top_k.

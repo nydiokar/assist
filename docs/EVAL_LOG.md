@@ -118,6 +118,47 @@ chunk alone did not carry — exactly the span@5 vs evidence@5 gap. The metric u
 `span@5` only credits questions whose doc is already retrieved at @5. Regression:
 `tests/integration/test_context_expansion.py` (4 cases, offline). 81 tests green.
 
+## 2026-10-28 — Round-2 Task B: cross-language query expansion — NEGATIVE, kept off (F11/F14)
+
+Hypothesis (handoff): yp07/yp09/yp31 fail because an EN query must hit a short BG table row; a cheap
+local glossary that appends counterpart-language anchor terms before retrieval should recover them
+without a model swap or egress. Built `src/project_rag/query_expansion.py` (script detection +
+curated EN↔BG domain lexicon, additive, off by default; `retrieval.query_expansion`).
+
+**Localization first (`scripts/probe_crosslang.py`, 2026-10-28).** Appending a *hand-picked* gloss
+to yp09's EN query DID move it: `raw_rank=None → raw+gloss_rank=1`. Promising — so the lever exists.
+
+**But the general glossary is brittle (measured, full pipeline, `yp_v2_qx.json` vs baseline, 39
+scored):**
+
+| metric | baseline | +query_expansion |
+|---|---|---|
+| recall@5 | 0.7381 | 0.7381 (unchanged) |
+| **evidence@5** | **0.619** | **0.595 (−1 question)** |
+| MRR | 0.6675 | 0.6675 |
+
+Only one question changed and it **regressed**: yp02 lost evidence (its `participants→участници`
+gloss floated a distractor above the evidence chunk). **yp09 did NOT move** and no question improved.
+
+**Mechanism — why the hand-probe worked but the general rule failed (the real lesson):**
+- yp09's query says *"attended"*, but the BG column header is `Брой постигнати` (= *achieved*). The
+  glossary maps "achieved"→`постигнати`, not "attended" — so the generic expansion omits the one
+  anchor (`постигнати`) that the hand-gloss included and that actually fetches the row (confirmed:
+  with `постигнати` the row is rank 1; without it, not in top-8). Fixing this needs a *word-sense*
+  mapping (attended→achieved) — overfitting to this single question.
+- The common phrase `Национална среща` the query DOES trigger pulls in a flood of invitation letters
+  (`Покани/*` all contain it), which crowd the numeric row out — the same "more retrieval injects
+  distractors" failure the k-sweep showed for `candidates_per_channel`.
+
+**Decision: reject and keep off** (the handoff's adopt-rule: "adopt only if yp07/09/31 move; else
+record the negative"). Tuning the glossary to pass yp09 would be fitting to our own n=1 — the exact
+overfitting the owner said to avoid. The capability stays in the tree, default-off, unit-tested
+(`tests/unit/test_query_expansion.py`), as a reproducible record of a tested-and-rejected lever. The
+honest fix for EN→BG short numeric rows is not query-side string tricks; it is a bilingual
+column-header enrichment at *index* time (a chunking change, out of the no-reindex scope this round)
+or the LLM reading the expanded sheet context (Task A already attaches it). yp09/yp31 remain the two
+accepted retrieval gaps (F11/F14).
+
 ## WP3 Gate (spec v1 §9 / §6.2) — assessed 2026-10-26 (re-assessed with measured dense/hybrid)
 
 WP3 gate text: *"Written evidence the candidate is useful versus baseline; no project-filter failures; documented unresolved failures."*

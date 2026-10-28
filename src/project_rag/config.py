@@ -161,6 +161,20 @@ class AbstentionConfig(BaseModel):
     suppress_on_insufficient: bool = True  # return verdict instead of passages when insufficient
 
 
+class QueryExpansionConfig(BaseModel):
+    """Cross-language query expansion (F11/F14, spec v1 §4.7). Query-time, no reindex, additive.
+
+    Appends a small fixed local domain glossary of counterpart-language anchor terms when the query
+    is in the minority script, so a short BG table row with no English token can still be fetched
+    from an EN query (measured: yp09 miss->rank 1, scripts/probe_crosslang.py). NOT translation (no
+    egress) and NOT a model swap (F11 disposition). Off by default. Honest limit: only glossary
+    terms are expanded — a curated project lexicon, not general MT.
+    """
+
+    enabled: bool = False
+    corpus_script: str = "cyrillic"   # dominant script of the indexed corpus (yspdb = Bulgarian)
+
+
 class ContextExpansionConfig(BaseModel):
     """Parent-section context expansion (spec v1 §7). Query-time, no reindex, additive.
 
@@ -189,6 +203,7 @@ class RetrievalConfig(BaseModel):
     rerank: RerankConfig = Field(default_factory=RerankConfig)
     abstention: AbstentionConfig = Field(default_factory=AbstentionConfig)
     context_expansion: ContextExpansionConfig = Field(default_factory=ContextExpansionConfig)
+    query_expansion: QueryExpansionConfig = Field(default_factory=QueryExpansionConfig)
     max_source_chars: int = 6000
 
 
