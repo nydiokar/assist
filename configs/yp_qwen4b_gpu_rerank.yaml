@@ -58,6 +58,9 @@ retrieval:
     signal: rerank_score    # calibrated cross-encoder relevance; needs rerank.enabled: true
     min_top_score: 0.26     # measured knee: abstains 10/11 no_answer, 2 real-hit false abstains
     suppress_on_insufficient: true   # return explicit no-evidence verdict to the LLM (WP4)
+  context_expansion:        # parent-section expansion (v1 §7, Task A); span@5 0.667->0.718
+    enabled: true           # additive; hands the WP4 answerer the surrounding section per chunk
+    max_chars: 4000
 
 security: {max_query_chars: 2000, max_result_excerpt_chars: 4000}
 

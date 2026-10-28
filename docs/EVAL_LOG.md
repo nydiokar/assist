@@ -81,6 +81,43 @@ Result identical on every metric to the 20-row run (lexical .714/.500, dense .64
 
 **What it teaches vs. prior runs.** The 2026-10-20 run (`yp_qwen4b_gpu_main.json` 18q + `_oos.json` 10q) had lexical/dense/hybrid at 0.733/0.733/0.733 (main) — all tied within noise, hybrid best only on evidence@5. v2 (34 scored, with 18 new exact/date/list questions yp20–yp40) **separates the channels for the first time on the real corpus**: hybrid is clearly ahead of lexical on Recall@5 and evidence@5, with a margin above the single-question noise floor. The added exact/numeric questions are exactly where lexical and dense each fail differently, so fusion's value becomes measurable. The dense channel's value on v2 is now **measured**, not assumed.
 
+## 2026-10-28 — Round-2 Task A: parent-section context expansion (span@5, query-time, no reindex)
+
+The evidence@5 ceiling (0.667 on the 39-scored set, abstain config) is a *chunk-granularity* gap,
+not a ranking one — the k-sweep and the smaller-chunk negative (Task 4) both proved that. The
+production move for this exact gap is not a reindex but returning MORE context around each retrieved
+chunk: its parent section. Built `src/project_rag/expand.py` (reuses the path-safe `open_source`:
+re-read the source filtered to the chunk's coarsest provenance anchor — heading for free text,
+sheet for tables, page for PDFs — returning the sibling blocks of the chunk's section). Query-time,
+additive (the verbatim `excerpt` is never replaced), off by default
+(`retrieval.context_expansion.enabled`). Wired into `search_project` on served (non-suppressed)
+results only.
+
+**Measured (`scripts/probe_span_coverage.py`, `yp_qwen4b_gpu_rerank_abstain.yaml`, 39 scored):**
+
+| metric | value | definition |
+|---|---|---|
+| evidence@5 (top-5 chunk excerpt) | 0.6667 (26/39) | current — answer substring in a top-5 chunk |
+| **span@5 (parent-section expansion)** | **0.7179 (28/39)** | answer substring in the EXPANDED context of a top-5 doc hit |
+
+**+2 questions recovered: yp28, yp33** — both are XLSX row chunks whose answer (`265`; `МТСП`/`НСОРБ`)
+sat in an adjacent row of the same sheet; sheet-level expansion brought it into the window.
+
+**What expansion CANNOT recover (mechanism, honest):**
+- yp30/yp45 (`KA154-YOU-E2373104`): the Form ID is page *boilerplate* dropped at chunk time (F9), so
+  it is not under the retrieved chunk's heading — heading-filtered section expansion excludes it.
+  yp45 additionally needs a second source (`2024-3-BG01-…` in the contract) not in its top-5.
+- yp06/yp09/yp11/yp12/yp20/yp31/yp38/yp43/yp44: the right *document* is not in the top-5 at all
+  (recall miss), so there is no retrieved chunk to expand — expansion is a within-retrieved-doc lever,
+  it cannot fix retrieval misses.
+
+**Verdict:** a real but modest honest lever (+2q, above the 1-question noise floor), well short of the
+"~0.85" the handoff hoped for. Its true value is for the *LLM*: `expanded_context` hands the answerer
+the surrounding section for every served chunk, so grounded answering can recover answers the top
+chunk alone did not carry — exactly the span@5 vs evidence@5 gap. The metric understates it because
+`span@5` only credits questions whose doc is already retrieved at @5. Regression:
+`tests/integration/test_context_expansion.py` (4 cases, offline). 81 tests green.
+
 ## WP3 Gate (spec v1 §9 / §6.2) — assessed 2026-10-26 (re-assessed with measured dense/hybrid)
 
 WP3 gate text: *"Written evidence the candidate is useful versus baseline; no project-filter failures; documented unresolved failures."*

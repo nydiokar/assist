@@ -161,6 +161,22 @@ class AbstentionConfig(BaseModel):
     suppress_on_insufficient: bool = True  # return verdict instead of passages when insufficient
 
 
+class ContextExpansionConfig(BaseModel):
+    """Parent-section context expansion (spec v1 §7). Query-time, no reindex, additive.
+
+    When on, each served result gets `expanded_context`: the parent section the chunk came from
+    (blocks sharing its heading; sheet for tables; page for PDFs), re-read via the path-safe
+    `open_source`. This widens the evidence window handed to a WP4 answerer so it can recover the
+    exact answer from the surrounding section when the top chunk alone did not carry it — the
+    standard production move for the evidence@5 chunk-granularity gap (measured: span@5 0.718 vs
+    evidence@5 0.667, +2q yp28/yp33; probe_span_coverage.py). Off by default; the chunk's own
+    verbatim `excerpt` is never replaced.
+    """
+
+    enabled: bool = False
+    max_chars: int = 4000
+
+
 class RetrievalConfig(BaseModel):
     top_k: int = 8
     candidates_per_channel: int = 16
@@ -172,6 +188,7 @@ class RetrievalConfig(BaseModel):
     fusion: FusionConfig = Field(default_factory=FusionConfig)
     rerank: RerankConfig = Field(default_factory=RerankConfig)
     abstention: AbstentionConfig = Field(default_factory=AbstentionConfig)
+    context_expansion: ContextExpansionConfig = Field(default_factory=ContextExpansionConfig)
     max_source_chars: int = 6000
 
 

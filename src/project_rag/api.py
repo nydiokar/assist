@@ -135,6 +135,16 @@ class ProjectRAG:
             warnings.append("insufficient evidence: top relevance "
                             f"{verdict.top_score:.3f} < {verdict.threshold:.3f}; passages withheld")
 
+        # Parent-section context expansion (v1 §7, F12/F9 chunk-granularity gap). Query-time,
+        # additive: widen the evidence window around each served chunk so a WP4 answerer can
+        # recover answers the top chunk alone did not carry (measured span@5 0.718 vs 0.667).
+        # Only on served (non-suppressed) passages; the verbatim excerpt is kept.
+        if served and self._cfg.retrieval.context_expansion.enabled:
+            from .expand import attach_expanded_context  # noqa: PLC0415
+
+            attach_expanded_context(self, project_id, served,
+                                    max_chars=self._cfg.retrieval.context_expansion.max_chars)
+
         trace = QueryTrace(query_id=qid, tool="search_project", project_id=project_id,
                            query_hash=query_hash(query), index_generation=gen,
                            retrieved_chunk_ids=[r.chunk_id for r in served],

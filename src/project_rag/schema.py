@@ -133,6 +133,7 @@ class RetrievedResult(BaseModel):
     rank: int
     retrieval_channels: list[str]
     score_details: dict[str, float] = Field(default_factory=dict)
+    expanded_context: str = ""       # parent-section context (v1 §7, query-time; empty unless on)
 
 
 class EvidenceVerdict(BaseModel):
