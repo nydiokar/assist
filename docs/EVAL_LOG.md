@@ -159,6 +159,53 @@ column-header enrichment at *index* time (a chunking change, out of the no-reind
 or the LLM reading the expanded sheet context (Task A already attaches it). yp09/yp31 remain the two
 accepted retrieval gaps (F11/F14).
 
+## 2026-10-28 — Round-2 Task D: holdout report-section eval set (the capability the owner will probe)
+
+The owner's real test is "can it help draft the project report?" — a retrieval-first,
+evidence-per-section task. Authored **12 report-section-oriented questions**
+(`eval/yp_report_questions_candidate.jsonl`, kind `report_section`) from the HOLDOUT report material
+(`holdout-report/`, gitignored, never ingested): Summary/headcount, Results/Indicators, Activities
+(youth studio), Dissemination (podcast), Methodology (working groups), Target groups, Partnership,
+Budget, Outcomes (Declaration), Legal basis, M&E, Project identification. **Every label validated
+against PARSED `yspdb/` text** via `scripts/eval_yp.py:validate_labels` (12/12, 0 problems; the raw
+holdout files are the *source of the questions*, the answers must exist in the ingested corpus).
+Multi-source facts got multiple `expect_source_paths`, each confirmed to carry the exact substring
+(no F17 raw-grep assumption). Held as a **candidate for owner review — NOT merged into the v2 set**
+(per the handoff).
+
+**Measured on the production reranked+abstain pipeline (12 scored, @5):**
+
+| metric | v2 self-authored (39) | **report-section (12)** |
+|---|---|---|
+| recall@5 | 0.795 | **0.417** |
+| evidence@5 | 0.667 | **0.083** |
+| MRR | 0.719 | **0.375** |
+
+**This is the point of a better-trusted eval: an independently-derived, harder set exposes the real
+report-drafting gap** — far below the self-authored numbers. Diagnosed per question (not hand-waved):
+- **rp10/rp11 (legal basis, M&E) retrieve REFERENCE material** (`Youth Participation Resources/`,
+  `doc_class=reference`) instead of the project's own record — a `doc_class: project_record` filter
+  at query time is the fix (the capability already exists; the report-drafting agent should scope to
+  project records). 
+- **rp12 (grant number) returns the application form, not the civil contract** where
+  `2024-3-BG01-…` lives — the contract isn't fetched into the pool (a retrieval miss, like yp09).
+- **rp07/rp08 (partnership names, budget total) are doc hits with no evidence chunk** — the
+  evidence@5 ceiling (the specific span is boilerplate-stripped or far from the retrieved chunk);
+  parent-section expansion (Task A) did NOT recover them here (span@5 = evidence@5 = 0.083: the
+  answer span is in a different section than the retrieved chunk), unlike the v2 table cases.
+- **rp01/rp03/rp05/rp09 are genuine span misses** — the fact is phrased differently across files;
+  the retrieved related doc doesn't carry the exact labelled substring.
+
+**What it teaches (honest, for the demo):** retrieval is strongest on *specific, uniquely-phrased*
+facts (indicators, target groups — rp02/rp06 hit) and weakest on *report-section synthesis* questions
+whose evidence is diffuse, reference-adjacent, or multi-document. The right demo framing is therefore
+the owner-drivable session (Task C) where the owner asks concrete questions and judges usefulness —
+not a headline recall number on synthesis questions. The report set is the honest baseline for "how
+far from a report-drafting assistant are we": the ranking is solid for pinpoint facts; section-level
+synthesis needs the LLM to read multiple retrieved docs + the parent-section context (Task A) and the
+`doc_class` filter to avoid reference bleed. These three are WP4 answerer concerns, not more retrieval
+tuning.
+
 ## WP3 Gate (spec v1 §9 / §6.2) — assessed 2026-10-26 (re-assessed with measured dense/hybrid)
 
 WP3 gate text: *"Written evidence the candidate is useful versus baseline; no project-filter failures; documented unresolved failures."*
