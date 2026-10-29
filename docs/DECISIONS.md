@@ -3,6 +3,41 @@
 Short, dated, unspecified-step design choices (AGENTS.md "Pivot rule"). Spec-contradicting
 changes go in `docs/AMENDMENT_A0N.md`, not here. Failures go in `docs/FAILURE_LEDGER.md`.
 
+## 2026-10-29 — Report eval REBUILT backwards from ground truth (supersedes the forward-authored Task-D set)
+
+**Why.** The prior 12 Task-D questions were authored *forwards* (guess a file, hope the answer is
+there) — measured recall@5 0.08–0.17, which the F20 probe showed was mostly a *labeling* artifact:
+only 4/12 had their expected substring in the served pool at any threshold, while the retriever
+returned relevant real docs at high confidence. That set cannot tell us whether the system is ready
+for an LLM — it measures my guessing, not retrieval.
+
+**Method (correct — answer first, question second).** For each question: (1) open the *parsed* text
+of real corpus files (`scripts/dump_parsed.py`, `scripts/find_facts.py` — read-only, UTF-8 terms via
+file not shell argv to avoid Cyrillic mangling), (2) extract a verbatim, unambiguous fact and the
+exact file that proves it, (3) write a natural question, (4) run it through the real retriever and
+**keep it only if** the targeted file ranks top-5 AND the substring is in the served pool. An eval
+question is admitted only when all four hold. This is the eval the brief's §C "better-trusted set"
+asked for.
+
+**Result (`eval/yp_report_questions.jsonl`, 13q — gitignored, quotes corpus text).**
+- **10 answerable, all GOOD: recall@5 = 1.0, evidence-in-pool = 1.0.** Facts span identification,
+  budget, partnership, duration, target groups, reach, objectives, contract fee, legal basis,
+  National-Meeting dates/place — each proven in its targeted file (grant number in the civil
+  contract, 49 697,00 + both org names + 01/02/2025–31/10/2025 in the application form, 17-22 юни
+  2025 + Ямбол in the National-Meeting invitation, etc.). Config `yp_qwen4b_gpu_report.yaml`,
+  `doc_class=project_record`.
+- **3 true no_answer** (catering budget, hotel, participation fee — absences established in the
+  2026-10-28 DECISIONS entry). **Readiness finding:** the retrieval gate flags only 1/3 as
+  insufficient; the other two score 0.63 / 0.36 (above the 0.26 threshold) because the retriever
+  confidently pulls topically-adjacent National-Meeting chunks that do not contain the absent fact.
+  **So abstention on plausible-but-absent facts is genuinely the LLM's job**, not the retrieval
+  gate's — which is exactly why the LLM goes in the loop and why this set can now *measure* whether
+  it refuses to fabricate. This is the division of labor the F16 note predicted.
+
+**Readiness verdict:** retrieval is ready — on a ground-truth set it surfaces the right file+passage
+10/10. The open question the LLM must answer is honest abstention on r12/r13. Reversible: the set is
+a standalone gitignored file; authoring scripts are kept as reproducible diagnostics.
+
 ## 2026-10-29 — Task D report-questions: owner review pass + a corpus-in-git finding (held for owner)
 
 **Owner asked for the 12 holdout report-section questions to be made fully correct before tee-up.**

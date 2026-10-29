@@ -12,10 +12,14 @@ yspdb/
 drive-download-*.zip
 # Holdout final-report corpus for Task D report-section questions — real NGO content, no egress.
 holdout-report/
-# Task D report-section eval questions: their expect_substrings quote VERBATIM corpus text
-# (participant feedback, org names, grant number). Real corpus must never enter git (AGENTS.md).
-# Kept locally for the owner demo/review; untracked. (A copy is still in history at 43873a1 —
+# Report-section eval questions: their expect_substrings quote VERBATIM corpus text (org names,
+# grant number, Bulgarian quotes). Real corpus must never enter git (AGENTS.md). Kept locally for
+# the demo/eval; untracked. (The old yp_report_questions_candidate.jsonl was committed at 43873a1 —
 # scrubbing that is a destructive history rewrite and needs owner sign-off.)
 eval/yp_report_questions_candidate.jsonl
+eval/yp_report_questions.jsonl
+# Scratch authoring inputs (corpus-derived); regenerable, not committed.
+scripts/_*.txt
+scripts/_*.jsonl
 
 *.egg-info/
