@@ -90,3 +90,15 @@ def test_prompt_falls_back_to_excerpt_without_expanded_context():
     res.results[0].expanded_context = ""   # no parent section attached
     prompt = build_grounding_prompt("q", res)
     assert "общ бюджет 49 697,00 EUR" in prompt
+
+
+def test_prompt_warns_when_passages_shown_below_threshold():
+    """Report-drafting profile (suppress off): passages present but gate said insufficient —
+    the prompt must tell the model the signal is weak and to abstain unless a passage states it."""
+    res = _sufficient_response()
+    res.results[0].score_details["rerank_score"] = 0.05
+    res.evidence = EvidenceVerdict(enabled=True, sufficient=False, signal="rerank_score",
+                                   top_score=0.05, threshold=0.26)
+    prompt = build_grounding_prompt("q", res)
+    assert "BELOW" in prompt
+    assert "abstain" in prompt.lower()

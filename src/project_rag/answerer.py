@@ -85,10 +85,20 @@ def build_grounding_prompt(question: str, res: SearchResponse) -> str:
     ev = res.evidence
     parts.append("")
     if ev.enabled and ev.top_score is not None:
-        parts.append(
-            f"(retrieval evidence signal: top relevance {ev.top_score:.3f}, "
-            f"threshold {ev.threshold}; passages cleared the sufficiency gate.)"
-        )
+        if ev.sufficient:
+            parts.append(
+                f"(retrieval evidence signal: top relevance {ev.top_score:.3f}, "
+                f"threshold {ev.threshold}; passages cleared the sufficiency gate.)"
+            )
+        else:
+            # Report-drafting profile: passages are shown despite a weak gate signal so you can
+            # judge them, but be EXTRA cautious — relevance is low, so abstain unless a passage
+            # genuinely contains the asked fact.
+            parts.append(
+                f"(retrieval evidence signal: top relevance {ev.top_score:.3f} is BELOW the "
+                f"{ev.threshold} sufficiency threshold. The passages may be only loosely related. "
+                f"Ground only on a passage that explicitly states the answer; otherwise abstain.)"
+            )
     parts.append("")
     parts.append(
         "Answer the question using ONLY the passages above. Cite each claim as [#n] with the file "
