@@ -3,6 +3,35 @@
 Short, dated, unspecified-step design choices (AGENTS.md "Pivot rule"). Spec-contradicting
 changes go in `docs/AMENDMENT_A0N.md`, not here. Failures go in `docs/FAILURE_LEDGER.md`.
 
+## 2026-10-29 — EGRESS DECISION: corpus passages MAY be sent to a hosted LLM (Anthropic) — owner go-ahead (v1 §8)
+
+**This is the explicit written owner decision the no-egress rule (spec v1 §8, AGENTS.md "No data
+egress") requires before any corpus content leaves the machine.** The owner reviewed
+`docs/WP4_WIRING_OPTIONS.md` (the §4 investigation) and chose **Option 2b (direct Claude via the
+official `anthropic` SDK), hosted, use Anthropic first.**
+
+- **Scope of what may egress:** only the *retrieved* passages for a given query (the top-k
+  `RetrievedResult.excerpt` / `expanded_context` the retriever already selected) plus the user's
+  question — never the whole corpus, never the index, never raw `yspdb/` files in bulk. The
+  retriever runs first and gates (retrieval-first, v1 §2.2); the LLM only grounds on what retrieval
+  hands it.
+- **Destination:** Anthropic Messages API (`api.anthropic.com`), model `claude-opus-4-8` (owner may
+  downgrade to `claude-sonnet-4-6` for cost). No other hosted provider authorized by this decision.
+- **Why this over Option 1 (Ollama local, no egress):** the owner's stated worry was a weak local
+  model producing false negatives on Bulgarian grounding and invalidating the demo; the hosted model
+  is far stronger at Bulgarian + grounded citation + honest abstention (WP4_WIRING_OPTIONS §4), and
+  it is the lowest-effort path to a working demo. The privacy cost is accepted knowingly: this is a
+  practice project on one completed NGO project the owner himself manages, testing only, and the
+  owner owns the data.
+- **Still forbidden:** egress of corpus content to any OCR / embedding / other LLM API not named
+  here; committing corpus text to git or any remote (unchanged — the frozen index, `yspdb/`, zips,
+  `local_data/`, `eval/results/` stay gitignored). The API key is supplied at runtime via
+  `ANTHROPIC_API_KEY` (never hardcoded, never committed).
+- **Reversibility:** the answerer is an additive standalone script (`scripts/answer.py`); deleting
+  it removes the egress path. The retrieval layer and its tests are untouched. To revert to
+  no-egress, the owner picks Option 1 (Ollama) per WP4_WIRING_OPTIONS and this decision is
+  superseded by a dated entry here.
+
 ## 2026-10-28 — Round-2 Task A/B/C design choices (parent-section expansion · cross-lang · owner eval)
 
 **Task A — parent-section context expansion (ADOPTED, on in prod config).** Spec v1 §7 names
