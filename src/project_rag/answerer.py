@@ -1,32 +1,24 @@
-"""WP4 grounded answerer (Option 2b, owner egress decision 2026-10-29).
+"""Grounding contract for the WP4 answerer (prompt + abstention logic). NO network, NO API key.
 
-Retrieval-first by construction (v1 §2.2): `search_project` runs and the evidence-sufficiency gate
-decides BEFORE any LLM call. When the gate abstains (passages suppressed), the answer is the fixed
-"Not established…" line (v1 §5.2) and NO token is spent. Otherwise the retrieved passages + the
-evidence verdict are formatted into a grounding prompt and a single hosted-Claude Messages call
-produces a citation-bearing answer. The LLM only grounds on what the retriever handed it; it never
-re-queries the corpus and is told to abstain rather than draw on its own prior.
+The LLM is wired via the AI-Team Claude-Agent-SDK session as an MCP toolset
+(`ai_team_adapter.build_rag_mcp_server`) — on the owner's existing plan, not the Anthropic API.
+This module holds the *grounding contract* that travels into that session: the fixed abstention
+line (v1 §5.2), the system/grounding prompt, and the retrieval-first decision helper. These are
+pure and unit-tested offline; the agent harness runs the actual turn.
 
-Egress: retrieved Bulgarian passages go to Anthropic (api.anthropic.com). Authorized by the written
-owner decision in docs/DECISIONS.md (2026-10-29), per the v1 §8 no-egress rule.
-
-The prompt builder (`build_grounding_prompt`) and the abstention short-circuit (`answer_from_search`)
-are pure / network-free so they are unit-tested without a paid call (AGENTS.md: tests call no paid
-service). Only `_call_claude` touches the SDK and the network.
+(Superseded 2026-10-29: an earlier direct-Anthropic-API path was retracted in favour of the SDK-MCP
+wiring — see docs/DECISIONS.md. `GROUNDING_GUIDANCE` in ai_team_adapter carries the same rules into
+the tool descriptions.)
 """
 
 from __future__ import annotations
 
-from collections.abc import Iterator
 from dataclasses import dataclass
 
 from .schema import RetrievedResult, SearchResponse
 
 # v1 §5.2 — the exact abstention statement the retriever's verdict maps to.
 ABSTENTION_LINE = "Not established from accessible project documents."
-
-DEFAULT_MODEL = "claude-opus-4-8"
-DEFAULT_MAX_TOKENS = 4096
 
 SYSTEM_PROMPT = (
     "You are a project-assistant that answers ONLY from the retrieved source passages supplied in "
@@ -54,10 +46,9 @@ class GroundedAnswer:
     question: str
     answer: str
     abstained_pre_llm: bool
-    citations: list[str]          # source_path strings of the passages offered to the model
+    citations: list[str]          # source_path strings of the passages offered to the LLM
     evidence_sufficient: bool
     evidence_top_score: float | None
-    model: str | None             # None when abstained pre-LLM
 
 
 def _format_passage(n: int, r: RetrievedResult) -> str:
@@ -108,68 +99,33 @@ def build_grounding_prompt(question: str, res: SearchResponse) -> str:
 
 
 def answer_from_search(question: str, res: SearchResponse, *,
-                       call_claude=None, model: str = DEFAULT_MODEL) -> GroundedAnswer:
+                       call_llm=None) -> GroundedAnswer:
     """Turn a SearchResponse into a grounded answer, retrieval-first.
 
-    `call_claude(system, user, model) -> str` is injected so tests can run the whole decision path
-    (including the abstention short-circuit) without a paid call. The real caller passes the SDK
-    wrapper `_call_claude`.
+    The real path is the AI-Team SDK-MCP session (the agent calls the RAG tools itself); this helper
+    is the pure decision contract used in tests and non-agent harnesses. `call_llm(system, user)
+    -> str` is injected so the whole decision path (including the abstention short-circuit) runs
+    without any paid call. When the retriever already abstained (empty results), no LLM is consulted.
     """
     citations = [r.source_path for r in res.results]
     ev = res.evidence
 
-    # Retrieval already decided: the gate suppressed passages as insufficient. Do not spend a
-    # token — emit the abstention line. (v1 §5.2 / §2.2; the owner's false-negative worry cuts both
-    # ways — never fabricate a section when the retriever found no evidence.)
+    # Retrieval already decided: the gate suppressed passages as insufficient. Emit the abstention
+    # line without consulting the LLM. (v1 §5.2 / §2.2; never fabricate a section with no evidence.)
     if not res.results:
         return GroundedAnswer(
             question=question, answer=ABSTENTION_LINE, abstained_pre_llm=True,
             citations=[], evidence_sufficient=ev.sufficient if ev.enabled else False,
-            evidence_top_score=ev.top_score, model=None,
+            evidence_top_score=ev.top_score,
         )
 
-    if call_claude is None:  # pragma: no cover - guarded; real runs inject _call_claude
-        raise ValueError("call_claude is required when passages are present")
+    if call_llm is None:  # pragma: no cover - guarded; the agent harness supplies the turn
+        raise ValueError("call_llm is required when passages are present")
 
     user = build_grounding_prompt(question, res)
-    answer = call_claude(SYSTEM_PROMPT, user, model)
+    answer = call_llm(SYSTEM_PROMPT, user)
     return GroundedAnswer(
         question=question, answer=answer, abstained_pre_llm=False,
         citations=citations, evidence_sufficient=ev.sufficient if ev.enabled else True,
-        evidence_top_score=ev.top_score, model=model,
+        evidence_top_score=ev.top_score,
     )
-
-
-def _call_claude(system: str, user: str, model: str,
-                 *, max_tokens: int = DEFAULT_MAX_TOKENS) -> str:
-    """Single hosted-Claude Messages call (streamed). Imports the SDK lazily so the module loads
-    without the `answer` extra installed. Streaming + adaptive thinking per the claude-api skill;
-    `claude-opus-4-8` uses adaptive thinking (no budget_tokens)."""
-    import anthropic  # noqa: PLC0415  (optional dep; only needed for a real egress call)
-
-    client = anthropic.Anthropic()  # ANTHROPIC_API_KEY from env; never hardcoded
-    with client.messages.stream(
-        model=model,
-        max_tokens=max_tokens,
-        thinking={"type": "adaptive"},
-        system=system,
-        messages=[{"role": "user", "content": user}],
-    ) as stream:
-        msg = stream.get_final_message()
-    return "".join(b.text for b in msg.content if b.type == "text").strip()
-
-
-def stream_claude(system: str, user: str, model: str,
-                  *, max_tokens: int = DEFAULT_MAX_TOKENS) -> Iterator[str]:
-    """Token iterator for the interactive CLI — same call, yields text deltas as they arrive."""
-    import anthropic  # noqa: PLC0415
-
-    client = anthropic.Anthropic()
-    with client.messages.stream(
-        model=model,
-        max_tokens=max_tokens,
-        thinking={"type": "adaptive"},
-        system=system,
-        messages=[{"role": "user", "content": user}],
-    ) as stream:
-        yield from stream.text_stream

@@ -1,9 +1,9 @@
-"""Grounded answerer contract (WP4, Option 2b). Pure, offline — NO paid LLM call.
+"""Grounding contract (WP4). Pure, offline — NO paid call.
 
 Exercises the retrieval-first decision path (abstention short-circuit) and the grounding-prompt
-assembly with a stubbed `call_claude`, so the whole answerer logic is covered without egress or
-cost (AGENTS.md: tests call no paid service). The real SDK call (`_call_claude`/`stream_claude`) is
-deliberately NOT exercised here.
+assembly with a stubbed `call_llm`, so the whole decision logic is covered without any LLM call
+(AGENTS.md: tests call no paid service). The live turn runs in the AI-Team SDK-MCP session
+(`ai_team_adapter.build_rag_mcp_server`), not here.
 """
 
 from __future__ import annotations
@@ -47,30 +47,28 @@ def _suppressed_response() -> SearchResponse:
 
 
 def test_abstains_pre_llm_when_gate_suppressed():
-    """No passages -> fixed abstention line, no LLM call (call_claude not even required)."""
+    """No passages -> fixed abstention line, no LLM consulted (call_llm not even required)."""
     ans = answer_from_search("колко е таксата за участие?", _suppressed_response())
     assert ans.abstained_pre_llm is True
     assert ans.answer == ABSTENTION_LINE
     assert ans.citations == []
     assert ans.evidence_sufficient is False
-    assert ans.model is None
 
 
 def test_grounds_on_passages_with_injected_call():
-    calls: list[tuple[str, str, str]] = []
+    calls: list[tuple[str, str]] = []
 
-    def fake_call(system: str, user: str, model: str) -> str:
-        calls.append((system, user, model))
+    def fake_call(system: str, user: str) -> str:
+        calls.append((system, user))
         return "Общият бюджет е 49 697,00 EUR [#1] (proposal.docx)."
 
     ans = answer_from_search("какъв е общият бюджет?", _sufficient_response(),
-                             call_claude=fake_call, model="claude-opus-4-8")
+                             call_llm=fake_call)
     assert ans.abstained_pre_llm is False
     assert "49 697,00" in ans.answer
     assert ans.citations == ["proposal.docx"]
     assert ans.evidence_sufficient is True
-    assert ans.model == "claude-opus-4-8"
-    # the model was called exactly once, with the grounding system prompt
+    # the LLM was called exactly once, with the grounding system prompt
     assert len(calls) == 1
     assert calls[0][0] == SYSTEM_PROMPT
 

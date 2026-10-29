@@ -74,7 +74,48 @@ never enters git — only synthetic fixtures are committed."*
   **Owner decision needed:** (a) scrub history before any push, or (b) accept it as low-sensitivity
   public application data and leave history as-is. Do not push until this is decided.
 
-## 2026-10-29 — EGRESS DECISION: corpus passages MAY be sent to a hosted LLM (Anthropic) — owner go-ahead (v1 §8)
+## 2026-10-29 — WP4 LLM wiring = AI-Team Claude-Agent-SDK as an MCP toolset (SUPERSEDES the direct-API egress plan)
+
+**Owner correction:** do NOT use the Anthropic API/key. The LLM runs on the owner's existing plan
+through the **AI-Team harness, which wraps the Claude Code SDK (`claude_agent_sdk`)**, and RAG is
+exposed to it as an **in-process MCP toolset** — the same mechanism AI-Team already runs for its
+`send_instruction` tool. This retracts the 2026-10-29 "egress to Anthropic Messages API" decision
+below and the Option 2b direct-API implementation.
+
+**What was built (verified against the live AI-Team repo, read-only; its CLAUDE.md test-cost guard
+honoured — nothing paid run):**
+- `src/project_rag/ai_team_adapter.build_rag_mcp_server(rag, project_id)` wraps `search_project` /
+  `open_source` / `get_ingestion_status` as `@tool`s via `create_sdk_mcp_server`, returning a
+  `ClaudeAgentOptions.mcp_servers` value. It is a near-mechanical mirror of
+  `src/control/agent_sender.py:build_claude_sender_server` (AI-Team, verified at line 215/219).
+  `claude_agent_sdk` is imported lazily (project_rag keeps no SDK/API dependency).
+- Naming follows AI-Team's merge contract: `RAG_SERVER_NAME="project_rag"`, tool FQNs
+  `mcp__project_rag__<tool>` (= `RAG_TOOL_FQNS`). The AI-Team side merges exactly as it does the
+  sender: `claude_driver._sdk_options` (verified line 973/988-992) does
+  `mcp_servers={SENDER_SERVER_NAME: build_claude_sender_server(slot)}` + appends the FQN to
+  `allowed_tools`; the RAG equivalent is the one-line analog.
+- `project_id` is bound server-side at build time (never from the LLM, v1 §4.6). Blocking RAG calls
+  run off the SDK loop via `asyncio.to_thread`, as the sender does.
+- Grounding/abstention contract (`answerer.SYSTEM_PROMPT` + `ai_team_adapter.GROUNDING_GUIDANCE`,
+  carried in the `search_project` tool description) travels with the tool: ground every claim + cite
+  source_path; abstain with "Not established from accessible project documents" (v1 §5.2) when no
+  passage states the fact; no authoritative counting across passages; preserve Cyrillic.
+- **Retracted:** `scripts/answer.py` (direct Messages CLI) deleted; `answerer._call_claude` /
+  `stream_claude` (anthropic SDK calls) removed; the `answer = ["anthropic>=0.49"]` pyproject extra
+  removed; `GroundedAnswer.model` dropped. `answerer.py` now holds only the pure grounding contract
+  (`SYSTEM_PROMPT`, `build_grounding_prompt`, `answer_from_search(call_llm=...)`), used in tests and
+  as the documented contract — no network. Tests: `tests/unit/test_rag_mcp_server.py` (stubbed SDK,
+  no dep/no paid call) + the retargeted `test_answerer.py`. 98 green.
+
+**No egress to a hosted API from project_rag.** The corpus passages reach the model only inside the
+AI-Team Claude-Code-SDK session (the owner's plan), through the MCP tool results — not via
+`api.anthropic.com` from this repo. The remaining AI-Team-side step (the one-line merge in
+`_sdk_options` + a per-session restricted tool set so the agent answers only from RAG tools) is an
+**AI-Team repo change**, to be done there under its own rules, not here.
+
+**The superseded plan is kept below as the record of what was reversed and why.**
+
+## 2026-10-29 — [SUPERSEDED by the entry above] EGRESS DECISION: corpus passages MAY be sent to a hosted LLM (Anthropic) — owner go-ahead (v1 §8)
 
 **This is the explicit written owner decision the no-egress rule (spec v1 §8, AGENTS.md "No data
 egress") requires before any corpus content leaves the machine.** The owner reviewed
