@@ -3,6 +3,42 @@
 Short, dated, unspecified-step design choices (AGENTS.md "Pivot rule"). Spec-contradicting
 changes go in `docs/AMENDMENT_A0N.md`, not here. Failures go in `docs/FAILURE_LEDGER.md`.
 
+## 2026-10-29 — Task D report-questions: owner review pass + a corpus-in-git finding (held for owner)
+
+**Owner asked for the 12 holdout report-section questions to be made fully correct before tee-up.**
+Done, two parts:
+
+**1. Re-validated + tightened (reversible, local-only file).** Re-ran `scripts/eval_yp.py:validate_labels`
+against *parsed* `yspdb/` this session — all 12 labels pass (F17 discipline: trust the validator,
+not prior prose). Then two owner-perspective label improvements, each re-validated:
+- **rp02 (Results/Indicators):** was a single met indicator with a brittle `Какво=`-prefixed
+  serialization. Strengthened to test a real planned-vs-achieved **gap**: webinars 3/3 (met) **and**
+  good-practices collection 15 planned / 10 achieved (shortfall). An Erasmus+ Results section must
+  report shortfalls honestly, so the question now exercises that.
+- **rp11 (M&E):** the substring was the generic `добри практики` (matches free-text noise anywhere).
+  Replaced with the concrete participant-recommendation question `Ще препоръчаш ли на твои връзстници`
+  — unambiguous evaluation evidence.
+- All 12 flipped `reviewed: false → true` (every label re-checked against parsed text this session).
+- Coverage left at 12 (brief said ~10–15); spans Summary/Results/Activities/Dissemination/
+  Methodology/Target-groups/Partnership/Budget/Outcomes/Legal/M&E/Identification. Not expanded —
+  more would be unrequested work with overfitting risk. **Still held for owner review; NOT merged
+  into the active eval set.**
+
+**2. FINDING — the candidate file was committed to git with verbatim corpus text (held for owner).**
+`eval/yp_report_questions_candidate.jsonl` was committed in `43873a1` (prior round). Its
+`expect_substrings` quote real corpus text (participant feedback, org names, the grant number
+`2024-3-BG01-KA154-YOU-000283706`, headcounts). That violates the AGENTS.md hard rule *"Real corpus
+never enters git — only synthetic fixtures are committed."*
+- **Done now (non-destructive):** added the file to `.gitignore` and `git rm --cached` it — the
+  local copy is preserved for the demo/review, but it will no longer be tracked or re-committed. My
+  rp11 tweak (which adds a participant-feedback quote) therefore does NOT land in git.
+- **Held for the owner (destructive — needs sign-off):** the already-committed blob still exists in
+  history at `43873a1`. Removing it requires a `git filter-repo`/history rewrite + force-push, which
+  the global rules forbid me from doing without explicit confirmation. Since the repo has not been
+  pushed (17+ local commits ahead of origin, no remote has it), the exposure is local-only for now.
+  **Owner decision needed:** (a) scrub history before any push, or (b) accept it as low-sensitivity
+  public application data and leave history as-is. Do not push until this is decided.
+
 ## 2026-10-29 — EGRESS DECISION: corpus passages MAY be sent to a hosted LLM (Anthropic) — owner go-ahead (v1 §8)
 
 **This is the explicit written owner decision the no-egress rule (spec v1 §8, AGENTS.md "No data
