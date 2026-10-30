@@ -9,10 +9,12 @@ independently testable without an LLM. Implements **spec v2**
 ## Status
 
 WP0→WP3 complete and **WP4 is wired and proven end-to-end**: a live Claude agent, grounding ONLY
-on the RAG retrieval tools, answers the validated report questions with citations and abstains on
-the genuinely-absent one — **13/13 answerable grounded + the no-answer case abstained, on
-`claude-sonnet-4-5`** (run `scripts/eval_agent.py`; results gitignored as they quote corpus text).
-See **`docs/HANDOFF_WP4_READY.md`** for the retrieval gate verdict and `docs/DECISIONS.md`
+on the RAG retrieval tools (stdio MCP, no backend change, no API key), answers the validated report
+questions with citations. On `claude-sonnet-4-5` the **11 pinpoint-fact questions ground correctly
+in every run**; the residual variance is on two borderline-abstention cases (a genuine no-answer and
+a fee-is-free hedge) — the honest frontier of LLM grounding, documented as ledger F22, not a wiring
+bug. Run `scripts/eval_agent.py` (results gitignored — they quote corpus text). See
+**`docs/HANDOFF_WP4_READY.md`** for the retrieval gate verdict and `docs/DECISIONS.md`
 (2026-10-29/30) for the wiring.
 
 - Real-corpus reranked pipeline (Qwen3-4B dense + FTS5 + RRF + cross-encoder reranker): recall@5

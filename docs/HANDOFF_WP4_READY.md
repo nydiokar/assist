@@ -1,5 +1,12 @@
 # WP4-readiness close-out — the retrieval layer, measured against every applicable gate
 
+> **UPDATE 2026-10-30 — WP4 is now BUILT and proven.** This document is a frozen point-in-time
+> *retrieval-readiness* assessment written before wiring; its "stop line / no LLM is called"
+> statements describe that moment only. WP4 is now live: RAG is exposed as a stdio MCP server
+> (`project_rag.mcp_server`) and a real Claude agent grounds on it end-to-end (see
+> `docs/DECISIONS.md` 2026-10-30, ledger F21/F22, `scripts/eval_agent.py`). Read this file for the
+> retrieval-gate verdict, not for current WP4 status.
+
 **Date:** 2026-10-28; **round-2 refresh 2026-10-29** · **Verdict:** the retrieval layer is
 **ready for an LLM to be wired (WP4)**, with items accepted-and-tracked, not blocking. · **Scope:**
 this document assesses the *retrieval* subsystem only. It does **not** cross the stop line — no LLM
