@@ -2,8 +2,8 @@
 
 Exercises the retrieval-first decision path (abstention short-circuit) and the grounding-prompt
 assembly with a stubbed `call_llm`, so the whole decision logic is covered without any LLM call
-(AGENTS.md: tests call no paid service). The live turn runs in the AI-Team SDK-MCP session
-(`ai_team_adapter.build_rag_mcp_server`), not here.
+(AGENTS.md: tests call no paid service). The live turn runs in the agent session that loads the
+stdio MCP server (`project_rag.mcp_server`), not here.
 """
 
 from __future__ import annotations

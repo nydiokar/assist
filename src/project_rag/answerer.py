@@ -1,14 +1,14 @@
 """Grounding contract for the WP4 answerer (prompt + abstention logic). NO network, NO API key.
 
-The LLM is wired via the AI-Team Claude-Agent-SDK session as an MCP toolset
-(`ai_team_adapter.build_rag_mcp_server`) — on the owner's existing plan, not the Anthropic API.
-This module holds the *grounding contract* that travels into that session: the fixed abstention
-line (v1 §5.2), the system/grounding prompt, and the retrieval-first decision helper. These are
-pure and unit-tested offline; the agent harness runs the actual turn.
+The LLM is wired via the standalone stdio MCP server (`project_rag.mcp_server`), registered in a
+project's `.mcp.json` and loaded by Claude Code / AI-Team at session start — on the owner's existing
+plan, not the Anthropic API. This module holds the *grounding contract* that travels into that
+session: the fixed abstention line (v1 §5.2), the system/grounding prompt, and the retrieval-first
+decision helper. These are pure and unit-tested offline; the agent harness runs the actual turn.
 
-(Superseded 2026-10-29: an earlier direct-Anthropic-API path was retracted in favour of the SDK-MCP
-wiring — see docs/DECISIONS.md. `GROUNDING_GUIDANCE` in ai_team_adapter carries the same rules into
-the tool descriptions.)
+(Superseded 2026-10-29: both an earlier direct-Anthropic-API path and a prototype in-process SDK
+helper were retracted in favour of the stdio-MCP-server wiring — see docs/DECISIONS.md.
+`GROUNDING_GUIDANCE` in ai_team_adapter carries the same rules into the tool descriptions.)
 """
 
 from __future__ import annotations

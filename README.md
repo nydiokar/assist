@@ -8,9 +8,12 @@ independently testable without an LLM. Implements **spec v2**
 
 ## Status
 
-WP0→WP3 complete; the retrieval layer is **measured on the real corpus and proven ready for WP4**
-(wiring an LLM) — see **`docs/HANDOFF_WP4_READY.md`** for the gate-by-gate verdict. WP4 generation
-is deliberately NOT built (stop line).
+WP0→WP3 complete and **WP4 is wired and proven end-to-end**: a live Claude agent, grounding ONLY
+on the RAG retrieval tools, answers the validated report questions with citations and abstains on
+the genuinely-absent one — **13/13 answerable grounded + the no-answer case abstained, on
+`claude-sonnet-4-5`** (run `scripts/eval_agent.py`; results gitignored as they quote corpus text).
+See **`docs/HANDOFF_WP4_READY.md`** for the retrieval gate verdict and `docs/DECISIONS.md`
+(2026-10-29/30) for the wiring.
 
 - Real-corpus reranked pipeline (Qwen3-4B dense + FTS5 + RRF + cross-encoder reranker): recall@5
   **0.82**, evidence@5 **0.71**, MRR **0.74** (34-scored v2 set); evidence-sufficiency/abstention
@@ -18,8 +21,12 @@ is deliberately NOT built (stop line).
 - Round 2 (2026-10-29): parent-section context expansion adopted (span@5 0.667→0.718), a
   cross-language glossary tested and rejected (negative), an owner-drivable session (`scripts/ask.py`),
   and a holdout report-section eval that honestly exposes the report-drafting gap (recall@5 0.42).
-  WP4 wiring investigated in `docs/WP4_WIRING_OPTIONS.md` — no wiring done (stop line).
-- 90 tests pass (offline hash embedder + in-memory store; fixture metrics are *not* a production SLA).
+  WP4 wiring investigated in `docs/WP4_WIRING_OPTIONS.md`.
+- WP4 (2026-10-30): RAG exposed as a **standalone stdio MCP server** (`project_rag.mcp_server`),
+  registered per-project in `.mcp.json`, loaded by Claude Code / AI-Team at session start — **no
+  harness/backend change, no API key**. Proven live (`scripts/eval_agent.py`); the one small-model
+  reading miss (Haiku on the budget total) is documented in ledger F21 and resolved by sonnet.
+- 102 tests pass (offline hash embedder + in-memory store; fixture metrics are *not* a production SLA).
 - **GPU path runs in WSL via ROCm, not on the Windows host.** The Windows host has no NVIDIA GPU
   (A01). WSL Ubuntu-24.04 has an AMD Radeon RX 7900 XT (gfx1100) reachable through ROCm 7.2.4;
   the real-corpus Qwen3-4B index was built and evaluated there (see `docs/EVAL_LOG.md` 2026-10-26).
@@ -116,21 +123,28 @@ reparsing; switching the embedding profile re-embeds without touching parse/chun
 
 `discovery → [stages: parse-cache → chunk-cache] → embeddings + vector_store (dense) +
 lexical_store (FTS5) → retrieval (RRF fusion + dedup) → api (tool contracts) →
-ai_team_adapter (WP4 seam)`.
+ai_team_adapter (transport-agnostic tool descriptors) → mcp_server (stdio MCP transport, WP4)`.
 `manifest` (SQLite) holds document state, active index generation, and pinned embedding profile.
 `trace` records grounding diagnostics (hashed query, retrieved chunk IDs) with no raw PII.
 
-## Build stop line (waiting on user-provided inputs)
+## Using the project assistant (WP4)
 
-1. **Real NGO corpus** → run the real parsing gate, decide the E5 download, run WP3 on real data.
-2. **AI-Team tool contract** → bind `ai_team_adapter.register_with_ai_team` at the `# WP4 SEAM`.
+The RAG retrieval tools are exposed to a Claude agent as a **stdio MCP server**, registered in a
+per-project `.mcp.json` (copy `.mcp.json.example`, set the absolute WSL paths). Claude Code (or the
+AI-Team harness that wraps it) loads it at session start — no backend change, no API key. Then:
 
-Until then no production gate requiring real data is marked passed, and no unsafe assumption is made.
+- **Interactive:** from the project dir in WSL, `claude --model claude-sonnet-4-5` — the agent has
+  `search_project` / `open_source` / `get_ingestion_status` and answers grounded in the corpus.
+- **Batch proof:** `scripts/eval_agent.py` runs the validated question set through the agent and
+  checks grounding + abstention. `scripts/smoke_mcp.py` proves the MCP transport alone.
+
+Model note (ledger F21): use **sonnet**; Haiku mis-read the budget total (reported a sub-line, not
+the line labelled "Total"). Retrieval and wiring are identical across models.
 
 ## What is intentionally NOT built yet
 
 Chat backend, scheduler, agent teams, indicator aggregation engine, knowledge graph, OCR,
-cloud hosting (v1 §2.4 / §7). The **LLM/generation path (WP4)** is the stop line: no LLM is called,
-no AI-Team tool is registered, no grounded-answer/citation synthesis exists. The retrieval layer is
-handed off *ready* for it — `docs/HANDOFF_WP4_READY.md`. (The cross-encoder reranker, once "deferred",
+cloud hosting (v1 §2.4 / §7). WP4 now exists as the **stdio-MCP tool surface + grounding contract**
+consumed by an external agent; the RAG repo itself still calls no LLM and hosts no chat loop — the
+agent (Claude Code / AI-Team, on the owner's plan) does. (The cross-encoder reranker, once "deferred",
 is now built and measured — F19.)

@@ -74,7 +74,45 @@ never enters git — only synthetic fixtures are committed."*
   **Owner decision needed:** (a) scrub history before any push, or (b) accept it as low-sensitivity
   public application data and leave history as-is. Do not push until this is decided.
 
-## 2026-10-29 — WP4 LLM wiring = AI-Team Claude-Agent-SDK as an MCP toolset (SUPERSEDES the direct-API egress plan)
+## 2026-10-29 — WP4 wiring FINAL: a standalone stdio MCP server registered in .mcp.json (SUPERSEDES both the direct-API and the in-process-SDK plans)
+
+**The correct, verified way — no AI-Team/backend change, no API key.** RAG is a plain local **stdio
+MCP server** (`src/project_rag/mcp_server.py`, `python -m project_rag.mcp_server --config --project
+--root`). It is registered in the project root's `.mcp.json`; Claude Code (and AI-Team, which wraps
+it) loads project-scoped MCP servers from that file at session start on its own — exactly how
+AI-Team's own `manager`/`jobs` servers load from user scope. Nothing in AI-Team is modified.
+
+- Built on `MCPServer` (the installed `mcp` 2.3.0 high-level API); three read-only tools
+  (`search_project`/`open_source`/`get_ingestion_status`) wrapping `build_tool_descriptors`, bound
+  to a server-resolved `project_id`+`root` from launch args (never the LLM, v1 §4.6). Grounding
+  guidance travels in the `search_project` description.
+- **Retracted the in-process `build_rag_mcp_server`** (the prior entry's approach) — that copied the
+  wrong template (`agent_sender`, which is in-process only because it carries a live secret slot)
+  and would have required editing `_sdk_options`. RAG has no such need; config-file registration is
+  the normal path. `ai_team_adapter.py` is now just the transport-agnostic descriptor contract +
+  `tool_result_is_error`.
+- **PROVEN end-to-end (not asserted):** `scripts/smoke_mcp.py` spawns the server as a subprocess
+  (as Claude Code does), connects an MCP client over stdio, lists the 3 tools, and runs a live
+  Bulgarian query against the real 5717-chunk index → 5 passages, evidence sufficient, SMOKE PASS.
+  And `claude mcp list` from the project dir reports `project-rag: ✓ Connected` — Claude Code itself
+  launches and handshakes the server. The ONLY thing not yet shown is the model reasoning over the
+  result: the WSL `claude` OAuth token is expired (401) — a credential refresh on the owner's side,
+  not a wiring defect. Once re-authed, `claude -p "...search_project..." --model claude-haiku-4-5`
+  from the project dir completes the loop.
+- `.mcp.json` is gitignored (host-specific absolute WSL paths, points at the gitignored corpus
+  config); `.mcp.json.example` is the committed template. `mcp>=1.2` added to pyproject (`mcp`
+  extra); it is installed in the WSL GPU venv where retrieval runs. The `test_rag_mcp_server.py`
+  test `importorskip`s `mcp` so the Windows `.venv` suite stays green (95 passed, 1 skipped) and the
+  WSL venv runs it (8 passed).
+- **Thread-affinity fix (ledger-worthy):** the first stdio run crashed with SQLite
+  "objects created in a thread can only be used in that same thread" because the handlers offloaded
+  via `asyncio.to_thread` while ProjectRAG's manifest/lexical SQLite connections are thread-affine.
+  Fixed by running retrieval synchronously in the handler — a stdio server serves one client
+  serially, so there is no concurrency to gain, and it removes the bug at the root.
+
+**The two earlier plans are kept below as the record of what was reversed and why.**
+
+## 2026-10-29 — [SUPERSEDED] WP4 LLM wiring = AI-Team Claude-Agent-SDK as an MCP toolset (SUPERSEDES the direct-API egress plan)
 
 **Owner correction:** do NOT use the Anthropic API/key. The LLM runs on the owner's existing plan
 through the **AI-Team harness, which wraps the Claude Code SDK (`claude_agent_sdk`)**, and RAG is

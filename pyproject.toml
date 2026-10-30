@@ -29,9 +29,11 @@ e5 = ["sentence-transformers>=3,<4"]        # legacy comparator (A01 supersedes 
 rerank = ["sentence-transformers>=3,<4"]
 chroma = ["chromadb>=0.5,<2"]
 docling = ["docling>=2,<3"]
-# WP4 LLM wiring is via AI-Team's Claude-Agent-SDK session (RAG as an in-process MCP toolset —
-# ai_team_adapter.build_rag_mcp_server). `claude_agent_sdk` is AI-Team's dependency and is imported
-# lazily there; project_rag does not take a hosted-API dep (no direct Anthropic API, no API key).
+# WP4 wiring: RAG is exposed as a standalone stdio MCP server (project_rag.mcp_server), registered
+# in a project's .mcp.json and loaded by Claude Code / AI-Team at session start. No hosted-API dep,
+# no API key — the agent (on the owner's plan) calls the tools. Installed in the venv that runs the
+# retriever (the WSL GPU venv).
+mcp = ["mcp>=1.2"]
 dev = [
     "pytest>=8,<9",
     "pytest-cov>=5,<6",

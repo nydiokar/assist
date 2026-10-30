@@ -1,0 +1,19 @@
+{
+  "_comment": "Project-scoped MCP registration for the RAG retrieval tools (WP4). Copy to .mcp.json and edit the absolute paths for your machine. Claude Code / AI-Team loads this at session start from the project root; no backend change. The server runs in the venv that has project_rag + the GPU index (here: the WSL ROCm venv). The real .mcp.json is gitignored because its paths are host-specific and it points at the gitignored real corpus.",
+  "mcpServers": {
+    "project-rag": {
+      "type": "stdio",
+      "command": "/ABSOLUTE/PATH/TO/venv/bin/python",
+      "args": [
+        "-X", "utf8", "-m", "project_rag.mcp_server",
+        "--config", "/ABSOLUTE/PATH/TO/assist/configs/yp_qwen4b_gpu_report.yaml",
+        "--project", "ypq",
+        "--root", "/ABSOLUTE/PATH/TO/assist/yspdb"
+      ],
+      "env": {
+        "PYTHONPATH": "/ABSOLUTE/PATH/TO/assist/src",
+        "HSA_ENABLE_DXG_DETECTION": "1"
+      }
+    }
+  }
+}

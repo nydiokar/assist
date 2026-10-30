@@ -6,7 +6,9 @@ __pycache__/
 .pytest_cache/
 .coverage
 htmlcov/
-eval/results/*.json
+# Eval outputs quote verbatim corpus text (answers/citations) — never in git. Cover .json AND
+# .jsonl (the agent-eval writer emits agent_eval.jsonl).
+eval/results/
 # Real NGO files must never be committed; only synthetic fixtures under tests/fixtures/.
 yspdb/
 drive-download-*.zip
@@ -21,5 +23,8 @@ eval/yp_report_questions.jsonl
 # Scratch authoring inputs (corpus-derived); regenerable, not committed.
 scripts/_*.txt
 scripts/_*.jsonl
+# Live MCP registration: host-specific absolute paths + points at the gitignored corpus config.
+# Committed template is .mcp.json.example — copy and edit per machine.
+.mcp.json
 
 *.egg-info/
