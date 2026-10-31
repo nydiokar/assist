@@ -74,7 +74,40 @@ never enters git — only synthetic fixtures are committed."*
   **Owner decision needed:** (a) scrub history before any push, or (b) accept it as low-sensitivity
   public application data and leave history as-is. Do not push until this is decided.
 
-## 2026-10-31 — Remote demo wiring: RAG registered in USER-scope `~/.claude.json` so every AI-Team session loads it (no AI-Team code change)
+## 2026-10-31 (rev) — Scope narrowed to PROJECT-LOCAL per owner: RAG loads only in the `assist` dir, not globally
+
+**Owner decision:** do NOT expose RAG in every agent session. It must be local to `assist`.
+Supersedes the user-scope registration below.
+
+**Done:**
+- Removed `project-rag` from the top-level `mcpServers` in `~/.claude.json`; also removed the stale
+  `test-pkg` (it lived under `projects["C:/Users/Cicada38"].mcpServers`, not top-level — that is why
+  it showed in `claude mcp list`). `~/.claude.json` top-level `mcpServers` is back to AI-Team's own
+  `jobs`/`manager`/`codebase-memory-mcp`.
+- `assist/.mcp.json` (project scope, gitignored) now carries `project-rag` and is the single source.
+  Its `command` was changed from the bare WSL python path to the **`wsl.exe -d Ubuntu-24.04 -- bash
+  -lc '…'` wrapper** so it launches correctly whether the loading `claude` session is Windows- or
+  WSL-side (a Windows session cannot exec a Linux path directly).
+- Pre-approved it: `projects["…/assist"].enabledMcpjsonServers = ["project-rag"]` so non-interactive
+  `claude -p` / AI-Team sessions load it without the project-MCP trust prompt (`⏸ Pending approval`).
+- The MCP server is **spawned on demand by the `claude` CLI** when a session with the tool starts,
+  and reaped when the session ends — it is never started or run manually, in tests or demo. Orphans
+  from verification runs were killed; WSL shows no `project_rag.mcp_server` at rest.
+
+**Proven:** `claude mcp list` from `C:\Users\Cicada38` shows NO `project-rag`/`test-pkg` (only
+jobs/manager); from `…/assist` it lists `project-rag` from `.mcp.json`; a non-interactive
+`claude -p … --model claude-sonnet-4-5` in `…/assist` called `search_project` (num_turns=3) and
+returned the applicant/partner orgs grounded with citation.
+
+**Consequence (trade-off the owner accepted):** a session must run with **cwd = the assist dir** to
+get the tool. If the AI-Team node opens phone sessions with cwd `Projects/` (not `assist`), the
+project `.mcp.json` will NOT load — the session must be started in `assist`. (User scope was
+cwd-independent; project scope is the price of "local only".)
+
+**Reversibility:** re-add the key to `~/.claude.json` `mcpServers` to go global again; backups
+`~/.claude.json.bak-deregister-*` and `~/.claude.json.bak-approve-*` capture the pre-change state.
+
+## 2026-10-31 — [SUPERSEDED by the rev above] Remote demo wiring: RAG registered in USER-scope `~/.claude.json` so every AI-Team session loads it (no AI-Team code change)
 
 **Goal:** interrogate the RAG agent from the operator's phone via the AI-Team gateway PWA, reusing
 AI-Team's existing node connectivity — NOT installing new remote tooling, NOT touching the backend.
