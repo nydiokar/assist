@@ -74,6 +74,38 @@ never enters git — only synthetic fixtures are committed."*
   **Owner decision needed:** (a) scrub history before any push, or (b) accept it as low-sensitivity
   public application data and leave history as-is. Do not push until this is decided.
 
+## 2026-10-31 — Remote demo wiring: RAG registered in USER-scope `~/.claude.json` so every AI-Team session loads it (no AI-Team code change)
+
+**Goal:** interrogate the RAG agent from the operator's phone via the AI-Team gateway PWA, reusing
+AI-Team's existing node connectivity — NOT installing new remote tooling, NOT touching the backend.
+
+**Verified against AI-Team code (read-only, nothing paid run):** `claude_driver._sdk_options`
+passes `cwd=session.repo_path` and, for role sessions, `setting_sources=["user","project"]`; the
+in-code comment (claude_driver.py ~2074) is explicit that the SDK **loads user-scope MCP servers
+from `~/.claude.json` when "user" is in setting_sources (the default when None)** — this is exactly
+how AI-Team's own `manager`/`jobs` servers load. So a plain config entry reaches every session.
+
+**What was done (one change, reversible):** added a `project-rag` entry to the `mcpServers` map in
+`C:\Users\Cicada38\.claude.json` (backed up first), mirroring the `manager`/`jobs` pattern. Because
+RAG must run in WSL (GPU index + `mcp` + `project_rag` live there) while AI-Team sessions launch MCP
+`command`s as Windows processes, the command is a **cross-OS stdio spawn**:
+`wsl.exe -d Ubuntu-24.04 -- bash -lc 'cd …/assist && PYTHONPATH=src HSA_ENABLE_DXG_DETECTION=1 <wsl
+venv python> -X utf8 -m project_rag.mcp_server --config configs/yp_qwen4b_gpu_report.yaml --project
+ypq --root …/yspdb'`. User scope (not project `.mcp.json`) is deliberate: the AI-Team node's
+sessions may run with a cwd of `Projects/` (not `assist`), so a path-scoped file would not load —
+user scope is cwd-independent, and the server is bound to the YP corpus by its launch args, not the
+session cwd.
+
+**Proven (not asserted):** `claude mcp list` from `C:\Users\Cicada38` (a non-assist dir) reports
+`project-rag: ✔ Connected`; a `claude -p … --allowed-tools mcp__project-rag__search_project …
+--model claude-sonnet-4-5` run from that same arbitrary dir called the tool (num_turns=3) and
+returned the grant total 49 697,00 EUR grounded with citation — reading the WSL index over wsl.exe
+stdio. A raw MCP stdio handshake probe over the same `wsl.exe` command lists the three tools with no
+banner contamination. `.mcp.json` (project scope) stays as the committed per-dir alternative.
+
+**Reversibility:** delete the `project-rag` key from `~/.claude.json` (or restore the dated backup).
+Nothing in AI-Team or the RAG repo changed for this; it is pure host MCP registration.
+
 ## 2026-10-29 — WP4 wiring FINAL: a standalone stdio MCP server registered in .mcp.json (SUPERSEDES both the direct-API and the in-process-SDK plans)
 
 **The correct, verified way — no AI-Team/backend change, no API key.** RAG is a plain local **stdio
