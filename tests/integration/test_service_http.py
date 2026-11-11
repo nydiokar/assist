@@ -138,10 +138,10 @@ async def _list_tools(base: str) -> list[str]:
     async with (
         httpx.AsyncClient(headers={"Authorization": f"Bearer {TOKEN}"}, timeout=60) as http,
         streamable_http_client(f"{base}/mcp", http_client=http) as streams,
+        ClientSession(streams[0], streams[1]) as session,
     ):
-        async with ClientSession(streams[0], streams[1]) as session:
-            await session.initialize()
-            return sorted(t.name for t in (await session.list_tools()).tools)
+        await session.initialize()
+        return sorted(t.name for t in (await session.list_tools()).tools)
 
 
 def test_tools_search_envelope_and_invalid_project(running: tuple[Runtime, str, str]) -> None:

@@ -33,39 +33,39 @@ async def run(url: str, token: str, project: str | None, query: str) -> int:
     from mcp import ClientSession
     from mcp.client.streamable_http import streamable_http_client
 
-    async with httpx.AsyncClient(headers={"Authorization": f"Bearer {token}"}, timeout=120) as http:
-        async with streamable_http_client(url, http_client=http) as streams:
-            async with ClientSession(streams[0], streams[1]) as session:
-                await session.initialize()
-                names = sorted(t.name for t in (await session.list_tools()).tools)
-                print("TOOLS:", names)
-                if names != EXPECTED_TOOLS:
-                    print("SMOKE: FAIL (tool list)")
-                    return 1
-                projects = json.loads(
-                    (await session.call_tool("list_projects", {})).content[0].text
-                )["projects"]
-                print("PROJECTS:", [(p["project_id"], p["documents"]) for p in projects])
-                pid = project or (projects[0]["project_id"] if projects else "")
-                res = await session.call_tool(
-                    "search_project", {"project_id": pid, "query": query, "top_k": 5}
-                )
-                text = res.content[0].text
-                if res.is_error:
-                    print("SMOKE: FAIL", text)
-                    return 1
-                payload = json.loads(text)
-                passages = payload["passages"]
-                ev = payload["evidence"]
-                print(f"QUERY: {query!r} project={pid} degraded={payload['degraded']}")
-                print(
-                    f"  passages={len(passages)} sufficient={ev['sufficient']} top={ev['top_score']}"
-                )
-                for p in passages[:3]:
-                    print(f"    [{p['rank']}] {p['trust']} {p['source_path']}")
-                ok = bool(passages) and all(p["trust"] == "untrusted_data" for p in passages)
-                print("SMOKE:", "PASS" if ok else "FAIL")
-                return 0 if ok else 1
+    async with (
+        httpx.AsyncClient(headers={"Authorization": f"Bearer {token}"}, timeout=120) as http,
+        streamable_http_client(url, http_client=http) as streams,
+        ClientSession(streams[0], streams[1]) as session,
+    ):
+        await session.initialize()
+        names = sorted(t.name for t in (await session.list_tools()).tools)
+        print("TOOLS:", names)
+        if names != EXPECTED_TOOLS:
+            print("SMOKE: FAIL (tool list)")
+            return 1
+        projects = json.loads((await session.call_tool("list_projects", {})).content[0].text)[
+            "projects"
+        ]
+        print("PROJECTS:", [(p["project_id"], p["documents"]) for p in projects])
+        pid = project or (projects[0]["project_id"] if projects else "")
+        res = await session.call_tool(
+            "search_project", {"project_id": pid, "query": query, "top_k": 5}
+        )
+        text = res.content[0].text
+        if res.is_error:
+            print("SMOKE: FAIL", text)
+            return 1
+        payload = json.loads(text)
+        passages = payload["passages"]
+        ev = payload["evidence"]
+        print(f"QUERY: {query!r} project={pid} degraded={payload['degraded']}")
+        print(f"  passages={len(passages)} sufficient={ev['sufficient']} top={ev['top_score']}")
+        for p in passages[:3]:
+            print(f"    [{p['rank']}] {p['trust']} {p['source_path']}")
+        ok = bool(passages) and all(p["trust"] == "untrusted_data" for p in passages)
+        print("SMOKE:", "PASS" if ok else "FAIL")
+        return 0 if ok else 1
 
 
 def _fixture_service() -> tuple[str, str, object]:
