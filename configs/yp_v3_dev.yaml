@@ -1,0 +1,72 @@
+# v3 dev ingest of the YP corpus inside the assist:dev container (S4). Container paths:
+#   /corpus/Youth Participation  <- yspdb (read-only bind mount; the registry's one project)
+#   /state                       <- local_data/v3_yp (catalog, FTS5, Chroma, caches, run reports)
+# Models: the llama-server pair on the host (deploy/dev/compose.models.yaml), Q8_0 embedder.
+# Retrieval settings = the prototype production profile (yp_qwen4b_gpu_rerank_abstain).
+schema_version: 1
+
+embedding:
+  provider: openai_compat
+  openai_compat:
+    base_url: http://host.docker.internal:8081
+    model_id: Qwen/Qwen3-Embedding-4B-GGUF
+    revision: f4602530db1d980e16da9d7d3a70294cf5c190be
+    gguf_file: Qwen3-Embedding-4B-Q8_0.gguf
+    gguf_sha256: b60ae5ce2dd6a0b77f82cadf21def1f310a3e10cde380ad0081b07a9d416949d
+    quant: Q8_0
+    dim: 2560
+    pooling: last
+    query_prompt_version: qwen3_query_v1
+    max_input_tokens: 2048
+    max_batch: 16
+    timeout_s: 300
+
+parsing:
+  backend: native
+  detect_scanned_pdf: true
+  antiword: true
+  ocr:
+    enabled: true
+    languages: bul+eng
+    min_chars: 40          # tuned in S4 (DECISIONS 2026-11-11)
+    min_mean_conf: 60.0    # tuned in S4 (DECISIONS 2026-11-11)
+
+vector_store:
+  provider: chroma
+  collection: yp_v3_q8_0
+  distance: cosine
+  persist_path: /state/chroma
+
+lexical_store:
+  path: /state/store.sqlite3
+
+chunking:
+  target_tokens: 500
+  max_tokens: 2048
+  overlap_tokens: 0
+  table_rows_per_chunk: 20
+
+retrieval:
+  top_k: 8
+  candidates_per_channel: 16
+  fusion: {method: rrf, k: 60}
+  per_file_cap: 3
+  max_source_chars: 6000
+  rerank:
+    enabled: true
+    provider: openai_compat
+    top_n: 12
+    openai_compat:
+      base_url: http://host.docker.internal:8082
+      gguf_sha256: a43c7c9b11a4c1517e5bf95151960e1621d1b72f7a493364b01e386cf1aaa1d3
+      score_transform: sigmoid
+  abstention:
+    enabled: true
+    signal: rerank_score
+    min_top_score: 0.26
+    suppress_on_insufficient: true
+
+security: {max_query_chars: 2000, max_result_excerpt_chars: 1200}
+
+classification:
+  reference_prefixes: ["Youth Participation Resources/"]

@@ -2,6 +2,7 @@
 
 Usage:
   project-rag ingest  --project PID --root PATH [--dry-run] [--config CFG]
+  project-rag ingest-corpus --corpus-root PATH [--summary] [--config CFG]
   project-rag search  --project PID --query "..." [--top-k N] [--config CFG] [--root PATH]
   project-rag status  --project PID [--config CFG]
   project-rag open    --project PID --doc DOCID --source-path REL --root PATH [--config CFG]
@@ -34,6 +35,10 @@ def run(argv: list[str] | None, open_api: Callable[[str | None], AssistantAPI]) 
     p_ing.add_argument("--root", required=True)
     p_ing.add_argument("--dry-run", action="store_true")
 
+    p_ic = sub.add_parser("ingest-corpus", help="registry-driven: one project per top folder")
+    p_ic.add_argument("--corpus-root", required=True)
+    p_ic.add_argument("--summary", action="store_true", help="print run reports only")
+
     p_se = sub.add_parser("search")
     p_se.add_argument("--project", required=True)
     p_se.add_argument("--query", required=True)
@@ -54,6 +59,11 @@ def run(argv: list[str] | None, open_api: Callable[[str | None], AssistantAPI]) 
     try:
         if args.command == "ingest":
             _emit(api.ingest_project(args.project, args.root, dry_run=args.dry_run).model_dump())
+        elif args.command == "ingest-corpus":
+            reports = api.ingest_corpus(args.corpus_root)
+            _emit(
+                [r.run.model_dump() if args.summary and r.run else r.model_dump() for r in reports]
+            )
         elif args.command == "search":
             if args.root:
                 api.register_project_root(args.project, args.root)

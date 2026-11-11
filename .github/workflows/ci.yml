@@ -20,6 +20,10 @@ jobs:
         with:
           version: "0.9.5"
           python-version: "3.12"
+      - name: OCR and legacy-doc tools (S4 adapter tests)
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q --no-install-recommends tesseract-ocr tesseract-ocr-bul tesseract-ocr-eng ocrmypdf antiword
       - name: Sync (frozen lock, dev extra)
         run: uv sync --frozen --extra dev
       - name: Ruff lint

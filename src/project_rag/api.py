@@ -75,6 +75,14 @@ class ProjectRAG:
             max_chars=max_chars,
         )
 
+    def ingest_corpus(self, corpus_root: str) -> list[IngestReport]:
+        """Registry-driven ingest: every top-level folder of `corpus_root` is one project."""
+        reports: list[IngestReport] = []
+        for rec in self._services.registry.sync(corpus_root):
+            self.register_project_root(rec.identity.project_id, rec.root_path)
+            reports.append(self._services.ingest.ingest(rec.identity.project_id, rec.root_path))
+        return reports
+
     def get_ingestion_status(self, project_id: str) -> StatusReport:
         return self._services.ingest.status(project_id)
 

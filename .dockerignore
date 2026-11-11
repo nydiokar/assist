@@ -1,0 +1,12 @@
+# Never send corpus, state, models or venvs into the build context.
+yspdb/
+holdout-report/
+local_data/
+models/
+eval/
+.venv/
+.git/
+*.zip
+**/__pycache__/
+.pytest_cache/
+.ruff_cache/

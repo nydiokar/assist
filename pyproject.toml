@@ -25,7 +25,11 @@ dependencies = [
 # v3 extras (spec A03 §15.2): `serve` = production service image (filled from S6 onward; torch
 # never enters it), `dev` = tests + toolchain (CI), `dev-gpu` = local reference/heavy backends
 # (torch Qwen3 embedder, cross-encoder reranker, docling, chroma) run in the WSL ROCm venv.
-serve = []
+serve = [
+    # D-3 (S2): Chroma is the vector store. The stdio/HTTP MCP interface (S6) needs `mcp`.
+    "chromadb>=0.5,<2",
+    "mcp>=1.2",
+]
 dev = [
     "pytest>=8,<9",
     "pytest-cov>=5,<6",
