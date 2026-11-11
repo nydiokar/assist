@@ -620,3 +620,44 @@ All behaviour-neutral (golden snapshot byte-identical to S0, `git diff 36b1ec9 -
   `max_result_excerpt_chars` (1200 chars). Revisit if E1 shows a rerank shift on long passages.
 - **FP16 reranker GGUF pinned** (`bge-reranker-v2-m3-f16`) only as the round-1 diagnostic; the
   served default stays Q8_0.
+
+## 2026-11-11 — S4 ingestion v2: design choices
+
+- **OCR orchestration lives in a service** (`services/parsing.OcrAwareParser`), the keep rule in
+  the core (`core.ingest_policy.ocr_keep`), the binaries in an adapter (`ocr_tesseract`). Its
+  output goes through the parse stage cache; the OCR config is part of the parse key and of the
+  generation id (`pipeline_fingerprint` now hashes the whole `ParsingConfig`).
+- **`OcrEngine.ocr_pdf` returns page texts** (ocrmypdf `--force-ocr --sidecar`) instead of a path
+  to a text-layered copy: temp files stay inside the adapter and blocks get page provenance.
+  The keep rule for scanned PDFs is `min_chars` only (the sidecar has no confidences).
+- **FAILED parse results are never cached** (found by the S4 isolation test): an OCR timeout or a
+  missing tool must be retried on the next run, not frozen until the parse config changes.
+- **Embedding is per document** so one document's provider error fails only that document.
+  Guard against a hollow index: if embedding fails for ≥ `abort_min_failures` (3) documents AND
+  > `max_embed_failure_fraction` (25 %) of the documents that needed new vectors, the run aborts
+  (`IngestAborted`), nothing is published, and the run report records it.
+- **Exclusions** (`ingest.exclude_extensions` media, `exclude_name_globs` temp/lock files,
+  `max_file_bytes` 200 MB) never reach the catalog, the generation id or coverage. Discovery
+  already drops `~$*`, `.~*`, `*.tmp`, `*.lock`, `*~`.
+- **Run report** = `RunReport` in `run_reports.report_json` + `<state>/runs/*.json`; it carries
+  counts by state, coverage (READY / in-scope), failed and newly-failed documents with reasons
+  (prior states snapshotted before phase 2 deletes them), OCR/antiword-indexed lists, embeddings
+  computed vs cached, and per-stage seconds. No document text.
+- **Registry**: slug = BG-transliterated folder name, assigned once; key = sidecar Drive id, dev
+  fallback `path:<sha256(folder)[:16]>` (not rename-stable, documented). Sidecar format
+  (`.sync/manifest.json`: `folders[{path, drive_id}]`, `files[{path, drive_id, web_link}]`) is
+  fixed here; the S8 sync job writes it.
+- **Query-time re-reads do not OCR** (`open_source`/context expansion use the plain registry):
+  for OCR'd documents expansion falls back to the stored excerpt.
+- **Dev image** `deploy/Dockerfile` (python 3.12-slim-bookworm + tesseract bul/eng + ocrmypdf +
+  antiword, `uv sync --extra serve`, no torch) is built now so OCR runs as in production; S8
+  hardens it. `chromadb` and `mcp` moved into the `serve` extra (D-3 = Chroma).
+- **OCR keep thresholds tuned on YP (2026-11-11): `min_chars` 15, `min_mean_conf` 65** (spec §6.5
+  "tune N and M on the corpus"). Survey (`scripts/ocr_survey.py` in the assist image,
+  tesseract 5.3.0 bul+eng, output local only): 144 images, 3 scanned PDFs, 0 errors, 191 s.
+  Below ~60 mean confidence the output is garbage even when long (a 147-char image at conf 45);
+  from ~70 up it is real text (posters, slides, Zoom screenshots with participant names), and
+  short high-confidence strings are sponsor/partner logos ("UniCredit Bulbank", 17 chars).
+  Kept/NO_TEXT: 40/60 → 74/70; **15/65 → 86/58**; 15/60 → 87/57; 30/70 → 77/67. 65 drops the
+  one 54-conf partial poster title and the 58–64 junk. The owner spot-check (10 OCR'd docs) is
+  the S4 owner gate.

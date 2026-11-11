@@ -28,8 +28,8 @@ parsing:
   ocr:
     enabled: true
     languages: bul+eng
-    min_chars: 40          # tuned in S4 (DECISIONS 2026-11-11)
-    min_mean_conf: 60.0    # tuned in S4 (DECISIONS 2026-11-11)
+    min_chars: 15          # tuned on the YP OCR survey (DECISIONS 2026-11-11)
+    min_mean_conf: 65.0    # tuned on the YP OCR survey (DECISIONS 2026-11-11)
 
 vector_store:
   provider: chroma

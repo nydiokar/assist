@@ -173,8 +173,8 @@ class OcrConfig(_Cfg):
 
     enabled: bool = False
     languages: str = "bul+eng"
-    min_chars: int = 40
-    min_mean_conf: float = 60.0
+    min_chars: int = 15  # tuned on YP 2026-11-11 (DECISIONS): keeps sponsor/partner logo text
+    min_mean_conf: float = 65.0  # tuned on YP 2026-11-11: below ~60 the output is garbage
     image_extensions: list[str] = Field(
         default_factory=lambda: [".png", ".jpg", ".jpeg", ".tif", ".tiff", ".bmp"]
     )

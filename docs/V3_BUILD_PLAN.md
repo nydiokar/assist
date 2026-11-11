@@ -448,7 +448,7 @@ Format: `YYYY-MM-DD · Stage · event · evidence (commands + one-line results, 
 
 **Owner queue** (the agent writes here when it stops; the owner clears entries):
 
-- *(empty)*
+- 2026-11-11 · S4/S5 · **Permission: run the GPU llama.cpp build on this PC.** The official ggml-org release `llama-b11804-bin-win-vulkan-x64.zip` (same build as the pinned CPU image; sha256 `db9ab319…87d5` verified against the GitHub release digest) is unpacked in `local_data/llama-b11804-win-vulkan/`; `llama-server.exe --list-devices` sees the RX 7900 XT. Starting it as a server was blocked by the session's permission policy ("code from external"). Needed for (a) a fast initial YP build in S4 (optional; the CPU container works, only slower) and (b) **S5 task 4, the GPU-vs-CPU parity check, which cannot run without it.** Options: (1) allow it, e.g. a permission rule for `local_data/llama-b11804-win-vulkan/llama-server.exe`, or run it yourself: `local_data\llama-b11804-win-vulkan\llama-server.exe --model models\Qwen3-Embedding-4B-Q8_0.gguf --embedding --pooling last --ctx-size 10240 --parallel 4 --batch-size 2560 --ubatch-size 2560 --n-gpu-layers 99 --device Vulkan0 --host 127.0.0.1 --port 8091`; (2) skip the GPU path: every build runs on CPU, and S5 drops task 4 (the host builds its own index, as the spec allows when parity is not shown). **Recommendation: (1).** It is the spec's stated plan (§6.2 E1 step 4) and saves hours per E1 re-index.
 
 **Open issues** (spec/code contradictions, X4):
 
