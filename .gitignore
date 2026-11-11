@@ -28,3 +28,6 @@ scripts/_*.jsonl
 .mcp.json
 
 *.egg-info/
+
+# Pinned GGUF model files (downloaded by scripts/fetch_models.py; multi-GB, never in git).
+models/

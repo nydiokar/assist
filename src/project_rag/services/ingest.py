@@ -191,7 +191,7 @@ class IngestService:
 
         discovered = self._corpus.list_files(root_path)
         pipeline = pipeline_fingerprint(
-            self._cfg.parsing, self._cfg.chunking, self._cfg.classification
+            self._cfg.parsing, self._cfg.chunking, self._cfg.classification, profile.key()
         )
         new_gen = generation_id(
             project_id, [d.content_hash + d.source_path for d in discovered], pipeline

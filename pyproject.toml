@@ -16,6 +16,9 @@ dependencies = [
     "openpyxl>=3.1,<4",
     # D-3 candidate vector index: one SQLite file with the catalog and FTS5 (S2 spike).
     "sqlite-vec==0.1.9",
+    # HTTP model providers (S3): one client for /v1/embeddings, /v1/rerank, /tokenize.
+    "httpx>=0.27,<1",
+    "tenacity>=8.2,<10",
 ]
 
 [project.optional-dependencies]
@@ -31,7 +34,6 @@ dev = [
     "import-linter>=2.1,<3",
     "hypothesis>=6.100,<7",
     "respx>=0.21,<1",
-    "httpx>=0.27,<1",
     # stdio MCP server (project_rag.mcp_server) — light; lets its unit test run in CI.
     "mcp>=1.2",
 ]

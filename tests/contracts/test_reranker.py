@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from pathlib import Path
 
 import pytest
 
@@ -22,8 +23,20 @@ def _torch() -> Reranker:
     return CrossEncoderReranker(RerankConfig(enabled=True))
 
 
+def _openai_compat() -> Reranker:
+    from project_rag.adapters.rerank_openai_compat import OpenAICompatReranker
+    from project_rag.wiring import load_config
+
+    cfg = load_config(Path(__file__).resolve().parents[2] / "configs" / "dev_llama_server.yaml")
+    r = OpenAICompatReranker(cfg.retrieval.rerank)
+    if not r.healthy():
+        pytest.skip("llama-server rerank not reachable (make models-up)")
+    return r
+
+
 ADAPTERS: list[object] = [
     pytest.param(_identity, id="identity"),
+    pytest.param(_openai_compat, id="openai_compat", marks=pytest.mark.live),
     pytest.param(_torch, id="torch_bge", marks=pytest.mark.live),
 ]
 

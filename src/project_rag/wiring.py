@@ -38,6 +38,10 @@ def build_embedder(cfg: EmbeddingConfig) -> Embedder:
         from .adapters.embed_torch import E5Embedder
 
         return E5Embedder(cfg)
+    if cfg.provider == "openai_compat":
+        from .adapters.embed_openai_compat import OpenAICompatEmbedder
+
+        return OpenAICompatEmbedder(cfg)
     raise ValueError(f"unknown embedding.provider: {cfg.provider}")
 
 
@@ -62,9 +66,15 @@ def build_vector_store(cfg: VectorStoreConfig, db: SqliteDb | None = None) -> Ve
 def build_reranker(cfg: RerankConfig) -> Reranker | None:
     if not cfg.enabled:
         return None
-    from .adapters.rerank_torch import CrossEncoderReranker
+    if cfg.provider == "openai_compat":
+        from .adapters.rerank_openai_compat import OpenAICompatReranker
 
-    return CrossEncoderReranker(cfg)
+        return OpenAICompatReranker(cfg)
+    if cfg.provider == "torch":
+        from .adapters.rerank_torch import CrossEncoderReranker
+
+        return CrossEncoderReranker(cfg)
+    raise ValueError(f"unknown retrieval.rerank.provider: {cfg.provider}")
 
 
 @dataclass(frozen=True)

@@ -33,15 +33,21 @@ def version_id(content_hash: str, parser_backend: str) -> str:
 
 
 def pipeline_fingerprint(
-    parsing: ParsingConfig, chunking: ChunkingConfig, classification: ClassificationConfig
+    parsing: ParsingConfig,
+    chunking: ChunkingConfig,
+    classification: ClassificationConfig,
+    embedding_profile_key: str,
 ) -> str:
-    """Everything that changes derived chunks; folded into the generation id (ADR-009)."""
+    """Everything that changes the derived index: chunks AND their vectors. Folded into the
+    generation id, so a different embedding profile (provider, model, GGUF sha256, quant, pooling,
+    prompt version, dim) is a new generation (ADR-009, A4)."""
     return "|".join(
         [
             CHUNKER_VERSION,
             parsing.backend,
             chunking.model_dump_json(),
             classification.model_dump_json(),
+            embedding_profile_key,
         ]
     )
 

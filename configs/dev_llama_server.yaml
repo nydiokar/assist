@@ -1,0 +1,34 @@
+# Dev profile against the local llama-server pair (deploy/dev/compose.models.yaml; v3 S3).
+# Q8_0 embedder + bge-reranker-v2-m3 Q8_0, sha256 pinned from configs/models.lock.yaml.
+embedding:
+  provider: openai_compat
+  openai_compat:
+    base_url: http://127.0.0.1:8081
+    model_id: Qwen/Qwen3-Embedding-4B-GGUF
+    revision: f4602530db1d980e16da9d7d3a70294cf5c190be
+    gguf_file: Qwen3-Embedding-4B-Q8_0.gguf
+    gguf_sha256: b60ae5ce2dd6a0b77f82cadf21def1f310a3e10cde380ad0081b07a9d416949d
+    quant: Q8_0
+    dim: 2560
+    pooling: last
+    query_prompt_version: qwen3_query_v1
+    append_text: ""
+    max_input_tokens: 2048
+
+vector_store:
+  provider: chroma
+  collection: dev_llama_q8_v1
+  persist_path: local_data/dev_llama/chroma
+
+lexical_store:
+  path: local_data/dev_llama/store.sqlite3
+
+retrieval:
+  rerank:
+    enabled: true
+    provider: openai_compat
+    top_n: 12
+    openai_compat:
+      base_url: http://127.0.0.1:8082
+      gguf_sha256: a43c7c9b11a4c1517e5bf95151960e1621d1b72f7a493364b01e386cf1aaa1d3
+      score_transform: none

@@ -49,19 +49,64 @@ class E5Config(_Cfg):
     batch_size: int = 32
 
 
+class RetryPolicy(_Cfg):
+    """Bounded exponential backoff for transient provider failures (timeouts, 5xx, refused)."""
+
+    attempts: int = 3  # total tries, first one included
+    backoff_s: float = 0.5  # wait before retry n is backoff_s * 2**(n-1), capped
+    max_backoff_s: float = 4.0
+
+
+class OpenAICompatEmbedConfig(_Cfg):
+    """llama-server (or any OpenAI-compatible) embeddings endpoint (spec §6.1, A1).
+
+    The Qwen3 query instruct prompt is applied CLIENT-side to queries only (llama-server does not
+    apply sentence-transformers' prompt_name); passages get no prefix. Vectors are L2-normalised
+    client-side. `gguf_sha256` + `quant` are part of the profile fingerprint (A4).
+    """
+
+    base_url: str = "http://127.0.0.1:8081"
+    model: str = "qwen3-embedding-4b"  # name sent in the request; the served GGUF decides
+    model_id: str = "Qwen/Qwen3-Embedding-4B-GGUF"  # fingerprint identity
+    revision: str = "f4602530db1d980e16da9d7d3a70294cf5c190be"
+    gguf_file: str = "Qwen3-Embedding-4B-Q8_0.gguf"
+    gguf_sha256: str = ""  # pinned from configs/models.lock.yaml; empty = not release-safe
+    quant: str = "Q8_0"
+    dim: int = 2560
+    normalize: bool = True
+    pooling: str = "last"
+    # Exact template of the qwen3_query_v1 profile (Qwen3-Embedding-4B
+    # config_sentence_transformers.json, prompts.query), prepended with no separator.
+    query_prompt: str = "Instruct: Given a web search query, retrieve relevant passages that answer the query\nQuery:"
+    query_prompt_version: str = "qwen3_query_v1"
+    # Appended to every input when the server does not add it itself (the HF tokenizer appends
+    # <|endoftext|> and last-token pooling reads it). Set from the S3 parity measurement.
+    append_text: str = ""
+    max_input_tokens: int = 2048
+    max_batch: int = 16
+    timeout_s: float = 60.0
+    connect_timeout_s: float = 3.0
+    api_key: str = ""  # hosted fallback only (L5); set from the environment, never in YAML
+    retry: RetryPolicy = Field(default_factory=RetryPolicy)
+
+
 class EmbeddingConfig(_Cfg):
-    # provider: hash (test/dev) | qwen3 (A01 production candidate) | e5 (legacy comparator)
+    # provider: hash (test/dev) | openai_compat (v3: llama-server) | qwen3 (torch reference)
+    #           | e5 (legacy comparator)
     provider: str = "hash"
     hash_dim: int = 2560  # match Qwen3 dim so store schema is provider-agnostic
     threads: int = 8
     qwen3: Qwen3Config = Field(default_factory=Qwen3Config)
     e5: E5Config = Field(default_factory=E5Config)
+    openai_compat: OpenAICompatEmbedConfig = Field(default_factory=OpenAICompatEmbedConfig)
 
     def effective_dim(self) -> int:
         if self.provider == "hash":
             return self.hash_dim
         if self.provider == "qwen3":
             return self.qwen3.dim
+        if self.provider == "openai_compat":
+            return self.openai_compat.dim
         return self.e5.dim
 
     def profile(self) -> EmbeddingProfile:
@@ -89,6 +134,21 @@ class EmbeddingConfig(_Cfg):
                 inference_dtype=q.inference_dtype,
                 device=q.device,
                 max_input_tokens=q.max_input_tokens,
+            )
+        if self.provider == "openai_compat":
+            o = self.openai_compat
+            return EmbeddingProfile(
+                provider="openai_compat",
+                model=o.model_id,
+                revision=o.revision,
+                dim=o.dim,
+                normalize=o.normalize,
+                pooling=o.pooling,
+                query_prompt_name="query",
+                query_prompt_version=o.query_prompt_version,
+                max_input_tokens=o.max_input_tokens,
+                gguf_sha256=o.gguf_sha256 or None,
+                quant=o.quant,
             )
         e = self.e5
         return EmbeddingProfile(
@@ -133,6 +193,20 @@ class FusionConfig(_Cfg):
     k: int = 60
 
 
+class OpenAICompatRerankConfig(_Cfg):
+    """llama-server `--reranking` endpoint, Jina/Cohere-style `POST /v1/rerank` (spec §6.1, A2)."""
+
+    base_url: str = "http://127.0.0.1:8082"
+    model: str = "bge-reranker-v2-m3"
+    gguf_sha256: str = ""
+    # The torch CrossEncoder returns sigmoid probabilities (the abstention threshold 0.26 is on
+    # that scale). Set to "sigmoid" when the server returns raw logits (S3 parity measurement).
+    score_transform: str = "none"  # none | sigmoid
+    timeout_s: float = 30.0
+    connect_timeout_s: float = 3.0
+    retry: RetryPolicy = Field(default_factory=RetryPolicy)
+
+
 class RerankConfig(_Cfg):
     """Cross-encoder reranker over the fused candidate pool (spec v1 §7, deferred until measured).
 
@@ -143,12 +217,14 @@ class RerankConfig(_Cfg):
     """
 
     enabled: bool = False
+    provider: str = "torch"  # torch (dev reference) | openai_compat (v3: llama-server /v1/rerank)
     model: str = "BAAI/bge-reranker-v2-m3"  # multilingual (BG+EN); pin revision when enabling
     revision: str = "main"
     device: str = "cpu"
     top_n: int = 12  # rerank this many fused candidates (F19 sweep peak)
     batch_size: int = 16
     max_length: int = 512
+    openai_compat: OpenAICompatRerankConfig = Field(default_factory=OpenAICompatRerankConfig)
 
 
 class AbstentionConfig(_Cfg):
@@ -264,6 +340,13 @@ class Config(_Cfg):
             problems.append("embedding.provider=hash is test-only; use qwen3 for release (A01)")
         if self.embedding.provider == "qwen3" and "PIN_EXACT" in self.embedding.qwen3.revision:
             problems.append("embedding.qwen3.revision not pinned; resolve HF commit at bootstrap")
+        if (
+            self.embedding.provider == "openai_compat"
+            and not self.embedding.openai_compat.gguf_sha256
+        ):
+            problems.append(
+                "embedding.openai_compat.gguf_sha256 not pinned (configs/models.lock.yaml)"
+            )
         if self.vector_store.provider == "memory":
             problems.append("vector_store.provider=memory is test-only; use chroma for release")
         return problems

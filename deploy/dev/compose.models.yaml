@@ -1,0 +1,73 @@
+# Local model servers for development (v3 build plan S3; spec A03 §6.2).
+# Two llama-server instances (embedding and reranking modes are mutually exclusive per instance),
+# CPU image pinned by digest (configs/models.lock.yaml), weights from ./models (make models),
+# ports bound to localhost only.
+#
+#   docker compose -f deploy/dev/compose.models.yaml up -d
+#   EMBED_GGUF=Qwen3-Embedding-4B-Q4_K_M.gguf docker compose -f deploy/dev/compose.models.yaml up -d embed
+#
+# Context: 4 slots x 2560 tokens. The chunker caps inputs at 2048 tokens (+ query prompt); long
+# inputs are also bounded client-side by timeouts (reports of llama-server hanging on very long
+# inputs). ubatch >= the longest input, because an embedding input must fit one micro-batch.
+name: assist-models
+
+x-llama: &llama
+  image: ghcr.io/ggml-org/llama.cpp:server-b11804@sha256:8c74db29f1a2bef3f0a331b52c4d6214601dfceed4bee0b94cc48b3b23ff257d
+  restart: unless-stopped
+  volumes:
+    - ../../models:/models:ro
+  healthcheck:
+    test: ["CMD", "curl", "-fsS", "http://localhost:8080/health"]
+    interval: 10s
+    timeout: 5s
+    retries: 30
+    start_period: 30s
+
+services:
+  embed:
+    <<: *llama
+    command:
+      - "--model"
+      - "/models/${EMBED_GGUF:-Qwen3-Embedding-4B-Q8_0.gguf}"
+      - "--embedding"
+      - "--pooling"
+      - "last"
+      - "--ctx-size"
+      - "10240"
+      - "--parallel"
+      - "4"
+      - "--batch-size"
+      - "2560"
+      - "--ubatch-size"
+      - "2560"
+      - "--threads"
+      - "${EMBED_THREADS:-8}"
+      - "--host"
+      - "0.0.0.0"
+      - "--port"
+      - "8080"
+    ports:
+      - "127.0.0.1:8081:8080"
+
+  rerank:
+    <<: *llama
+    command:
+      - "--model"
+      - "/models/${RERANK_GGUF:-bge-reranker-v2-m3-Q8_0.gguf}"
+      - "--reranking"
+      - "--ctx-size"
+      - "8192"
+      - "--parallel"
+      - "4"
+      - "--batch-size"
+      - "2048"
+      - "--ubatch-size"
+      - "2048"
+      - "--threads"
+      - "${RERANK_THREADS:-4}"
+      - "--host"
+      - "0.0.0.0"
+      - "--port"
+      - "8080"
+    ports:
+      - "127.0.0.1:8082:8080"

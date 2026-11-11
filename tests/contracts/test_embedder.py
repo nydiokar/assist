@@ -13,6 +13,8 @@ from project_rag.domain.config import EmbeddingConfig
 from project_rag.ports.embedder import Embedder
 from project_rag.wiring import load_config
 
+LIVE_CONFIG = Path(__file__).resolve().parents[2] / "configs" / "dev_llama_server.yaml"
+
 
 def _hash() -> Embedder:
     return HashEmbedder(EmbeddingConfig(provider="hash", hash_dim=256))
@@ -32,8 +34,19 @@ def _qwen3() -> Embedder:
     return Qwen3Embedder(cfg.embedding)
 
 
+def _openai_compat() -> Embedder:
+    """The pinned llama-server (deploy/dev/compose.models.yaml), Q8_0 by default."""
+    from project_rag.adapters.embed_openai_compat import OpenAICompatEmbedder
+
+    e = OpenAICompatEmbedder(load_config(LIVE_CONFIG).embedding)
+    if not e.healthy():
+        pytest.skip("llama-server embed not reachable (make models-up)")
+    return e
+
+
 ADAPTERS: list[object] = [
     pytest.param(_hash, id="hash"),
+    pytest.param(_openai_compat, id="openai_compat", marks=pytest.mark.live),
     pytest.param(_qwen3, id="torch_qwen3", marks=pytest.mark.live),
 ]
 

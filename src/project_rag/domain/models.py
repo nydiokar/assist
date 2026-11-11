@@ -124,13 +124,21 @@ class EmbeddingProfile(Frozen):
     inference_dtype: str | None = None  # recorded for drift diagnosis (A01 §C)
     device: str | None = None
     max_input_tokens: int | None = None
+    gguf_sha256: str | None = None  # served weights identity (HTTP providers, A4)
+    quant: str | None = None
 
     def key(self) -> str:
+        """Fingerprint (ADR-009, A4): provider, model id, revision, dim, pooling, normalisation,
+        prompt version, and for served GGUF weights their sha256 and quant. Fields that are unset
+        add nothing, so prototype profiles keep their key."""
         qp = self.query_prompt_version or self.query_prefix
-        return (
+        key = (
             f"{self.provider}:{self.model}:{self.revision}:{self.dim}:"
             f"{self.pooling}:{int(self.normalize)}:{qp}"
         )
+        if self.gguf_sha256 or self.quant:
+            key += f":{self.quant or ''}:{self.gguf_sha256 or ''}"
+        return key
 
 
 # ---- Tool response contracts (v1 §3.2) ----
