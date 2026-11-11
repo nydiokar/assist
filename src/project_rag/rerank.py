@@ -24,11 +24,14 @@ class CrossEncoderReranker:
     def _ensure(self) -> None:
         if self._model is not None:
             return
-        from sentence_transformers import CrossEncoder  # noqa: PLC0415
+        from sentence_transformers import CrossEncoder
 
         self._model = CrossEncoder(
-            self._cfg.model, revision=self._cfg.revision, device=self._cfg.device,
-            max_length=self._cfg.max_length, trust_remote_code=False,
+            self._cfg.model,
+            revision=self._cfg.revision,
+            device=self._cfg.device,
+            max_length=self._cfg.max_length,
+            trust_remote_code=False,
         )
 
     def rerank(self, query: str, results: list[RetrievedResult]) -> list[RetrievedResult]:

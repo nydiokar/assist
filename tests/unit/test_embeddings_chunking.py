@@ -40,21 +40,32 @@ def test_profile_key_changes_with_provider():
 
 def _doc() -> ParsedDocument:
     return ParsedDocument(
-        source_path="d.md", state=DocState.PARSED,
+        source_path="d.md",
+        state=DocState.PARSED,
         blocks=[
             Block(block_type=BlockType.HEADING, text="Project indicators"),
-            Block(block_type=BlockType.PARAGRAPH,
-                  text="Indicator 1: people trained. Target: 120 people.",
-                  location=SourceLocation(heading="Project indicators")),
-            Block(block_type=BlockType.TABLE_ROW, text="indicator=1, target=120, unit=people",
-                  location=SourceLocation(sheet="Indicators", row=2)),
+            Block(
+                block_type=BlockType.PARAGRAPH,
+                text="Indicator 1: people trained. Target: 120 people.",
+                location=SourceLocation(heading="Project indicators"),
+            ),
+            Block(
+                block_type=BlockType.TABLE_ROW,
+                text="indicator=1, target=120, unit=people",
+                location=SourceLocation(sheet="Indicators", row=2),
+            ),
         ],
     )
 
 
 def test_chunk_ids_deterministic_and_prefixed():
-    kw = dict(project_id="p", source_id="s", version_id="v", source_type="md",
-              cfg=ChunkingConfig())
+    kw = {
+        "project_id": "p",
+        "source_id": "s",
+        "version_id": "v",
+        "source_type": "md",
+        "cfg": ChunkingConfig(),
+    }
     c1 = chunk_document(_doc(), **kw)
     c2 = chunk_document(_doc(), **kw)
     assert [c.chunk_id for c in c1] == [c.chunk_id for c in c2]
@@ -62,10 +73,16 @@ def test_chunk_ids_deterministic_and_prefixed():
 
 
 def test_target_and_unit_stay_in_same_span():
-    chunks = chunk_document(_doc(), project_id="p", source_id="s", version_id="v",
-                            source_type="md", cfg=ChunkingConfig())
-    text_chunk = [c for c in chunks if "Target: 120" in c.citation_text][0]
+    chunks = chunk_document(
+        _doc(),
+        project_id="p",
+        source_id="s",
+        version_id="v",
+        source_type="md",
+        cfg=ChunkingConfig(),
+    )
+    text_chunk = next(c for c in chunks if "Target: 120" in c.citation_text)
     # the heading context travels with the chunk for embedding
     assert "Project indicators" in text_chunk.embed_text
-    table_chunk = [c for c in chunks if c.block_type == BlockType.TABLE][0]
+    table_chunk = next(c for c in chunks if c.block_type == BlockType.TABLE)
     assert "target=120" in table_chunk.citation_text and "people" in table_chunk.citation_text

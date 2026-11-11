@@ -1,4 +1,4 @@
-"""Ingest the YP corpus with a given config then run retrieval evaluation. (A02 pilot-gate script)
+r"""Ingest the YP corpus with a given config then run retrieval evaluation. (A02 pilot-gate script)
 
 Designed to be launched as a watched/detached job:
   - All output is line-buffered stdout (captured by the job runner's log).
@@ -43,6 +43,7 @@ from pathlib import Path
 
 # ---- helpers ----------------------------------------------------------------
 
+
 def log(msg: str) -> None:
     """Line-buffered timestamped print — captured by the job log verbatim."""
     ts = time.strftime("%H:%M:%S")
@@ -52,8 +53,8 @@ def log(msg: str) -> None:
 def _check_imports() -> None:
     """Fail early with a clear message if sentence-transformers / torch are missing."""
     try:
-        import torch  # noqa: F401
         import sentence_transformers  # noqa: F401
+        import torch  # noqa: F401
     except ImportError as e:
         log(f"ABORT: missing dependency — {e}")
         log("Install with:  .venv\\Scripts\\python.exe -m pip install -e '.[qwen3]'")
@@ -61,6 +62,7 @@ def _check_imports() -> None:
 
 
 # ---- ingest -----------------------------------------------------------------
+
 
 def run_ingest(config_path: str, project: str, root: str) -> None:
     from project_rag.api import ProjectRAG
@@ -78,10 +80,12 @@ def run_ingest(config_path: str, project: str, root: str) -> None:
         rag.close()
         sys.exit(1)
 
-    log(f"embedding.provider={cfg.embedding.provider}  "
+    log(
+        f"embedding.provider={cfg.embedding.provider}  "
         f"model={cfg.embedding.qwen3.model if cfg.embedding.provider == 'qwen3' else '?'}  "
         f"device={cfg.embedding.qwen3.device if cfg.embedding.provider == 'qwen3' else 'n/a'}  "
-        f"batch_size={cfg.embedding.qwen3.batch_size if cfg.embedding.provider == 'qwen3' else '?'}")
+        f"batch_size={cfg.embedding.qwen3.batch_size if cfg.embedding.provider == 'qwen3' else '?'}"
+    )
 
     t0 = time.time()
     try:
@@ -93,23 +97,29 @@ def run_ingest(config_path: str, project: str, root: str) -> None:
 
     elapsed = time.time() - t0
     log(f"ingest done in {elapsed:.0f}s — gen={report.index_generation}")
-    log(f"  added={report.added} modified={report.modified} "
-        f"unchanged={report.unchanged} deleted={report.deleted}")
+    log(
+        f"  added={report.added} modified={report.modified} "
+        f"unchanged={report.unchanged} deleted={report.deleted}"
+    )
     if report.warnings:
         for w in report.warnings:
             log(f"  WARN: {w}")
 
     ready = sum(1 for f in report.files if f.state == DocState.READY)
-    not_ready = [(f.source_path, f.state, f.diagnostics) for f in report.files
-                 if f.state != DocState.READY]
+    not_ready = [
+        (f.source_path, f.state, f.diagnostics) for f in report.files if f.state != DocState.READY
+    ]
     log(f"  files READY={ready}  non-ready={len(not_ready)}")
     for sp, st, diags in not_ready[:30]:  # cap to avoid log spam
         log(f"    {st.value:20s} {sp}  {'; '.join(diags)[:120]}")
     if len(not_ready) > 30:
         log(f"    ... and {len(not_ready) - 30} more non-ready files (see full results JSON)")
 
-    truncated = [(f.source_path, f.diagnostics) for f in report.files
-                 if any("TRUNCATION" in d for d in f.diagnostics)]
+    truncated = [
+        (f.source_path, f.diagnostics)
+        for f in report.files
+        if any("TRUNCATION" in d for d in f.diagnostics)
+    ]
     if truncated:
         log(f"  TRUNCATION in {len(truncated)} file(s) — review chunking config:")
         for sp, diags in truncated[:10]:
@@ -119,12 +129,15 @@ def run_ingest(config_path: str, project: str, root: str) -> None:
     log(f"  total chunks indexed: {n_chunks}")
 
     status = rag.get_ingestion_status(project)
-    log(f"  status: n_documents={status.n_documents} n_chunks={status.n_chunks} "
-        f"healthy={status.healthy}")
+    log(
+        f"  status: n_documents={status.n_documents} n_chunks={status.n_chunks} "
+        f"healthy={status.healthy}"
+    )
     rag.close()
 
 
 # ---- label validation -------------------------------------------------------
+
 
 def validate_labels(questions: list, root: Path) -> None:
     from project_rag.config import load_config
@@ -153,10 +166,17 @@ def validate_labels(questions: list, root: Path) -> None:
 
 # ---- eval -------------------------------------------------------------------
 
-def run_eval(config_path: str, project: str, root: str,
-             questions_path: str, oos_path: str | None,
-             channels: list[str], run_name: str,
-             do_validate: bool) -> dict:
+
+def run_eval(
+    config_path: str,
+    project: str,
+    root: str,
+    questions_path: str,
+    oos_path: str | None,
+    channels: list[str],
+    run_name: str,
+    do_validate: bool,
+) -> dict:
     from project_rag.api import ProjectRAG
     from project_rag.evaluation import evaluate, load_questions
 
@@ -179,12 +199,14 @@ def run_eval(config_path: str, project: str, root: str,
                 elapsed = time.time() - t0
                 key = f"{label}/{cs}"
                 all_results[key] = rep.model_dump()
-                log(f"\n[{key}] Recall@5={rep.recall_at_5:.3f}  "
+                log(
+                    f"\n[{key}] Recall@5={rep.recall_at_5:.3f}  "
                     f"evidence@5={rep.evidence_recall_at_5:.3f}  "
-                    f"MRR={rep.mrr:.3f}  n={rep.n}  elapsed={elapsed:.1f}s")
+                    f"MRR={rep.mrr:.3f}  n={rep.n}  elapsed={elapsed:.1f}s"
+                )
                 for r in rep.per_question:
                     hit = "HIT " if r.hit_at_5 else "miss"
-                    ev  = "EV" if r.evidence_hit_at_5 else "--"
+                    ev = "EV" if r.evidence_hit_at_5 else "--"
                     log(f"  {r.id:6s} {r.kind:18s} {hit} {ev}  rr={r.reciprocal_rank:.2f}")
         finally:
             rag.close()
@@ -200,18 +222,22 @@ def run_eval(config_path: str, project: str, root: str,
 
 # ---- summary ----------------------------------------------------------------
 
+
 def print_summary(results: dict) -> None:
     log("\n=== SUMMARY")
     for key, rep_raw in results.items():
         rep = rep_raw if isinstance(rep_raw, dict) else {}
-        log(f"  {key:35s}  "
+        log(
+            f"  {key:35s}  "
             f"Recall@5={rep.get('recall_at_5', '?'):.3f}  "
             f"evidence@5={rep.get('evidence_recall_at_5', '?'):.3f}  "
             f"MRR={rep.get('mrr', '?'):.3f}  "
-            f"n={rep.get('n', '?')}")
+            f"n={rep.get('n', '?')}"
+        )
 
 
 # ---- main -------------------------------------------------------------------
+
 
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__)
@@ -221,12 +247,10 @@ def main() -> None:
     ap.add_argument("--questions", default="eval/yp_questions.jsonl")
     ap.add_argument("--oos-questions", default="eval/yp_questions_oos.jsonl")
     ap.add_argument("--run-name", default="run")
-    ap.add_argument("--channels", nargs="*",
-                    default=["lexical", "dense", "lexical+dense"])
+    ap.add_argument("--channels", nargs="*", default=["lexical", "dense", "lexical+dense"])
     ap.add_argument("--skip-ingest", action="store_true")
     ap.add_argument("--skip-eval", action="store_true")
-    ap.add_argument("--validate-labels", dest="validate_labels", action="store_true",
-                    default=True)
+    ap.add_argument("--validate-labels", dest="validate_labels", action="store_true", default=True)
     ap.add_argument("--no-validate-labels", dest="validate_labels", action="store_false")
     args = ap.parse_args()
 

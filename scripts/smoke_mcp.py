@@ -21,44 +21,58 @@ async def run(config: str, project: str, root: str, query: str) -> int:
 
     params = StdioServerParameters(
         command=sys.executable,
-        args=["-m", "project_rag.mcp_server",
-              "--config", config, "--project", project, "--root", root],
+        args=[
+            "-m",
+            "project_rag.mcp_server",
+            "--config",
+            config,
+            "--project",
+            project,
+            "--root",
+            root,
+        ],
         env=None,
     )
-    async with stdio_client(params) as (read, write):
-        async with ClientSession(read, write) as session:
-            await session.initialize()
-            tools = await session.list_tools()
-            names = [t.name for t in tools.tools]
-            print("TOOLS:", names)
-            assert names == ["search_project", "open_source", "get_ingestion_status"], names
+    async with stdio_client(params) as (read, write), ClientSession(read, write) as session:
+        await session.initialize()
+        tools = await session.list_tools()
+        names = [t.name for t in tools.tools]
+        print("TOOLS:", names)
+        assert names == ["search_project", "open_source", "get_ingestion_status"], names
 
-            res = await session.call_tool("search_project", {"query": query, "top_k": 5})
-            # MCPServer may return the str via structuredContent and/or a content block; handle both
-            text = None
-            sc = getattr(res, "structuredContent", None)
-            if isinstance(sc, dict):
-                text = sc.get("result") if isinstance(sc.get("result"), str) else json.dumps(sc)
-            if text is None and res.content:
-                text = res.content[0].text
-            payload = json.loads(text)
-            n = len(payload.get("results", []))
-            ev = payload.get("evidence", {})
-            print(f"QUERY: {query!r}")
-            print(f"  results={n}  evidence_sufficient={ev.get('sufficient')} "
-                  f"top_score={ev.get('top_score')}")
-            for r in payload.get("results", [])[:3]:
-                print(f"    [{r['rank']}] {r['source_path']}")
-                print(f"        {r['excerpt'][:140].strip()}")
-            status = await session.call_tool("get_ingestion_status", {})
-            st_text = (status.structuredContent or {}).get("result") if getattr(
-                status, "structuredContent", None) else status.content[0].text
-            st = json.loads(st_text)
-            print(f"STATUS: n_documents={st.get('n_documents')} n_chunks={st.get('n_chunks')} "
-                  f"healthy={st.get('healthy')}")
-            ok = n > 0 and not res.is_error
-            print("SMOKE:", "PASS" if ok else "FAIL")
-            return 0 if ok else 1
+        res = await session.call_tool("search_project", {"query": query, "top_k": 5})
+        # MCPServer may return the str via structuredContent and/or a content block; handle both
+        text = None
+        sc = getattr(res, "structuredContent", None)
+        if isinstance(sc, dict):
+            text = sc.get("result") if isinstance(sc.get("result"), str) else json.dumps(sc)
+        if text is None and res.content:
+            text = res.content[0].text
+        payload = json.loads(text)
+        n = len(payload.get("results", []))
+        ev = payload.get("evidence", {})
+        print(f"QUERY: {query!r}")
+        print(
+            f"  results={n}  evidence_sufficient={ev.get('sufficient')} "
+            f"top_score={ev.get('top_score')}"
+        )
+        for r in payload.get("results", [])[:3]:
+            print(f"    [{r['rank']}] {r['source_path']}")
+            print(f"        {r['excerpt'][:140].strip()}")
+        status = await session.call_tool("get_ingestion_status", {})
+        st_text = (
+            (status.structuredContent or {}).get("result")
+            if getattr(status, "structuredContent", None)
+            else status.content[0].text
+        )
+        st = json.loads(st_text)
+        print(
+            f"STATUS: n_documents={st.get('n_documents')} n_chunks={st.get('n_chunks')} "
+            f"healthy={st.get('healthy')}"
+        )
+        ok = n > 0 and not res.is_error
+        print("SMOKE:", "PASS" if ok else "FAIL")
+        return 0 if ok else 1
 
 
 def main() -> None:

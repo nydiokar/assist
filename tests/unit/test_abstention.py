@@ -17,9 +17,14 @@ from project_rag.schema import RetrievedResult, SourceLocation
 
 def _result(score_key: str, score: float) -> RetrievedResult:
     return RetrievedResult(
-        chunk_id="c", document_id="d", source_path="p",
-        source_location=SourceLocation(), excerpt="x", rank=1,
-        retrieval_channels=["dense", "lexical"], score_details={score_key: score},
+        chunk_id="c",
+        document_id="d",
+        source_path="p",
+        source_location=SourceLocation(),
+        excerpt="x",
+        rank=1,
+        retrieval_channels=["dense", "lexical"],
+        score_details={score_key: score},
     )
 
 

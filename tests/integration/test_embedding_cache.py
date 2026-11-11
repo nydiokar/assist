@@ -19,8 +19,10 @@ def test_only_changed_chunks_are_reembedded(make_rag, corpus_root, tmp_path):
     assert first > 0
     seen.clear()
 
-    (root / "memo_bg.md").write_text("# Нова бележка\n\nуникален текст за кеша.\n", encoding="utf-8")
+    (root / "memo_bg.md").write_text(
+        "# Нова бележка\n\nуникален текст за кеша.\n", encoding="utf-8"
+    )
     rag.ingest_project("demo", str(root))
-    assert 0 < sum(seen) < first          # only the changed file's chunks were embedded
+    assert 0 < sum(seen) < first  # only the changed file's chunks were embedded
     res = rag.search_project("demo", "уникален текст за кеша")
     assert any("уникален" in r.excerpt for r in res.results)

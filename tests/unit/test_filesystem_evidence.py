@@ -13,8 +13,15 @@ from project_rag.filesystem import FILESYSTEM_DOC_CLASS, build_filesystem_chunks
 
 def _df(path: str, supported: bool, chash: str = "h") -> DiscoveredFile:
     ext = ("." + path.rsplit(".", 1)[1]) if "." in path.rsplit("/", 1)[-1] else ""
-    return DiscoveredFile(source_path=path, abs_path="/abs/" + path, ext=ext,
-                          size=1, mtime=0.0, content_hash=chash, supported=supported)
+    return DiscoveredFile(
+        source_path=path,
+        abs_path="/abs/" + path,
+        ext=ext,
+        size=1,
+        mtime=0.0,
+        content_hash=chash,
+        supported=supported,
+    )
 
 
 def test_one_chunk_per_folder_with_unparseable_only() -> None:
@@ -22,8 +29,8 @@ def test_one_chunk_per_folder_with_unparseable_only() -> None:
         _df("Уебинари/2. Младежко участие на практика/clip.mp4", False),
         _df("Уебинари/2. Младежко участие на практика/thumb.jpg", False),
         _df("Уебинари/2. Младежко участие на практика/notes.docx", True),
-        _df("Docs/report.docx", True),            # parseable-only folder → skipped
-        _df("Images/a.png", False),               # unparseable-only folder → included
+        _df("Docs/report.docx", True),  # parseable-only folder → skipped
+        _df("Images/a.png", False),  # unparseable-only folder → included
     ]
     chunks = build_filesystem_chunks("ypq", files)
     folders = {c.heading for c in chunks}
@@ -51,17 +58,17 @@ def test_chunk_text_is_labelled_and_lists_names_and_counts() -> None:
 def test_names_are_capped() -> None:
     files = [_df(f"Big/{i}.png", False) for i in range(50)]
     c = build_filesystem_chunks("ypq", files)[0]
-    assert "…" in c.embed_text                    # truncation marker present
-    assert "50 unparseable" in c.embed_text       # count still reflects all 50
+    assert "…" in c.embed_text  # truncation marker present
+    assert "50 unparseable" in c.embed_text  # count still reflects all 50
 
 
 def test_ids_deterministic_and_inventory_sensitive() -> None:
     base = [_df("F/a.png", False), _df("F/b.png", False)]
     c1 = build_filesystem_chunks("ypq", base)[0]
     c2 = build_filesystem_chunks("ypq", list(base))[0]
-    assert c1.chunk_id == c2.chunk_id             # deterministic
-    c3 = build_filesystem_chunks("ypq", base + [_df("F/c.png", False)])[0]
-    assert c3.version_id != c1.version_id         # adding a file changes the version
+    assert c1.chunk_id == c2.chunk_id  # deterministic
+    c3 = build_filesystem_chunks("ypq", [*base, _df("F/c.png", False)])[0]
+    assert c3.version_id != c1.version_id  # adding a file changes the version
     assert c3.chunk_id != c1.chunk_id
 
 

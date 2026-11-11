@@ -55,8 +55,7 @@ def _fs_chunk_id(project_id: str, source_id: str, version_id: str) -> str:
     return "ckfs_" + hashlib.sha256(raw.encode("utf-8")).hexdigest()[:24]
 
 
-def build_filesystem_chunks(project_id: str,
-                            discovered: list[DiscoveredFile]) -> list[Chunk]:
+def build_filesystem_chunks(project_id: str, discovered: list[DiscoveredFile]) -> list[Chunk]:
     """One presence chunk per folder that contains >=1 unparseable file.
 
     The chunk text names the folder, counts parseable vs unparseable files (with an extension
@@ -97,13 +96,24 @@ def build_filesystem_chunks(project_id: str,
         inventory = [f.source_path for f in files]
         version_id = _fs_version_id(folder, inventory)
         chunk_id = _fs_chunk_id(project_id, source_id, version_id)
-        chunks.append(Chunk(
-            chunk_id=chunk_id, project_id=project_id, source_id=source_id,
-            version_id=version_id, document_id=source_id,
-            embed_text=body, citation_text=body,
-            block_type=BlockType.PARAGRAPH, heading=folder_label,
-            location=SourceLocation(block_path=folder_label),
-            chunk_ordinal=0, source_path=folder_label, source_type="filesystem",
-            doc_class=FILESYSTEM_DOC_CLASS, token_count=len(body.split()), truncated=False,
-        ))
+        chunks.append(
+            Chunk(
+                chunk_id=chunk_id,
+                project_id=project_id,
+                source_id=source_id,
+                version_id=version_id,
+                document_id=source_id,
+                embed_text=body,
+                citation_text=body,
+                block_type=BlockType.PARAGRAPH,
+                heading=folder_label,
+                location=SourceLocation(block_path=folder_label),
+                chunk_ordinal=0,
+                source_path=folder_label,
+                source_type="filesystem",
+                doc_class=FILESYSTEM_DOC_CLASS,
+                token_count=len(body.split()),
+                truncated=False,
+            )
+        )
     return chunks

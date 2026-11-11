@@ -20,9 +20,9 @@ class Qwen3Config(BaseModel):
     dim: int = 2560
     normalize: bool = True
     vector_storage_dtype: str = "float32"
-    inference_dtype: str = "float16"   # bf16 permitted after tested hardware compatibility
-    device: str = "cuda"               # fail visibly if unavailable; no silent fallback
-    max_input_tokens: int = 2048       # operational cap, NOT the 32768 model max
+    inference_dtype: str = "float16"  # bf16 permitted after tested hardware compatibility
+    device: str = "cuda"  # fail visibly if unavailable; no silent fallback
+    max_input_tokens: int = 2048  # operational cap, NOT the 32768 model max
     document_prompt: str | None = None  # no prefix for indexed passages
     query_prompt_name: str = "query"
     query_prompt_version: str = "qwen3_query_v1"
@@ -47,7 +47,7 @@ class E5Config(BaseModel):
 class EmbeddingConfig(BaseModel):
     # provider: hash (test/dev) | qwen3 (A01 production candidate) | e5 (legacy comparator)
     provider: str = "hash"
-    hash_dim: int = 2560               # match Qwen3 dim so store schema is provider-agnostic
+    hash_dim: int = 2560  # match Qwen3 dim so store schema is provider-agnostic
     threads: int = 8
     qwen3: Qwen3Config = Field(default_factory=Qwen3Config)
     e5: E5Config = Field(default_factory=E5Config)
@@ -62,25 +62,39 @@ class EmbeddingConfig(BaseModel):
     def profile(self) -> EmbeddingProfile:
         if self.provider == "hash":
             return EmbeddingProfile(
-                provider="hash", model="hash-deterministic", revision="v1",
-                dim=self.hash_dim, normalize=True, pooling="hash",
+                provider="hash",
+                model="hash-deterministic",
+                revision="v1",
+                dim=self.hash_dim,
+                normalize=True,
+                pooling="hash",
                 query_prompt_version="hash_query_v1",
             )
         if self.provider == "qwen3":
             q = self.qwen3
             return EmbeddingProfile(
-                provider="qwen3", model=q.model, revision=q.revision, dim=q.dim,
-                normalize=q.normalize, pooling="last_token",
+                provider="qwen3",
+                model=q.model,
+                revision=q.revision,
+                dim=q.dim,
+                normalize=q.normalize,
+                pooling="last_token",
                 query_prompt_name=q.query_prompt_name,
                 query_prompt_version=q.query_prompt_version,
-                inference_dtype=q.inference_dtype, device=q.device,
+                inference_dtype=q.inference_dtype,
+                device=q.device,
                 max_input_tokens=q.max_input_tokens,
             )
         e = self.e5
         return EmbeddingProfile(
-            provider="e5", model=e.model, revision=e.revision, dim=e.dim,
-            normalize=e.normalize, pooling=e.pooling,
-            query_prefix=e.query_prefix, passage_prefix=e.passage_prefix,
+            provider="e5",
+            model=e.model,
+            revision=e.revision,
+            dim=e.dim,
+            normalize=e.normalize,
+            pooling=e.pooling,
+            query_prefix=e.query_prefix,
+            passage_prefix=e.passage_prefix,
         )
 
 
@@ -123,10 +137,10 @@ class RerankConfig(BaseModel):
     """
 
     enabled: bool = False
-    model: str = "BAAI/bge-reranker-v2-m3"   # multilingual (BG+EN); pin revision when enabling
+    model: str = "BAAI/bge-reranker-v2-m3"  # multilingual (BG+EN); pin revision when enabling
     revision: str = "main"
     device: str = "cpu"
-    top_n: int = 12                          # rerank this many fused candidates (F19 sweep peak)
+    top_n: int = 12  # rerank this many fused candidates (F19 sweep peak)
     batch_size: int = 16
     max_length: int = 512
 
@@ -156,8 +170,8 @@ class AbstentionConfig(BaseModel):
     """
 
     enabled: bool = False
-    signal: str = "rerank_score"          # rerank_score (calibrated) | fusion_score (weak fallback)
-    min_top_score: float = 0.26           # measured knee (F19 reranker, 2026-10-28)
+    signal: str = "rerank_score"  # rerank_score (calibrated) | fusion_score (weak fallback)
+    min_top_score: float = 0.26  # measured knee (F19 reranker, 2026-10-28)
     suppress_on_insufficient: bool = True  # return verdict instead of passages when insufficient
 
 
@@ -172,7 +186,7 @@ class QueryExpansionConfig(BaseModel):
     """
 
     enabled: bool = False
-    corpus_script: str = "cyrillic"   # dominant script of the indexed corpus (yspdb = Bulgarian)
+    corpus_script: str = "cyrillic"  # dominant script of the indexed corpus (yspdb = Bulgarian)
 
 
 class ContextExpansionConfig(BaseModel):
@@ -242,8 +256,7 @@ class Config(BaseModel):
         problems: list[str] = []
         if self.embedding.provider == "hash":
             problems.append("embedding.provider=hash is test-only; use qwen3 for release (A01)")
-        if (self.embedding.provider == "qwen3"
-                and "PIN_EXACT" in self.embedding.qwen3.revision):
+        if self.embedding.provider == "qwen3" and "PIN_EXACT" in self.embedding.qwen3.revision:
             problems.append("embedding.qwen3.revision not pinned; resolve HF commit at bootstrap")
         if self.vector_store.provider == "memory":
             problems.append("vector_store.provider=memory is test-only; use chroma for release")

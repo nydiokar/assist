@@ -45,9 +45,13 @@ class TextParser:
             def flush() -> None:
                 nonlocal para_buf, idx
                 if para_buf:
-                    blocks.append(Block(block_type=BlockType.PARAGRAPH, text=" ".join(para_buf),
-                                        location=SourceLocation(heading=heading,
-                                                                block_path=f"p{idx}")))
+                    blocks.append(
+                        Block(
+                            block_type=BlockType.PARAGRAPH,
+                            text=" ".join(para_buf),
+                            location=SourceLocation(heading=heading, block_path=f"p{idx}"),
+                        )
+                    )
                     idx += 1
                     para_buf = []
 
@@ -59,16 +63,26 @@ class TextParser:
                 if stripped.startswith("#"):
                     flush()
                     heading = stripped.lstrip("#").strip()
-                    blocks.append(Block(block_type=BlockType.HEADING, text=heading,
-                                        location=SourceLocation(block_path=f"h{idx}")))
+                    blocks.append(
+                        Block(
+                            block_type=BlockType.HEADING,
+                            text=heading,
+                            location=SourceLocation(block_path=f"h{idx}"),
+                        )
+                    )
                     idx += 1
                 else:
                     para_buf.append(stripped)
             flush()
         else:
             for i, para in enumerate(_split_paragraphs(text)):
-                blocks.append(Block(block_type=BlockType.PARAGRAPH, text=para.strip(),
-                                    location=SourceLocation(heading=heading, block_path=f"p{i}")))
+                blocks.append(
+                    Block(
+                        block_type=BlockType.PARAGRAPH,
+                        text=para.strip(),
+                        location=SourceLocation(heading=heading, block_path=f"p{i}"),
+                    )
+                )
         return ParsedDocument(source_path=source_path, state=DocState.PARSED, blocks=blocks)
 
 
@@ -81,36 +95,54 @@ class PdfParser:
 
     def parse(self, abs_path: str, source_path: str) -> ParsedDocument:
         try:
-            from pypdf import PdfReader  # noqa: PLC0415
+            from pypdf import PdfReader
         except ImportError as e:  # pragma: no cover
-            return ParsedDocument(source_path=source_path, state=DocState.FAILED,
-                                  diagnostics=[f"pypdf missing: {e}"])
+            return ParsedDocument(
+                source_path=source_path, state=DocState.FAILED, diagnostics=[f"pypdf missing: {e}"]
+            )
         try:
             reader = PdfReader(abs_path)
         except Exception as e:  # noqa: BLE001
-            return ParsedDocument(source_path=source_path, state=DocState.FAILED,
-                                  diagnostics=[f"pdf open failed: {e}"])
+            return ParsedDocument(
+                source_path=source_path,
+                state=DocState.FAILED,
+                diagnostics=[f"pdf open failed: {e}"],
+            )
         if reader.is_encrypted:
-            return ParsedDocument(source_path=source_path, state=DocState.QUARANTINED,
-                                  diagnostics=["encrypted PDF"])
+            return ParsedDocument(
+                source_path=source_path, state=DocState.QUARANTINED, diagnostics=["encrypted PDF"]
+            )
         blocks: list[Block] = []
         total_chars = 0
         for pageno, page in enumerate(reader.pages, start=1):
             try:
                 text = page.extract_text() or ""
             except Exception as e:  # noqa: BLE001
-                blocks.append(Block(block_type=BlockType.PARAGRAPH, text="",
-                                    location=SourceLocation(page=pageno)))
+                blocks.append(
+                    Block(
+                        block_type=BlockType.PARAGRAPH,
+                        text="",
+                        location=SourceLocation(page=pageno),
+                    )
+                )
                 _ = e
                 continue
             total_chars += len(text.strip())
             for i, para in enumerate(_split_paragraphs(text, strict_blank=True)):
                 if para.strip():
-                    blocks.append(Block(block_type=BlockType.PARAGRAPH, text=para.strip(),
-                                        location=SourceLocation(page=pageno, block_path=f"p{pageno}.{i}")))
+                    blocks.append(
+                        Block(
+                            block_type=BlockType.PARAGRAPH,
+                            text=para.strip(),
+                            location=SourceLocation(page=pageno, block_path=f"p{pageno}.{i}"),
+                        )
+                    )
         if self._detect_scanned and total_chars < 20 and len(reader.pages) > 0:
-            return ParsedDocument(source_path=source_path, state=DocState.OCR_REQUIRED,
-                                  diagnostics=["likely scanned PDF: negligible extractable text"])
+            return ParsedDocument(
+                source_path=source_path,
+                state=DocState.OCR_REQUIRED,
+                diagnostics=["likely scanned PDF: negligible extractable text"],
+            )
         return ParsedDocument(source_path=source_path, state=DocState.PARSED, blocks=blocks)
 
 
@@ -120,17 +152,23 @@ class DocxParser:
 
     def parse(self, abs_path: str, source_path: str) -> ParsedDocument:
         try:
-            import docx  # noqa: PLC0415
+            import docx
         except ImportError as e:  # pragma: no cover
-            return ParsedDocument(source_path=source_path, state=DocState.FAILED,
-                                  diagnostics=[f"python-docx missing: {e}"])
+            return ParsedDocument(
+                source_path=source_path,
+                state=DocState.FAILED,
+                diagnostics=[f"python-docx missing: {e}"],
+            )
         try:
             doc = docx.Document(abs_path)
         except Exception as e:  # noqa: BLE001
-            return ParsedDocument(source_path=source_path, state=DocState.FAILED,
-                                  diagnostics=[f"docx open failed: {e}"])
-        from docx.table import Table  # noqa: PLC0415
-        from docx.text.paragraph import Paragraph  # noqa: PLC0415
+            return ParsedDocument(
+                source_path=source_path,
+                state=DocState.FAILED,
+                diagnostics=[f"docx open failed: {e}"],
+            )
+        from docx.table import Table
+        from docx.text.paragraph import Paragraph
 
         blocks: list[Block] = []
         heading: str | None = None
@@ -149,12 +187,21 @@ class DocxParser:
                 style = (para.style.name or "").lower() if para.style else ""
                 if style.startswith("heading") or style == "title":
                     heading = txt
-                    blocks.append(Block(block_type=BlockType.HEADING, text=txt,
-                                        location=SourceLocation(block_path=f"para{idx}")))
+                    blocks.append(
+                        Block(
+                            block_type=BlockType.HEADING,
+                            text=txt,
+                            location=SourceLocation(block_path=f"para{idx}"),
+                        )
+                    )
                 else:
-                    blocks.append(Block(block_type=BlockType.PARAGRAPH, text=txt,
-                                        location=SourceLocation(heading=heading,
-                                                                block_path=f"para{idx}")))
+                    blocks.append(
+                        Block(
+                            block_type=BlockType.PARAGRAPH,
+                            text=txt,
+                            location=SourceLocation(heading=heading, block_path=f"para{idx}"),
+                        )
+                    )
             elif tag == "tbl":
                 blocks.extend(_docx_table_blocks(Table(child, doc), n_table, heading))
                 n_table += 1
@@ -202,9 +249,15 @@ def _docx_table_blocks(table: object, ti: int, heading: str | None) -> list[Bloc
             text = ", ".join(f"{h}: {v}" for h, v in zip(head, cells, strict=False) if v)
         else:
             text = " | ".join(v for v in cells if v)
-        out.append(Block(block_type=BlockType.TABLE_ROW, text=text,
-                         location=SourceLocation(heading=heading,
-                                                 block_path=f"table{ti}.row{ri + 1}", row=ri + 1)))
+        out.append(
+            Block(
+                block_type=BlockType.TABLE_ROW,
+                text=text,
+                location=SourceLocation(
+                    heading=heading, block_path=f"table{ti}.row{ri + 1}", row=ri + 1
+                ),
+            )
+        )
     return out
 
 
@@ -214,27 +267,35 @@ class XlsxParser:
 
     def parse(self, abs_path: str, source_path: str) -> ParsedDocument:
         try:
-            from openpyxl import load_workbook  # noqa: PLC0415
-            from openpyxl.utils import get_column_letter  # noqa: PLC0415
+            from openpyxl import load_workbook
+            from openpyxl.utils import get_column_letter
         except ImportError as e:  # pragma: no cover
-            return ParsedDocument(source_path=source_path, state=DocState.FAILED,
-                                  diagnostics=[f"openpyxl missing: {e}"])
+            return ParsedDocument(
+                source_path=source_path,
+                state=DocState.FAILED,
+                diagnostics=[f"openpyxl missing: {e}"],
+            )
         try:
             # data_only=False keeps formulas visible; cached values read separately.
             wb = load_workbook(abs_path, read_only=True, data_only=True)
         except Exception as e:  # noqa: BLE001
-            return ParsedDocument(source_path=source_path, state=DocState.FAILED,
-                                  diagnostics=[f"xlsx open failed: {e}"])
+            return ParsedDocument(
+                source_path=source_path,
+                state=DocState.FAILED,
+                diagnostics=[f"xlsx open failed: {e}"],
+            )
         blocks: list[Block] = []
         diagnostics: list[str] = []
         for ws in wb.worksheets:
-            rows = [r for r in ws.iter_rows(values_only=False)]
+            rows = list(ws.iter_rows(values_only=False))
             hdr_idx: int | None = _xlsx_header_index([[c.value for c in r] for r in rows])
             if hdr_idx is None:
                 hdr_idx = -1  # no table-like header: every non-empty row is a plain row
             header: list[str] = (
                 [str(c.value).strip() if c.value is not None else "" for c in rows[hdr_idx]]
-                if hdr_idx >= 0 else [])
+                if hdr_idx >= 0
+                else []
+            )
             for r_idx, row in enumerate(rows, start=1):
                 values = [c.value for c in row]
                 if all(v is None or str(v).strip() == "" for v in values):
@@ -250,15 +311,23 @@ class XlsxParser:
                     if tabular and h:
                         pairs.append(f"{h}={shown}")
                     elif shown:  # title/loose cell, or a column without a header
-                        pairs.append(f"{get_column_letter(col_idx)}{r_idx}={shown}" if tabular
-                                     else shown)
+                        pairs.append(
+                            f"{get_column_letter(col_idx)}{r_idx}={shown}" if tabular else shown
+                        )
                 text = f"[{ws.title}] " + ", ".join(pairs)
-                blocks.append(Block(block_type=BlockType.TABLE_ROW, text=text,
-                                    location=SourceLocation(sheet=ws.title, row=r_idx,
-                                                            block_path=f"{ws.title}.row{r_idx}")))
+                blocks.append(
+                    Block(
+                        block_type=BlockType.TABLE_ROW,
+                        text=text,
+                        location=SourceLocation(
+                            sheet=ws.title, row=r_idx, block_path=f"{ws.title}.row{r_idx}"
+                        ),
+                    )
+                )
         wb.close()
-        return ParsedDocument(source_path=source_path, state=DocState.PARSED,
-                              blocks=blocks, diagnostics=diagnostics)
+        return ParsedDocument(
+            source_path=source_path, state=DocState.PARSED, blocks=blocks, diagnostics=diagnostics
+        )
 
 
 def _xlsx_header_index(grid: list[list[object]]) -> int | None:
@@ -272,8 +341,12 @@ def _xlsx_header_index(grid: list[list[object]]) -> int | None:
     for i, r in enumerate(top):
         cells = [str(v).strip() for v in r if v is not None and str(v).strip()]
         strings = [c for c in cells if not _looks_numeric(c)]
-        if (len(cells) >= 2 and len(strings) == len(cells) and len(set(cells)) == len(cells)
-                and len(cells) * 2 >= max(widths)):
+        if (
+            len(cells) >= 2
+            and len(strings) == len(cells)
+            and len(set(cells)) == len(cells)
+            and len(cells) * 2 >= max(widths)
+        ):
             return i
     return None
 
@@ -305,18 +378,28 @@ class CsvParser:
         reader = csv.reader(io.StringIO(text), dialect)
         rows = list(reader)
         if not rows:
-            return ParsedDocument(source_path=source_path, state=DocState.PARSED,
-                                  diagnostics=["empty csv"])
+            return ParsedDocument(
+                source_path=source_path, state=DocState.PARSED, diagnostics=["empty csv"]
+            )
         header = [h.strip() for h in rows[0]]
         blocks: list[Block] = []
         for r_idx, row in enumerate(rows[1:], start=2):
             if not any(cell.strip() for cell in row):
                 continue
             pairs = ", ".join(f"{h}={v.strip()}" for h, v in zip(header, row, strict=False))
-            blocks.append(Block(block_type=BlockType.TABLE_ROW, text=pairs,
-                                location=SourceLocation(row=r_idx, block_path=f"row{r_idx}")))
-        return ParsedDocument(source_path=source_path, state=DocState.PARSED, blocks=blocks,
-                              diagnostics=[f"encoding={encoding}"])
+            blocks.append(
+                Block(
+                    block_type=BlockType.TABLE_ROW,
+                    text=pairs,
+                    location=SourceLocation(row=r_idx, block_path=f"row{r_idx}"),
+                )
+            )
+        return ParsedDocument(
+            source_path=source_path,
+            state=DocState.PARSED,
+            blocks=blocks,
+            diagnostics=[f"encoding={encoding}"],
+        )
 
 
 def _split_paragraphs(text: str, strict_blank: bool = False) -> list[str]:
@@ -360,12 +443,15 @@ class ParserRegistry:
         for parser in self._parsers:
             if parser.can_parse(ext):
                 return parser.parse(abs_path, source_path)
-        return ParsedDocument(source_path=source_path, state=DocState.UNSUPPORTED,
-                              diagnostics=[f"no parser for extension {ext}"])
+        return ParsedDocument(
+            source_path=source_path,
+            state=DocState.UNSUPPORTED,
+            diagnostics=[f"no parser for extension {ext}"],
+        )
 
     def _try_docling(self, abs_path: str, source_path: str, ext: str) -> ParsedDocument | None:
         try:
-            from .parsers_docling import DoclingParser  # noqa: PLC0415
+            from .parsers_docling import DoclingParser
         except ImportError:
             return None
         p = DoclingParser()

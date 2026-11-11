@@ -25,22 +25,22 @@ from project_rag.evaluation import load_questions
 
 def _peak_vram_gb() -> float | None:
     try:
-        import torch  # noqa: PLC0415
+        import torch
 
         if torch.cuda.is_available():
             return round(torch.cuda.max_memory_allocated() / 1e9, 3)
-    except Exception:
+    except (ImportError, RuntimeError):
         return None
     return None
 
 
 def _rss_gb() -> float | None:
     try:
-        import resource  # noqa: PLC0415
+        import resource
 
         # ru_maxrss is KB on Linux.
         return round(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1e6, 3)
-    except Exception:
+    except (ImportError, AttributeError):  # no `resource` module on Windows
         return None
 
 
@@ -50,8 +50,12 @@ def main() -> None:
     ap.add_argument("--project", default="ypq")
     ap.add_argument("--root", default="yspdb")
     ap.add_argument("--questions", default="eval/yp_questions_v2.jsonl")
-    ap.add_argument("--repeats", type=int, default=3,
-                    help="timed passes over the question set after warmup (default 3)")
+    ap.add_argument(
+        "--repeats",
+        type=int,
+        default=3,
+        help="timed passes over the question set after warmup (default 3)",
+    )
     ap.add_argument("--out", default="eval/results/yp_v2_latency.json")
     args = ap.parse_args()
 
@@ -81,6 +85,7 @@ def main() -> None:
 
     per_query_ms.sort()
     n = len(per_query_ms)
+
     def pct(p: float) -> float:
         return round(per_query_ms[min(n - 1, int(p * n))], 1)
 

@@ -40,13 +40,23 @@ def open_source(
     try:
         abs_path = _resolve_within_root(root, source_path)
     except PathTraversalError as e:
-        return SourceResponse(project_id=project_id, document_id=document_id,
-                              source_path=source_path, location=location, excerpt="",
-                              warnings=[str(e)])
+        return SourceResponse(
+            project_id=project_id,
+            document_id=document_id,
+            source_path=source_path,
+            location=location,
+            excerpt="",
+            warnings=[str(e)],
+        )
     if not abs_path.is_file():
-        return SourceResponse(project_id=project_id, document_id=document_id,
-                              source_path=source_path, location=location, excerpt="",
-                              warnings=["source file not found"])
+        return SourceResponse(
+            project_id=project_id,
+            document_id=document_id,
+            source_path=source_path,
+            location=location,
+            excerpt="",
+            warnings=["source file not found"],
+        )
 
     doc = registry.parse(str(abs_path), source_path, abs_path.suffix.lower())
     blocks = doc.blocks
@@ -57,8 +67,12 @@ def open_source(
     text = "\n".join(b.text for b in blocks)
     truncated = len(text) > max_chars
     return SourceResponse(
-        project_id=project_id, document_id=document_id, source_path=source_path,
-        location=location, excerpt=text[:max_chars], truncated=truncated,
+        project_id=project_id,
+        document_id=document_id,
+        source_path=source_path,
+        location=location,
+        excerpt=text[:max_chars],
+        truncated=truncated,
         warnings=list(doc.diagnostics),
     )
 
@@ -68,6 +82,4 @@ def _matches(block_loc: SourceLocation, want: SourceLocation) -> bool:
         return False
     if want.sheet is not None and block_loc.sheet != want.sheet:
         return False
-    if want.heading is not None and block_loc.heading != want.heading:
-        return False
-    return True
+    return not (want.heading is not None and block_loc.heading != want.heading)

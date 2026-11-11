@@ -7,7 +7,6 @@ scored as a separate abstention signal (expected empty / weak retrieval), not as
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 
 from pydantic import BaseModel
@@ -22,19 +21,21 @@ class EvalQuestion(BaseModel):
     query: str
     expect_source_paths: list[str]
     expect_substrings: list[str]
-    filters: dict = {}               # forwarded to search_project (doc_class, ...)
+    filters: dict = {}  # forwarded to search_project (doc_class, ...)
 
 
 class QuestionResult(BaseModel):
     id: str
     kind: str
     hit_at_5: bool
-    evidence_hit_at_5: bool = False   # expected substrings found in top-k excerpts of expected sources
+    evidence_hit_at_5: bool = (
+        False  # expected substrings found in top-k excerpts of expected sources
+    )
     reciprocal_rank: float
     matched_substring: bool
     top_paths: list[str]
-    abstained: bool = False           # evidence verdict said insufficient (v1 §6.2, F16)
-    top_score: float | None = None    # abstention signal top-1 score (for threshold study)
+    abstained: bool = False  # evidence verdict said insufficient (v1 §6.2, F16)
+    top_score: float | None = None  # abstention signal top-1 score (for threshold study)
 
 
 class EvalReport(BaseModel):
@@ -45,10 +46,10 @@ class EvalReport(BaseModel):
     substring_rate: float
     # Abstention (v1 §6.2, F16): measured on the whole set when the gate is enabled.
     abstention_enabled: bool = False
-    noanswer_total: int = 0           # count of no_answer questions
-    noanswer_abstained: int = 0       # correctly withheld (true positives)
-    answerable_total: int = 0         # count of scored (answerable) questions
-    answerable_abstained: int = 0     # wrongly withheld (false positives)
+    noanswer_total: int = 0  # count of no_answer questions
+    noanswer_abstained: int = 0  # correctly withheld (true positives)
+    answerable_total: int = 0  # count of scored (answerable) questions
+    answerable_abstained: int = 0  # wrongly withheld (false positives)
     answerable_hit_abstained: int = 0  # wrongly withheld AND was a real recall hit (the real cost)
     per_question: list[QuestionResult]
     notes: list[str] = []
@@ -63,8 +64,13 @@ def load_questions(path: str | Path) -> list[EvalQuestion]:
     return out
 
 
-def evaluate(rag: ProjectRAG, project_id: str, questions: list[EvalQuestion],
-             top_k: int = 5, channels: list[str] | None = None) -> EvalReport:
+def evaluate(
+    rag: ProjectRAG,
+    project_id: str,
+    questions: list[EvalQuestion],
+    top_k: int = 5,
+    channels: list[str] | None = None,
+) -> EvalReport:
     per: list[QuestionResult] = []
     recall_hits = 0
     rr_sum = 0.0
@@ -90,10 +96,18 @@ def evaluate(rag: ProjectRAG, project_id: str, questions: list[EvalQuestion],
         if q.kind == "no_answer" or not q.expect_source_paths:
             noanswer_total += 1
             noanswer_abstained += int(abstained)
-            per.append(QuestionResult(id=q.id, kind=q.kind, hit_at_5=False,
-                                      reciprocal_rank=0.0, matched_substring=substr,
-                                      top_paths=top_paths, abstained=abstained,
-                                      top_score=ev.top_score))
+            per.append(
+                QuestionResult(
+                    id=q.id,
+                    kind=q.kind,
+                    hit_at_5=False,
+                    reciprocal_rank=0.0,
+                    matched_substring=substr,
+                    top_paths=top_paths,
+                    abstained=abstained,
+                    top_score=ev.top_score,
+                )
+            )
             continue
 
         scored += 1
@@ -101,19 +115,30 @@ def evaluate(rag: ProjectRAG, project_id: str, questions: list[EvalQuestion],
         answerable_abstained += int(abstained)
         from_expected = [r.excerpt for r in res.results if r.source_path in q.expect_source_paths]
         evidence = bool(from_expected) and all(
-            any(sub in ex for ex in from_expected) for sub in q.expect_substrings)
+            any(sub in ex for ex in from_expected) for sub in q.expect_substrings
+        )
         evidence_hits += int(evidence)
-        rank = next((i for i, p in enumerate(top_paths, start=1)
-                     if p in q.expect_source_paths), None)
+        rank = next(
+            (i for i, p in enumerate(top_paths, start=1) if p in q.expect_source_paths), None
+        )
         hit = rank is not None
         recall_hits += int(hit)
         answerable_hit_abstained += int(abstained and hit)
         rr_sum += (1.0 / rank) if rank else 0.0
         substr_hits += int(substr)
-        per.append(QuestionResult(id=q.id, kind=q.kind, hit_at_5=hit, evidence_hit_at_5=evidence,
-                                  reciprocal_rank=(1.0 / rank) if rank else 0.0,
-                                  matched_substring=substr, top_paths=top_paths,
-                                  abstained=abstained, top_score=ev.top_score))
+        per.append(
+            QuestionResult(
+                id=q.id,
+                kind=q.kind,
+                hit_at_5=hit,
+                evidence_hit_at_5=evidence,
+                reciprocal_rank=(1.0 / rank) if rank else 0.0,
+                matched_substring=substr,
+                top_paths=top_paths,
+                abstained=abstained,
+                top_score=ev.top_score,
+            )
+        )
 
     return EvalReport(
         n=len(questions),
@@ -122,10 +147,14 @@ def evaluate(rag: ProjectRAG, project_id: str, questions: list[EvalQuestion],
         mrr=round(rr_sum / scored, 4) if scored else 0.0,
         substring_rate=round(substr_hits / scored, 4) if scored else 0.0,
         abstention_enabled=abstention_enabled,
-        noanswer_total=noanswer_total, noanswer_abstained=noanswer_abstained,
-        answerable_total=answerable_total, answerable_abstained=answerable_abstained,
+        noanswer_total=noanswer_total,
+        noanswer_abstained=noanswer_abstained,
+        answerable_total=answerable_total,
+        answerable_abstained=answerable_abstained,
         answerable_hit_abstained=answerable_hit_abstained,
         per_question=per,
-        notes=[f"scored={scored} (excludes no_answer)",
-               "embedder/store are configurable; results are fixture-only until real corpus"],
+        notes=[
+            f"scored={scored} (excludes no_answer)",
+            "embedder/store are configurable; results are fixture-only until real corpus",
+        ],
     )

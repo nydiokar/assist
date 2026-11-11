@@ -30,13 +30,21 @@ def run(rag: ProjectRAG, project: str, questions, doc_class: str | None) -> None
         ev_hits += int(ev_hit)
         suff += int(verdict.sufficient and verdict.enabled)
         ts = f"{verdict.top_score:.3f}" if verdict.top_score is not None else "n/a"
-        state = "SUFF" if (verdict.enabled and verdict.sufficient) else ("ABST" if verdict.enabled else "off")
+        state = (
+            "SUFF"
+            if (verdict.enabled and verdict.sufficient)
+            else ("ABST" if verdict.enabled else "off")
+        )
         top3 = [Path(p).name[:34] for p in paths[:3]]
-        print(f"  {q.id} [{state} ts={ts}] "
-              f"src@5={'Y' if hit else 'n'} ev@5={'Y' if ev_hit else 'n'}  top: {top3}")
+        print(
+            f"  {q.id} [{state} ts={ts}] "
+            f"src@5={'Y' if hit else 'n'} ev@5={'Y' if ev_hit else 'n'}  top: {top3}"
+        )
     n = len(questions)
-    print(f"  -- doc_class={label}: src@5 {hits}/{n}={hits/n:.2f}  "
-          f"ev@5 {ev_hits}/{n}={ev_hits/n:.2f}  sufficient {suff}/{n}")
+    print(
+        f"  -- doc_class={label}: src@5 {hits}/{n}={hits/n:.2f}  "
+        f"ev@5 {ev_hits}/{n}={ev_hits/n:.2f}  sufficient {suff}/{n}"
+    )
 
 
 def main() -> None:

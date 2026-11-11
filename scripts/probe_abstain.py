@@ -5,6 +5,7 @@ Runs the full reranked pipeline on a question set and prints, per question:
 Used to find a signal that separates no_answer (irrelevant-but-plausible) from answerable.
 No LLM. WSL ROCm GPU.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -26,8 +27,11 @@ def main() -> None:
     ap.add_argument("--project", default="ypq")
     ap.add_argument("--root", default="yspdb")
     ap.add_argument("--questions", default="eval/yp_questions_v2.jsonl")
-    ap.add_argument("--signal", default="rerank_score",
-                    help="score_details key to probe (rerank_score | fusion_score)")
+    ap.add_argument(
+        "--signal",
+        default="rerank_score",
+        help="score_details key to probe (rerank_score | fusion_score)",
+    )
     ap.add_argument("--out", default="eval/results/abstain_probe.json")
     args = ap.parse_args()
 
@@ -45,23 +49,37 @@ def main() -> None:
             margin = (top1 - top2) if (top1 is not None and top2 is not None) else None
             mean5 = (sum(scores) / len(scores)) if scores else None
             top_paths = [r.source_path for r in res.results]
-            hit = (q.kind != "no_answer"
-                   and any(p in q.expect_source_paths for p in top_paths))
-            rows.append({
-                "id": q.id, "kind": q.kind, "no_answer": q.kind == "no_answer",
-                "hit5": hit, "top1": top1, "top2": top2, "margin": margin, "mean5": mean5,
-            })
+            hit = q.kind != "no_answer" and any(p in q.expect_source_paths for p in top_paths)
+            rows.append(
+                {
+                    "id": q.id,
+                    "kind": q.kind,
+                    "no_answer": q.kind == "no_answer",
+                    "hit5": hit,
+                    "top1": top1,
+                    "top2": top2,
+                    "margin": margin,
+                    "mean5": mean5,
+                }
+            )
     finally:
         rag.close()
 
     rows.sort(key=lambda r: (r["top1"] if r["top1"] is not None else -1e9))
     print(f"signal={args.signal}  (sorted ascending by top1)")
-    print(f"{'id':6} {'kind':14} {'noAns':5} {'hit5':4} {'top1':>9} {'top2':>9} {'margin':>8} {'mean5':>9}")
+    print(
+        f"{'id':6} {'kind':14} {'noAns':5} {'hit5':4} {'top1':>9} {'top2':>9} {'margin':>8} {'mean5':>9}"
+    )
     for r in rows:
-        def f(x): return f"{x:9.3f}" if isinstance(x, float) else f"{'--':>9}"
-        print(f"{r['id']:6} {r['kind']:14} {str(r['no_answer']):5} {str(r['hit5']):4} "
-              f"{f(r['top1'])} {f(r['top2'])} "
-              f"{(f'{r['margin']:8.3f}' if r['margin'] is not None else '      --')} {f(r['mean5'])}")
+
+        def f(x):
+            return f"{x:9.3f}" if isinstance(x, float) else f"{'--':>9}"
+
+        print(
+            f"{r['id']:6} {r['kind']:14} {r['no_answer']!s:5} {r['hit5']!s:4} "
+            f"{f(r['top1'])} {f(r['top2'])} "
+            f"{(f'{r['margin']:8.3f}' if r['margin'] is not None else '      --')} {f(r['mean5'])}"
+        )
     Path(args.out).parent.mkdir(parents=True, exist_ok=True)
     Path(args.out).write_text(json.dumps(rows, ensure_ascii=False, indent=1), encoding="utf-8")
 

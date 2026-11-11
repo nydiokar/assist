@@ -43,8 +43,12 @@ def main() -> None:
     dtype = getattr(torch, args.dtype)
 
     t0 = time.perf_counter()
-    model = SentenceTransformer(args.model, device="cpu", model_kwargs={"torch_dtype": dtype},
-                                tokenizer_kwargs={"padding_side": "left"})
+    model = SentenceTransformer(
+        args.model,
+        device="cpu",
+        model_kwargs={"torch_dtype": dtype},
+        tokenizer_kwargs={"padding_side": "left"},
+    )
     model.max_seq_length = args.max_len
     load_s = time.perf_counter() - t0
 
@@ -56,11 +60,17 @@ def main() -> None:
     tok_s = sum(min(t, args.max_len) for t in toks) / enc_s
     mean_tok = float(np.mean(toks))
     out = {
-        "model": args.model, "dtype": args.dtype, "threads": args.threads, "dim": int(vecs.shape[1]),
-        "sample": len(texts), "load_s": round(load_s, 1),
-        "tokens_mean": round(mean_tok, 1), "tokens_max": int(max(toks)),
+        "model": args.model,
+        "dtype": args.dtype,
+        "threads": args.threads,
+        "dim": int(vecs.shape[1]),
+        "sample": len(texts),
+        "load_s": round(load_s, 1),
+        "tokens_mean": round(mean_tok, 1),
+        "tokens_max": int(max(toks)),
         "n_over_max_len": int(sum(t > args.max_len for t in toks)),
-        "encode_s": round(enc_s, 1), "tokens_per_s": round(tok_s, 1),
+        "encode_s": round(enc_s, 1),
+        "tokens_per_s": round(tok_s, 1),
         "chunks_total": total,
         "est_full_index_hours": round(total * mean_tok / tok_s / 3600, 2),
         "finite": bool(np.isfinite(vecs).all()),

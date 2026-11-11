@@ -14,45 +14,51 @@ from __future__ import annotations
 
 def test_verdict_attached_and_passages_suppressed(make_rag, corpus_root):
     # Threshold above any achievable fusion_score (RRF max ≈ 2/(60+1) ≈ 0.033) → always insufficient.
-    rag = make_rag(**{
-        "retrieval.abstention.enabled": True,
-        "retrieval.abstention.signal": "fusion_score",
-        "retrieval.abstention.min_top_score": 0.99,
-        "retrieval.abstention.suppress_on_insufficient": True,
-    })
+    rag = make_rag(
+        **{
+            "retrieval.abstention.enabled": True,
+            "retrieval.abstention.signal": "fusion_score",
+            "retrieval.abstention.min_top_score": 0.99,
+            "retrieval.abstention.suppress_on_insufficient": True,
+        }
+    )
     rag.ingest_project("demo", corpus_root)
     res = rag.search_project("demo", "What indicators did the approved project define?")
     assert res.evidence.enabled is True
     assert res.evidence.sufficient is False
-    assert res.results == []                      # passages withheld
+    assert res.results == []  # passages withheld
     assert any("insufficient evidence" in w for w in res.warnings)
 
 
 def test_sufficient_passes_through(make_rag, corpus_root):
     # Threshold of 0 → any positive top score is sufficient; passages flow through.
-    rag = make_rag(**{
-        "retrieval.abstention.enabled": True,
-        "retrieval.abstention.signal": "fusion_score",
-        "retrieval.abstention.min_top_score": 0.0,
-        "retrieval.abstention.suppress_on_insufficient": True,
-    })
+    rag = make_rag(
+        **{
+            "retrieval.abstention.enabled": True,
+            "retrieval.abstention.signal": "fusion_score",
+            "retrieval.abstention.min_top_score": 0.0,
+            "retrieval.abstention.suppress_on_insufficient": True,
+        }
+    )
     rag.ingest_project("demo", corpus_root)
     res = rag.search_project("demo", "What indicators did the approved project define?")
     assert res.evidence.enabled is True and res.evidence.sufficient is True
-    assert res.results                             # not suppressed
+    assert res.results  # not suppressed
 
 
 def test_suppression_off_keeps_passages_but_flags(make_rag, corpus_root):
-    rag = make_rag(**{
-        "retrieval.abstention.enabled": True,
-        "retrieval.abstention.signal": "fusion_score",
-        "retrieval.abstention.min_top_score": 0.99,
-        "retrieval.abstention.suppress_on_insufficient": False,
-    })
+    rag = make_rag(
+        **{
+            "retrieval.abstention.enabled": True,
+            "retrieval.abstention.signal": "fusion_score",
+            "retrieval.abstention.min_top_score": 0.99,
+            "retrieval.abstention.suppress_on_insufficient": False,
+        }
+    )
     rag.ingest_project("demo", corpus_root)
     res = rag.search_project("demo", "What indicators did the approved project define?")
     assert res.evidence.enabled is True and res.evidence.sufficient is False
-    assert res.results                             # kept: advisory-only mode
+    assert res.results  # kept: advisory-only mode
 
 
 def test_gate_off_by_default(make_rag, corpus_root):

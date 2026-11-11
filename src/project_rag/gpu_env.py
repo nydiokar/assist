@@ -41,8 +41,12 @@ def prepare_gpu_env() -> None:
 
 def describe_gpu_env(torch_hip: str | None, torch_cuda: str | None) -> str:
     report = GpuEnvReport(
-        is_wsl=is_wsl(), dxg_present=DXG_DEVICE.exists(), dxg_env=os.environ.get(DXG_ENV),
-        torch_hip=torch_hip, torch_cuda=torch_cuda)
+        is_wsl=is_wsl(),
+        dxg_present=DXG_DEVICE.exists(),
+        dxg_env=os.environ.get(DXG_ENV),
+        torch_hip=torch_hip,
+        torch_cuda=torch_cuda,
+    )
     hint: str = ""
     if report.torch_hip and report.is_wsl and not report.dxg_present:
         hint = " /dev/dxg is missing: WSL GPU passthrough/Windows driver problem."
@@ -52,5 +56,7 @@ def describe_gpu_env(torch_hip: str | None, torch_cuda: str | None) -> str:
         hint = " ROCm torch outside WSL: run this inside WSL (Ubuntu-24.04 ROCm venv)."
     elif not report.torch_hip and not report.torch_cuda:
         hint = " This torch build has neither CUDA nor ROCm (CPU wheel): wrong venv."
-    return (f"GPU env: {report.model_dump_json()}.{hint} "
-            "Do NOT restart WSL (`wsl --shutdown`) and do not conclude 'GPU down' without this report.")
+    return (
+        f"GPU env: {report.model_dump_json()}.{hint} "
+        "Do NOT restart WSL (`wsl --shutdown`) and do not conclude 'GPU down' without this report."
+    )

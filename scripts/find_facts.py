@@ -23,8 +23,11 @@ def main() -> None:
     ap.add_argument("--terms", default=None, help="UTF-8 file of search terms, one per line")
     args = ap.parse_args()
 
-    terms = (Path(args.terms).read_text(encoding="utf-8").splitlines()
-             if args.terms else sys.stdin.read().splitlines())
+    terms = (
+        Path(args.terms).read_text(encoding="utf-8").splitlines()
+        if args.terms
+        else sys.stdin.read().splitlines()
+    )
     terms = [t.strip() for t in terms if t.strip()]
 
     reg = ParserRegistry(load_config(None).parsing)

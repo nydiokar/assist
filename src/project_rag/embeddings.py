@@ -132,8 +132,8 @@ class Qwen3Embedder:
         if self._model is not None:
             return
         prepare_gpu_env()  # must precede `import torch` (ROCm-on-WSL needs HSA_ENABLE_DXG_DETECTION)
-        import torch  # noqa: PLC0415
-        from sentence_transformers import SentenceTransformer  # noqa: PLC0415
+        import torch
+        from sentence_transformers import SentenceTransformer
 
         torch.set_num_threads(self._cfg.threads)
         if self._q.device == "cuda" and not torch.cuda.is_available():
@@ -141,11 +141,17 @@ class Qwen3Embedder:
             raise RuntimeError(
                 "Qwen3 profile requires CUDA but torch.cuda.is_available() is False. "
                 + describe_gpu_env(torch.version.hip, torch.version.cuda)
-                + " Run scripts/feasibility_smoke.py; do not silently substitute device/model.")
-        dtype = {"float16": torch.float16, "bfloat16": torch.bfloat16,
-                 "float32": torch.float32}.get(self._q.inference_dtype, torch.float16)
+                + " Run scripts/feasibility_smoke.py; do not silently substitute device/model."
+            )
+        dtype = {
+            "float16": torch.float16,
+            "bfloat16": torch.bfloat16,
+            "float32": torch.float32,
+        }.get(self._q.inference_dtype, torch.float16)
         self._model = SentenceTransformer(
-            self._q.model, revision=self._q.revision, device=self._q.device,
+            self._q.model,
+            revision=self._q.revision,
+            device=self._q.device,
             model_kwargs={"torch_dtype": dtype},
             tokenizer_kwargs={"padding_side": self._q.tokenizer_padding_side},
         )
@@ -173,9 +179,12 @@ class Qwen3Embedder:
     def _encode(self, texts: list[str], *, is_query: bool) -> np.ndarray:
         self._ensure()
         assert self._model is not None
-        kwargs = dict(batch_size=self._q.batch_size,
-                      normalize_embeddings=self._q.normalize,
-                      convert_to_numpy=True, show_progress_bar=False)
+        kwargs = {
+            "batch_size": self._q.batch_size,
+            "normalize_embeddings": self._q.normalize,
+            "convert_to_numpy": True,
+            "show_progress_bar": False,
+        }
         if is_query and self._has_query_prompt:
             kwargs["prompt_name"] = self._q.query_prompt_name
         vecs = np.asarray(self._model.encode(texts, **kwargs), dtype=np.float32)
@@ -205,8 +214,8 @@ class E5Embedder:
     def _ensure(self) -> None:
         if self._model is not None:
             return
-        import torch  # noqa: PLC0415
-        from sentence_transformers import SentenceTransformer  # noqa: PLC0415
+        import torch
+        from sentence_transformers import SentenceTransformer
 
         torch.set_num_threads(self._cfg.threads)
         self._model = SentenceTransformer(self._e.model, revision=self._e.revision)
@@ -232,9 +241,13 @@ class E5Embedder:
     def _encode(self, texts: list[str], prefix: str) -> np.ndarray:
         self._ensure()
         assert self._model is not None
-        vecs = self._model.encode([prefix + t for t in texts], batch_size=self._e.batch_size,
-                                  normalize_embeddings=self._e.normalize,
-                                  convert_to_numpy=True, show_progress_bar=False)
+        vecs = self._model.encode(
+            [prefix + t for t in texts],
+            batch_size=self._e.batch_size,
+            normalize_embeddings=self._e.normalize,
+            convert_to_numpy=True,
+            show_progress_bar=False,
+        )
         return np.asarray(vecs, dtype=np.float32)
 
     def embed_passages(self, texts: list[str]) -> np.ndarray:

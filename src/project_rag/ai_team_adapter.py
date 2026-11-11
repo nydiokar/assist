@@ -53,33 +53,49 @@ def build_tool_descriptors(rag: ProjectRAG, project_id: str) -> list[ToolDescrip
         return rag.search_project(project_id, query, top_k=top_k).model_dump()
 
     def open_src(document_id: str, source_path: str, max_chars: int = 6000) -> dict:
-        return rag.open_source(project_id, document_id, source_path=source_path,
-                               max_chars=max_chars).model_dump()
+        return rag.open_source(
+            project_id, document_id, source_path=source_path, max_chars=max_chars
+        ).model_dump()
 
     def status() -> dict:
         return rag.get_ingestion_status(project_id).model_dump()
 
     return [
         ToolDescriptor(
-            name="search_project", read_only=True, handler=search,
+            name="search_project",
+            read_only=True,
+            handler=search,
             description="Retrieve source-backed passages for the active project. "
-                        + GROUNDING_GUIDANCE,
-            json_schema={"type": "object", "properties": {
-                "query": {"type": "string"},
-                "top_k": {"type": "integer", "default": 5}}, "required": ["query"]},
+            + GROUNDING_GUIDANCE,
+            json_schema={
+                "type": "object",
+                "properties": {
+                    "query": {"type": "string"},
+                    "top_k": {"type": "integer", "default": 5},
+                },
+                "required": ["query"],
+            },
         ),
         ToolDescriptor(
-            name="open_source", read_only=True, handler=open_src,
+            name="open_source",
+            read_only=True,
+            handler=open_src,
             description="Return the exact original excerpt for a retrieved document/location "
-                        "to verify extraction or expand context before numeric claims.",
-            json_schema={"type": "object", "properties": {
-                "document_id": {"type": "string"},
-                "source_path": {"type": "string"},
-                "max_chars": {"type": "integer", "default": 6000}},
-                "required": ["document_id", "source_path"]},
+            "to verify extraction or expand context before numeric claims.",
+            json_schema={
+                "type": "object",
+                "properties": {
+                    "document_id": {"type": "string"},
+                    "source_path": {"type": "string"},
+                    "max_chars": {"type": "integer", "default": 6000},
+                },
+                "required": ["document_id", "source_path"],
+            },
         ),
         ToolDescriptor(
-            name="get_ingestion_status", read_only=True, handler=status,
+            name="get_ingestion_status",
+            read_only=True,
+            handler=status,
             description="Report corpus ingestion health/coverage for the active project.",
             json_schema={"type": "object", "properties": {}},
         ),
@@ -91,4 +107,5 @@ def tool_result_is_error(payload: object) -> bool:
     or no active index generation). The stdio MCP server uses this to set tool-result is_error."""
     warnings = payload.get("warnings") if isinstance(payload, dict) else None
     return bool(warnings) and any(
-        "not registered" in str(w) or "no active generation" in str(w) for w in warnings)
+        "not registered" in str(w) or "no active generation" in str(w) for w in warnings
+    )

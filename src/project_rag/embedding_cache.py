@@ -46,7 +46,9 @@ class EmbeddingCache:
             marks = ",".join("?" * len(part))
             rows = self._conn.execute(
                 f"SELECT text_hash, vec FROM emb WHERE profile=? AND dim=? "
-                f"AND text_hash IN ({marks})", (profile, dim, *part)).fetchall()
+                f"AND text_hash IN ({marks})",
+                (profile, dim, *part),
+            ).fetchall()
             for h, blob in rows:
                 found[h] = np.frombuffer(blob, dtype=np.float32).copy()
         return found
@@ -54,6 +56,9 @@ class EmbeddingCache:
     def put_many(self, profile: str, items: dict[str, np.ndarray]) -> None:
         self._conn.executemany(
             "INSERT OR REPLACE INTO emb(profile, text_hash, dim, vec) VALUES(?,?,?,?)",
-            [(profile, h, int(v.shape[0]), np.asarray(v, dtype=np.float32).tobytes())
-             for h, v in items.items()])
+            [
+                (profile, h, int(v.shape[0]), np.asarray(v, dtype=np.float32).tobytes())
+                for h, v in items.items()
+            ],
+        )
         self._conn.commit()

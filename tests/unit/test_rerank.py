@@ -24,9 +24,14 @@ class _FakeCrossEncoder:
 
 def _result(chunk_id: str, excerpt: str, rank: int) -> RetrievedResult:
     return RetrievedResult(
-        chunk_id=chunk_id, document_id="d", source_path="p",
-        source_location=SourceLocation(), excerpt=excerpt, rank=rank,
-        retrieval_channels=["dense", "lexical"], score_details={"fusion_score": 1.0 / rank},
+        chunk_id=chunk_id,
+        document_id="d",
+        source_path="p",
+        source_location=SourceLocation(),
+        excerpt=excerpt,
+        rank=rank,
+        retrieval_channels=["dense", "lexical"],
+        score_details={"fusion_score": 1.0 / rank},
     )
 
 

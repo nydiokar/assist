@@ -61,8 +61,9 @@ def main(argv: list[str] | None = None) -> int:
             _emit(rag.get_ingestion_status(args.project).model_dump())
         elif args.command == "open":
             rag.register_project_root(args.project, args.root)
-            _emit(rag.open_source(args.project, args.doc,
-                                  source_path=args.source_path).model_dump())
+            _emit(
+                rag.open_source(args.project, args.doc, source_path=args.source_path).model_dump()
+            )
     finally:
         rag.close()
     return 0

@@ -42,8 +42,9 @@ def _parent_location(loc: SourceLocation) -> SourceLocation | None:
     return None
 
 
-def expand_result_context(rag: ProjectRAG, project_id: str, result: RetrievedResult,
-                          *, max_chars: int = 4000) -> str:
+def expand_result_context(
+    rag: ProjectRAG, project_id: str, result: RetrievedResult, *, max_chars: int = 4000
+) -> str:
     """Return the parent-section text for one retrieved result (chunk excerpt if none exists).
 
     Pure read via `open_source` (path-safe, server-side root). Falls back to the verbatim chunk
@@ -53,8 +54,13 @@ def expand_result_context(rag: ProjectRAG, project_id: str, result: RetrievedRes
     parent = _parent_location(result.source_location)
     if parent is None:
         return result.excerpt
-    resp = rag.open_source(project_id, result.document_id,
-                           source_path=result.source_path, location=parent, max_chars=max_chars)
+    resp = rag.open_source(
+        project_id,
+        result.document_id,
+        source_path=result.source_path,
+        location=parent,
+        max_chars=max_chars,
+    )
     text = resp.excerpt.strip()
     if not text:
         return result.excerpt
@@ -65,8 +71,9 @@ def expand_result_context(rag: ProjectRAG, project_id: str, result: RetrievedRes
     return text
 
 
-def attach_expanded_context(rag: ProjectRAG, project_id: str,
-                            results: list[RetrievedResult], *, max_chars: int = 4000) -> None:
+def attach_expanded_context(
+    rag: ProjectRAG, project_id: str, results: list[RetrievedResult], *, max_chars: int = 4000
+) -> None:
     """Populate `RetrievedResult.expanded_context` in place for each served result.
 
     Re-reads are cached per source_path inside `open_source`'s parser registry call; we cap the

@@ -99,29 +99,42 @@ def _append(results: list[RetrievedResult], c: _Candidate, fused: float) -> None
             excerpt=c.payload.get("citation_text", ""),
             rank=0,
             retrieval_channels=sorted(c.channels),
-            score_details={"fusion_score": round(fused, 6),
-                           **{f"rank_{ch}": float(r) for ch, r in c.ranks.items()}},
+            score_details={
+                "fusion_score": round(fused, 6),
+                **{f"rank_{ch}": float(r) for ch, r in c.ranks.items()},
+            },
         )
     )
 
 
 class Retriever:
-    def __init__(self, embedder: EmbedderProtocol, vector_store: VectorStoreProtocol,
-                 lexical_store: LexicalStore, cfg: RetrievalConfig) -> None:
+    def __init__(
+        self,
+        embedder: EmbedderProtocol,
+        vector_store: VectorStoreProtocol,
+        lexical_store: LexicalStore,
+        cfg: RetrievalConfig,
+    ) -> None:
         self._embedder = embedder
         self._vs = vector_store
         self._lx = lexical_store
         self._cfg = cfg
         self._reranker = None
         if cfg.rerank.enabled:
-            from .rerank import CrossEncoderReranker  # noqa: PLC0415
+            from .rerank import CrossEncoderReranker
 
             self._reranker = CrossEncoderReranker(cfg.rerank)
 
-    def retrieve(self, project_id: str, generation: str, query: str,
-                 excerpt_limit: int, *, doc_class: str | None = None,
-                 channels: tuple[str, ...] = ("dense", "lexical"),
-                 ) -> tuple[list[RetrievedResult], dict[str, int]]:
+    def retrieve(
+        self,
+        project_id: str,
+        generation: str,
+        query: str,
+        excerpt_limit: int,
+        *,
+        doc_class: str | None = None,
+        channels: tuple[str, ...] = ("dense", "lexical"),
+    ) -> tuple[list[RetrievedResult], dict[str, int]]:
         dense: list[tuple[str, float, dict]] = []
         lexical: list[tuple[str, float, dict]] = []
         # Cross-language query expansion (F11/F14): append counterpart-language domain anchors so
@@ -129,17 +142,24 @@ class Retriever:
         # both channels. Original query is unchanged upstream (trace hashes the original).
         search_query = query
         if self._cfg.query_expansion.enabled:
-            from .query_expansion import expand_query  # noqa: PLC0415
+            from .query_expansion import expand_query
 
             search_query = expand_query(
-                query, corpus_script=self._cfg.query_expansion.corpus_script)
+                query, corpus_script=self._cfg.query_expansion.corpus_script
+            )
         if "dense" in channels:
             qvec = self._embedder.embed_queries([search_query])[0]
-            dense = self._vs.query(project_id, generation, np.asarray(qvec),
-                                   self._cfg.candidates_per_channel, doc_class)
+            dense = self._vs.query(
+                project_id,
+                generation,
+                np.asarray(qvec),
+                self._cfg.candidates_per_channel,
+                doc_class,
+            )
         if "lexical" in channels:
-            lexical = self._lx.search(project_id, generation, search_query,
-                                      self._cfg.candidates_per_channel, doc_class)
+            lexical = self._lx.search(
+                project_id, generation, search_query, self._cfg.candidates_per_channel, doc_class
+            )
         if self._reranker is not None:
             # Fuse a wider window, rerank it by content, then cut to top_k.
             pool = fuse_and_rank(dense, lexical, self._cfg, limit=self._cfg.rerank.top_n)

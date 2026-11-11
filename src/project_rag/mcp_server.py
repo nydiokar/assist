@@ -35,11 +35,11 @@ def build_server(rag: ProjectRAG, project_id: str):
     (project not registered, no active generation) is raised so the agent sees an MCP tool error,
     not a silent empty result.
     """
-    from mcp.server import MCPServer  # noqa: PLC0415
+    from mcp.server import MCPServer
 
     try:  # a deliberately-raised ToolError keeps its text for the agent; a bare crash does not
-        from mcp.server.mcpserver.exceptions import ToolError  # noqa: PLC0415
-    except Exception:  # pragma: no cover - fallback if the import path differs
+        from mcp.server.mcpserver.exceptions import ToolError
+    except ImportError:  # pragma: no cover - fallback if the import path differs
         ToolError = RuntimeError  # type: ignore[assignment,misc]
 
     server = MCPServer(name=RAG_SERVER_NAME, version="1.0.0")
@@ -50,22 +50,27 @@ def build_server(rag: ProjectRAG, project_id: str):
             raise ToolError(text)
         return text
 
-    @server.tool(name="search_project",
-                 description="Retrieve source-backed passages for the active project. "
-                             + GROUNDING_GUIDANCE)
+    @server.tool(
+        name="search_project",
+        description="Retrieve source-backed passages for the active project. " + GROUNDING_GUIDANCE,
+    )
     async def search_project(query: str, top_k: int = 5) -> str:
         res = rag.search_project(project_id, query, top_k=top_k)
         return _dump(res.model_dump())
 
-    @server.tool(name="open_source",
-                 description="Return the exact original excerpt for a retrieved document/location "
-                             "to verify a span before citing a numeric or named fact.")
+    @server.tool(
+        name="open_source",
+        description="Return the exact original excerpt for a retrieved document/location "
+        "to verify a span before citing a numeric or named fact.",
+    )
     async def open_source(document_id: str, source_path: str, max_chars: int = 6000) -> str:
         res = rag.open_source(project_id, document_id, source_path=source_path, max_chars=max_chars)
         return _dump(res.model_dump())
 
-    @server.tool(name="get_ingestion_status",
-                 description="Report corpus ingestion health/coverage for the active project.")
+    @server.tool(
+        name="get_ingestion_status",
+        description="Report corpus ingestion health/coverage for the active project.",
+    )
     async def get_ingestion_status() -> str:
         res = rag.get_ingestion_status(project_id)
         return _dump(res.model_dump())

@@ -18,7 +18,9 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("path")
     ap.add_argument("--root", default="yspdb")
-    ap.add_argument("--grep", default=None, help="print only blocks containing this term (+context)")
+    ap.add_argument(
+        "--grep", default=None, help="print only blocks containing this term (+context)"
+    )
     ap.add_argument("--max", type=int, default=12000)
     args = ap.parse_args()
 

@@ -17,16 +17,24 @@ from project_rag.api import ProjectRAG
 
 PROBES = {
     # id: (raw EN query, BG gloss to append, expected source, expected substring)
-    "yp09": ("How many decision makers were planned and attended the national meeting?",
-             "Вземащи решения брой заложени постигнати национална среща",
-             "Overview_Debate 2025.xlsx", "Вземащи решения, брой заложени=10.0"),
-    "yp07": ("How many advocacy campaigns by participants were planned and how many achieved?",
-             "застъпнически кампании брой заложени постигнати",
-             "Overview_Debate 2025.xlsx", "брой заложени=5.0, Брой постигнати=1.0"),
+    "yp09": (
+        "How many decision makers were planned and attended the national meeting?",
+        "Вземащи решения брой заложени постигнати национална среща",
+        "Overview_Debate 2025.xlsx",
+        "Вземащи решения, брой заложени=10.0",
+    ),
+    "yp07": (
+        "How many advocacy campaigns by participants were planned and how many achieved?",
+        "застъпнически кампании брой заложени постигнати",
+        "Overview_Debate 2025.xlsx",
+        "брой заложени=5.0, Брой постигнати=1.0",
+    ),
 }
 
 
-def _rank(rag: ProjectRAG, project: str, query: str, want_path: str) -> tuple[int | None, list[str]]:
+def _rank(
+    rag: ProjectRAG, project: str, query: str, want_path: str
+) -> tuple[int | None, list[str]]:
     res = rag.search_project(project, query, top_k=5)
     paths = [r.source_path for r in res.results]
     rank = next((i for i, p in enumerate(paths, 1) if p == want_path), None)

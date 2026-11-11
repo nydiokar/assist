@@ -34,8 +34,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
-from project_rag.ai_team_adapter import RAG_SERVER_NAME, RAG_TOOL_NAMES  # noqa: E402
-from project_rag.answerer import ABSTENTION_LINE, SYSTEM_PROMPT  # noqa: E402
+from project_rag.ai_team_adapter import RAG_SERVER_NAME, RAG_TOOL_NAMES
+from project_rag.answerer import ABSTENTION_LINE, SYSTEM_PROMPT
 
 # Execution directive layered ON TOP of the pure grounding contract (SYSTEM_PROMPT). It makes the
 # agent actually CALL the tool instead of answering from a first glance, and read the exact value
@@ -68,18 +68,28 @@ def _allowed_tools() -> list[str]:
 def _ask_agent(query: str, model: str, mcp_config: str, timeout_s: int) -> tuple[str, dict]:
     """Launch one `claude -p` turn restricted to the RAG tools. Returns (answer_text, raw_json)."""
     cmd = [
-        "claude", "-p", query,
-        "--model", model,
-        "--output-format", "json",
-        "--mcp-config", mcp_config,
+        "claude",
+        "-p",
+        query,
+        "--model",
+        model,
+        "--output-format",
+        "json",
+        "--mcp-config",
+        mcp_config,
         "--strict-mcp-config",
-        "--permission-mode", "bypassPermissions",
-        "--allowed-tools", *_allowed_tools(),
-        "--append-system-prompt", AGENT_SYSTEM_PROMPT,
+        "--permission-mode",
+        "bypassPermissions",
+        "--allowed-tools",
+        *_allowed_tools(),
+        "--append-system-prompt",
+        AGENT_SYSTEM_PROMPT,
     ]
     proc = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout_s)
     if proc.returncode != 0:
-        raise RuntimeError(f"claude exited {proc.returncode}: {proc.stderr[:500] or proc.stdout[:500]}")
+        raise RuntimeError(
+            f"claude exited {proc.returncode}: {proc.stderr[:500] or proc.stdout[:500]}"
+        )
     raw = json.loads(proc.stdout)
     # json output format: {"type":"result","result": "<assistant text>","num_turns": N, ...}
     # It carries NO transcript (`messages`) — tool use is inferred from num_turns (see _used_rag).
@@ -143,7 +153,11 @@ def main() -> None:
     args = ap.parse_args()
 
     only = set(args.only.split(",")) if args.only else None
-    items = [json.loads(ln) for ln in Path(args.questions).read_text(encoding="utf-8").splitlines() if ln.strip()]
+    items = [
+        json.loads(ln)
+        for ln in Path(args.questions).read_text(encoding="utf-8").splitlines()
+        if ln.strip()
+    ]
     if only:
         items = [it for it in items if it["id"] in only]
 
@@ -165,9 +179,21 @@ def main() -> None:
         npass += int(ok)
         print(f"  tool_used={used}  ok={ok}  {reason}")
         print(f"  ANSWER: {answer[:280]}")
-        out.write(json.dumps({"id": qid, "kind": it.get("kind"), "query": query,
-                              "answer": answer, "ok": ok, "reason": reason,
-                              "rag_tool_used": used}, ensure_ascii=False) + "\n")
+        out.write(
+            json.dumps(
+                {
+                    "id": qid,
+                    "kind": it.get("kind"),
+                    "query": query,
+                    "answer": answer,
+                    "ok": ok,
+                    "reason": reason,
+                    "rag_tool_used": used,
+                },
+                ensure_ascii=False,
+            )
+            + "\n"
+        )
     out.close()
     total = len(items)
     print(f"\n=== AGENT EVAL: {npass}/{total} passed ===  results -> {RESULTS_PATH}")

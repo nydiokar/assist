@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import ClassVar
+
 import numpy as np
 
 from project_rag.config import EmbeddingConfig
@@ -9,12 +11,12 @@ from project_rag.embeddings import Qwen3Embedder
 
 
 class _FakeBf16Model:
-    prompts: dict = {"query": "q"}
+    prompts: ClassVar[dict] = {"query": "q"}
 
     def encode(self, texts, **kw):
         rng = np.random.default_rng(0)
         v = rng.normal(size=(len(texts), 1024)).astype(np.float32)
-        return v / np.linalg.norm(v, axis=1, keepdims=True) * 0.9985   # bf16-style drift
+        return v / np.linalg.norm(v, axis=1, keepdims=True) * 0.9985  # bf16-style drift
 
 
 def test_low_precision_vectors_are_renormalized_in_fp32() -> None:

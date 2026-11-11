@@ -31,11 +31,14 @@ def main() -> None:
         questions = [q for q in questions if q.id in args.only]
     try:
         for q in questions:
-            res = rag.search_project(args.project, q.query, top_k=5,
-                                     filters={"doc_class": "project_record"})
+            res = rag.search_project(
+                args.project, q.query, top_k=5, filters={"doc_class": "project_record"}
+            )
             v = res.evidence
             ts = f"{v.top_score:.3f}" if v.top_score is not None else "n/a"
-            print(f"\n### {q.id} [{'SUFF' if v.sufficient else 'ABST'} top={ts}] expect={q.expect_source_paths}")
+            print(
+                f"\n### {q.id} [{'SUFF' if v.sufficient else 'ABST'} top={ts}] expect={q.expect_source_paths}"
+            )
             print(f"    want substr: {q.expect_substrings}")
             for r in res.results:
                 rr = r.score_details.get("rerank_score")

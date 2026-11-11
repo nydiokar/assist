@@ -36,12 +36,12 @@ class BlockType(StrEnum):
 class SourceLocation(BaseModel):
     """Provenance address back to the original source (v1 §4.3)."""
 
-    page: int | None = None          # PDF page (1-based)
-    sheet: str | None = None         # XLSX worksheet name
-    row: int | None = None           # CSV/XLSX row (1-based)
-    cell: str | None = None          # XLSX cell ref, e.g. "B7"
-    heading: str | None = None       # nearest heading text
-    block_path: str | None = None    # structural path, e.g. "sec2/para3"
+    page: int | None = None  # PDF page (1-based)
+    sheet: str | None = None  # XLSX worksheet name
+    row: int | None = None  # CSV/XLSX row (1-based)
+    cell: str | None = None  # XLSX cell ref, e.g. "B7"
+    heading: str | None = None  # nearest heading text
+    block_path: str | None = None  # structural path, e.g. "sec2/para3"
     char_start: int | None = None
     char_end: int | None = None
 
@@ -57,7 +57,7 @@ class Block(BaseModel):
 class ParsedDocument(BaseModel):
     """Output of a parser adapter (v1 §4.2)."""
 
-    source_path: str                 # relative path within project root
+    source_path: str  # relative path within project root
     state: DocState
     blocks: list[Block] = Field(default_factory=list)
     diagnostics: list[str] = Field(default_factory=list)
@@ -74,18 +74,20 @@ class Chunk(BaseModel):
     project_id: str
     source_id: str
     version_id: str
-    document_id: str                 # == source_id; kept for response contract clarity
-    embed_text: str                  # alias: A01 retrieval_text (enriched, auditable)
-    citation_text: str               # verbatim original; citations refer to THIS, never embed_text
+    document_id: str  # == source_id; kept for response contract clarity
+    embed_text: str  # alias: A01 retrieval_text (enriched, auditable)
+    citation_text: str  # verbatim original; citations refer to THIS, never embed_text
     block_type: BlockType
     heading: str | None = None
     location: SourceLocation = Field(default_factory=SourceLocation)
     chunk_ordinal: int = 0
     source_path: str = ""
-    source_type: str = ""            # file extension without dot
-    doc_class: str = "project_record"   # project_record | reference | filesystem (config classification)
-    token_count: int = 0             # measured tokens of embed_text (A01 §F)
-    truncated: bool = False          # True if embed_text was token-truncated (A01 §F fail check)
+    source_type: str = ""  # file extension without dot
+    doc_class: str = (
+        "project_record"  # project_record | reference | filesystem (config classification)
+    )
+    token_count: int = 0  # measured tokens of embed_text (A01 §F)
+    truncated: bool = False  # True if embed_text was token-truncated (A01 §F fail check)
 
     @property
     def retrieval_text(self) -> str:
@@ -111,14 +113,16 @@ class EmbeddingProfile(BaseModel):
     passage_prefix: str = ""
     query_prompt_name: str | None = None
     query_prompt_version: str | None = None
-    inference_dtype: str | None = None   # recorded for drift diagnosis (A01 §C)
+    inference_dtype: str | None = None  # recorded for drift diagnosis (A01 §C)
     device: str | None = None
     max_input_tokens: int | None = None
 
     def key(self) -> str:
         qp = self.query_prompt_version or self.query_prefix
-        return (f"{self.provider}:{self.model}:{self.revision}:{self.dim}:"
-                f"{self.pooling}:{int(self.normalize)}:{qp}")
+        return (
+            f"{self.provider}:{self.model}:{self.revision}:{self.dim}:"
+            f"{self.pooling}:{int(self.normalize)}:{qp}"
+        )
 
 
 # ---- Tool response contracts (v1 §3.2) ----
@@ -133,7 +137,7 @@ class RetrievedResult(BaseModel):
     rank: int
     retrieval_channels: list[str]
     score_details: dict[str, float] = Field(default_factory=dict)
-    expanded_context: str = ""       # parent-section context (v1 §7, query-time; empty unless on)
+    expanded_context: str = ""  # parent-section context (v1 §7, query-time; empty unless on)
 
 
 class EvidenceVerdict(BaseModel):
@@ -148,9 +152,9 @@ class EvidenceVerdict(BaseModel):
 
     enabled: bool = False
     sufficient: bool = True
-    signal: str = ""                 # score_details key used (rerank_score | fusion_score)
-    top_score: float | None = None   # top-1 relevance score observed
-    threshold: float | None = None   # min_top_score the signal was compared against
+    signal: str = ""  # score_details key used (rerank_score | fusion_score)
+    top_score: float | None = None  # top-1 relevance score observed
+    threshold: float | None = None  # min_top_score the signal was compared against
 
 
 class SearchResponse(BaseModel):

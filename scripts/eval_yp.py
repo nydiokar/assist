@@ -46,10 +46,15 @@ def main() -> None:
     ap.add_argument("--project", default="yp")
     ap.add_argument("--root", default="yspdb")
     ap.add_argument("--questions", default="eval/yp_questions.jsonl")
-    ap.add_argument("--channels", nargs="*", default=["lexical"],
-                    help="channel sets to run, e.g. lexical dense lexical+dense")
-    ap.add_argument("--top-k", type=int, default=5,
-                    help="k for Recall@k / evidence@k / MRR (default 5)")
+    ap.add_argument(
+        "--channels",
+        nargs="*",
+        default=["lexical"],
+        help="channel sets to run, e.g. lexical dense lexical+dense",
+    )
+    ap.add_argument(
+        "--top-k", type=int, default=5, help="k for Recall@k / evidence@k / MRR (default 5)"
+    )
     ap.add_argument("--out", default="eval/results/yp_eval.json")
     args = ap.parse_args()
 
@@ -68,12 +73,16 @@ def main() -> None:
         for cs in args.channels:
             rep = evaluate(rag, args.project, questions, top_k=5, channels=cs.split("+"))
             results[cs] = rep.model_dump()
-            print(f"\n== {cs}: Recall@5={rep.recall_at_5} evidence@5={rep.evidence_recall_at_5} "
-                  f"MRR={rep.mrr} (n={rep.n})")
+            print(
+                f"\n== {cs}: Recall@5={rep.recall_at_5} evidence@5={rep.evidence_recall_at_5} "
+                f"MRR={rep.mrr} (n={rep.n})"
+            )
             if rep.abstention_enabled:
-                print(f"   abstention: no_answer withheld {rep.noanswer_abstained}/{rep.noanswer_total}; "
-                      f"answerable wrongly withheld {rep.answerable_abstained}/{rep.answerable_total} "
-                      f"(of which real hits: {rep.answerable_hit_abstained})")
+                print(
+                    f"   abstention: no_answer withheld {rep.noanswer_abstained}/{rep.noanswer_total}; "
+                    f"answerable wrongly withheld {rep.answerable_abstained}/{rep.answerable_total} "
+                    f"(of which real hits: {rep.answerable_hit_abstained})"
+                )
             for r in rep.per_question:
                 mark = "HIT " if r.hit_at_5 else "miss"
                 ev = "EV" if r.evidence_hit_at_5 else "--"

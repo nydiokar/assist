@@ -30,7 +30,7 @@ class FileRow(BaseModel):
     ext: str
     size: int
     content_hash: str
-    scope: str                       # text | legacy_office | image | media | other
+    scope: str  # text | legacy_office | image | media | other
     duplicate_of: str | None = None
     state: str | None = None
     n_blocks: int = 0
@@ -57,8 +57,13 @@ def build_rows(root: Path, parse: bool) -> list[FileRow]:
     first_seen: dict[str, str] = {}
     rows: list[FileRow] = []
     for d in discover(root):
-        row = FileRow(source_path=d.source_path, ext=d.ext, size=d.size,
-                      content_hash=d.content_hash, scope=classify(d))
+        row = FileRow(
+            source_path=d.source_path,
+            ext=d.ext,
+            size=d.size,
+            content_hash=d.content_hash,
+            scope=classify(d),
+        )
         if d.content_hash in first_seen:
             row.duplicate_of = first_seen[d.content_hash]
         else:
@@ -86,14 +91,18 @@ def summarize(rows: list[FileRow]) -> dict[str, object]:
         by_scope[r.scope]["files"] += 1
         by_scope[r.scope]["bytes"] += r.size
     states: collections.Counter[str] = collections.Counter(
-        f"{r.ext}:{r.state}" for r in rows if r.state is not None)
+        f"{r.ext}:{r.state}" for r in rows if r.state is not None
+    )
     return {
         "files": len(rows),
         "by_scope": by_scope,
         "exact_duplicates": sum(1 for r in rows if r.duplicate_of),
         "parse_states_by_ext": dict(sorted(states.items())),
-        "text_files_zero_blocks": [r.source_path for r in rows
-                                   if r.scope == "text" and r.state == "PARSED" and r.n_blocks == 0],
+        "text_files_zero_blocks": [
+            r.source_path
+            for r in rows
+            if r.scope == "text" and r.state == "PARSED" and r.n_blocks == 0
+        ],
     }
 
 
@@ -108,8 +117,13 @@ def main() -> None:
     rows: list[FileRow] = build_rows(Path(args.root), parse=not args.no_parse)
     summary: dict[str, object] = summarize(rows)
     (out / "inventory.json").write_text(
-        json.dumps({"summary": summary, "files": [r.model_dump() for r in rows]},
-                   ensure_ascii=False, indent=1), encoding="utf-8")
+        json.dumps(
+            {"summary": summary, "files": [r.model_dump() for r in rows]},
+            ensure_ascii=False,
+            indent=1,
+        ),
+        encoding="utf-8",
+    )
     print(json.dumps(summary, ensure_ascii=False, indent=1))
 
 

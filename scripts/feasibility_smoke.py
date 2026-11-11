@@ -44,16 +44,19 @@ def main() -> int:
     # 1) environment capture
     prepare_gpu_env()  # must precede `import torch`
     try:
-        import torch  # noqa: PLC0415
+        import torch
     except ImportError as e:
         return _fail(report, f"torch not installed (install .[qwen3]): {e}")
 
     report["torch_version"] = torch.__version__
     report["cuda_available"] = bool(torch.cuda.is_available())
     if not torch.cuda.is_available():
-        return _fail(report, "torch.cuda.is_available() is False — no CUDA/ROCm device. "
-                             + describe_gpu_env(torch.version.hip, torch.version.cuda)
-                             + " Do NOT silently fall back to CPU/0.6B (A01 §E).")
+        return _fail(
+            report,
+            "torch.cuda.is_available() is False — no CUDA/ROCm device. "
+            + describe_gpu_env(torch.version.hip, torch.version.cuda)
+            + " Do NOT silently fall back to CPU/0.6B (A01 §E).",
+        )
 
     dev = torch.cuda.current_device()
     free, total = torch.cuda.mem_get_info(dev)
@@ -63,8 +66,8 @@ def main() -> int:
     report["cuda_runtime"] = torch.version.cuda
 
     # 2) load model + encode
-    from project_rag.config import load_config  # noqa: PLC0415
-    from project_rag.embeddings import build_embedder  # noqa: PLC0415
+    from project_rag.config import load_config
+    from project_rag.embeddings import build_embedder
 
     cfg = load_config()
     cfg.embedding.provider = "qwen3"
@@ -89,7 +92,7 @@ def main() -> int:
         return _fail(report, f"encode failed: {e}")
 
     # 3) output validation
-    import numpy as np  # noqa: PLC0415
+    import numpy as np
 
     report["doc_shape"] = list(docs.shape)
     if docs.shape[1] != cfg.embedding.qwen3.dim:

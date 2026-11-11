@@ -2,10 +2,8 @@
 
 from __future__ import annotations
 
-import pytest
-
-from project_rag.retrieval import fuse_and_rank
 from project_rag.config import RetrievalConfig
+from project_rag.retrieval import fuse_and_rank
 from project_rag.schema import SourceLocation
 
 
@@ -63,8 +61,9 @@ def test_project_isolation_zero_leakage(make_rag, corpus_root, tmp_path):
     # second project with distinct unique content
     other = tmp_path / "other"
     other.mkdir()
-    (other / "secret.md").write_text("# Secret\n\nZEBRAPHONE classified marker only in B.\n",
-                                     encoding="utf-8")
+    (other / "secret.md").write_text(
+        "# Secret\n\nZEBRAPHONE classified marker only in B.\n", encoding="utf-8"
+    )
     rag.ingest_project("proj_b", str(other))
     res_a = rag.search_project("proj_a", "ZEBRAPHONE classified marker")
     assert all("ZEBRAPHONE" not in r.excerpt for r in res_a.results)
@@ -108,8 +107,12 @@ def test_query_length_bounded(make_rag, corpus_root):
 
 def test_fusion_is_deterministic():
     cfg = RetrievalConfig()
-    payload = {"source_path": "a.md", "document_id": "d", "citation_text": "t",
-               "location": SourceLocation()}
+    payload = {
+        "source_path": "a.md",
+        "document_id": "d",
+        "citation_text": "t",
+        "location": SourceLocation(),
+    }
     dense = [("ck_1", 0.1, payload), ("ck_2", 0.2, payload)]
     lexical = [("ck_2", 1.0, payload), ("ck_3", 2.0, payload)]
     a = [r.chunk_id for r in fuse_and_rank(dense, lexical, cfg)]

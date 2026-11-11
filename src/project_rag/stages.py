@@ -14,7 +14,6 @@ stages.py owns [1] PARSE and [2] CHUNK, the two stages that are expensive to rec
 from __future__ import annotations
 
 import hashlib
-import json
 from pathlib import Path
 
 from pydantic import BaseModel
@@ -40,14 +39,14 @@ def chunk_key(parsed_artifact_id: str, chunk_cfg: ChunkingConfig) -> str:
 
 
 class ParseArtifact(BaseModel):
-    artifact_id: str            # == parse_key (identity for downstream chunk key)
+    artifact_id: str  # == parse_key (identity for downstream chunk key)
     source_path: str
     source_content_hash: str
     doc: ParsedDocument
 
 
 class ChunkArtifact(BaseModel):
-    artifact_id: str            # == chunk_key
+    artifact_id: str  # == chunk_key
     parsed_artifact_id: str
     chunks: list[Chunk]
 
@@ -78,9 +77,16 @@ class StageCache:
         return self._chunk_dir / f"{key}.json"
 
     # ---- [1] PARSE ----
-    def get_or_parse(self, *, abs_path: str, source_path: str, ext: str,
-                     content_hash: str, registry: ParserRegistry,
-                     parser_cfg: ParsingConfig) -> ParseArtifact:
+    def get_or_parse(
+        self,
+        *,
+        abs_path: str,
+        source_path: str,
+        ext: str,
+        content_hash: str,
+        registry: ParserRegistry,
+        parser_cfg: ParsingConfig,
+    ) -> ParseArtifact:
         key = parse_key(content_hash, parser_cfg)
         p = self._parse_path(key)
         if p.is_file():
@@ -88,15 +94,24 @@ class StageCache:
             return ParseArtifact.model_validate_json(p.read_text(encoding="utf-8"))
         self.parse_misses += 1
         doc = registry.parse(abs_path, source_path, ext)
-        art = ParseArtifact(artifact_id=key, source_path=source_path,
-                            source_content_hash=content_hash, doc=doc)
+        art = ParseArtifact(
+            artifact_id=key, source_path=source_path, source_content_hash=content_hash, doc=doc
+        )
         p.write_text(art.model_dump_json(), encoding="utf-8")
         return art
 
     # ---- [2] CHUNK ----
-    def get_or_chunk(self, *, parse_art: ParseArtifact, project_id: str, source_id: str,
-                     version_id: str, source_type: str, chunk_cfg: ChunkingConfig,
-                     token_counter=None) -> ChunkArtifact:
+    def get_or_chunk(
+        self,
+        *,
+        parse_art: ParseArtifact,
+        project_id: str,
+        source_id: str,
+        version_id: str,
+        source_type: str,
+        chunk_cfg: ChunkingConfig,
+        token_counter=None,
+    ) -> ChunkArtifact:
         key = chunk_key(parse_art.artifact_id, chunk_cfg)
         # Chunk identity also depends on project/source/version lineage; fold into filename.
         lineage = _fp(key, project_id, source_id, version_id)
@@ -105,14 +120,25 @@ class StageCache:
             self.chunk_hits += 1
             return ChunkArtifact.model_validate_json(p.read_text(encoding="utf-8"))
         self.chunk_misses += 1
-        chunks = chunk_document(parse_art.doc, project_id=project_id, source_id=source_id,
-                                version_id=version_id, source_type=source_type,
-                                cfg=chunk_cfg, token_counter=token_counter)
-        art = ChunkArtifact(artifact_id=lineage, parsed_artifact_id=parse_art.artifact_id,
-                            chunks=chunks)
+        chunks = chunk_document(
+            parse_art.doc,
+            project_id=project_id,
+            source_id=source_id,
+            version_id=version_id,
+            source_type=source_type,
+            cfg=chunk_cfg,
+            token_counter=token_counter,
+        )
+        art = ChunkArtifact(
+            artifact_id=lineage, parsed_artifact_id=parse_art.artifact_id, chunks=chunks
+        )
         p.write_text(art.model_dump_json(), encoding="utf-8")
         return art
 
     def stats(self) -> dict:
-        return {"parse_hits": self.parse_hits, "parse_misses": self.parse_misses,
-                "chunk_hits": self.chunk_hits, "chunk_misses": self.chunk_misses}
+        return {
+            "parse_hits": self.parse_hits,
+            "parse_misses": self.parse_misses,
+            "chunk_hits": self.chunk_hits,
+            "chunk_misses": self.chunk_misses,
+        }

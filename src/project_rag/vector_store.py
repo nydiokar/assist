@@ -28,8 +28,14 @@ class VectorStoreProtocol(Protocol):
 
     def delete_generation(self, project_id: str, generation: str) -> None: ...
 
-    def query(self, project_id: str, generation: str, query_embedding: np.ndarray,
-              limit: int, doc_class: str | None = None) -> list[tuple[str, float, dict]]: ...
+    def query(
+        self,
+        project_id: str,
+        generation: str,
+        query_embedding: np.ndarray,
+        limit: int,
+        doc_class: str | None = None,
+    ) -> list[tuple[str, float, dict]]: ...
 
     def count(self, project_id: str, generation: str) -> int: ...
 
@@ -72,8 +78,7 @@ class InMemoryVectorStore:
         self._ids: list[str] = []
         self._vecs: list[np.ndarray] = []
         self._meta: list[dict] = []
-        self._file = (Path(cfg.persist_path) / "memory_store.json"
-                      if cfg.persist_path else None)
+        self._file = Path(cfg.persist_path) / "memory_store.json" if cfg.persist_path else None
         self._load()
 
     def _load(self) -> None:
@@ -88,11 +93,16 @@ class InMemoryVectorStore:
         if not self._file:
             return
         self._file.parent.mkdir(parents=True, exist_ok=True)
-        self._file.write_text(json.dumps({
-            "ids": self._ids,
-            "vecs": [v.tolist() for v in self._vecs],
-            "meta": self._meta,
-        }), encoding="utf-8")
+        self._file.write_text(
+            json.dumps(
+                {
+                    "ids": self._ids,
+                    "vecs": [v.tolist() for v in self._vecs],
+                    "meta": self._meta,
+                }
+            ),
+            encoding="utf-8",
+        )
 
     def add(self, generation: str, chunks: list[Chunk], embeddings: np.ndarray) -> None:
         for c, v in zip(chunks, embeddings, strict=True):
@@ -109,12 +119,21 @@ class InMemoryVectorStore:
         self._save()
 
     def delete_generation(self, project_id: str, generation: str) -> None:
-        drop = [self._ids[i] for i, m in enumerate(self._meta)
-                if m["project_id"] == project_id and m["generation"] == generation]
+        drop = [
+            self._ids[i]
+            for i, m in enumerate(self._meta)
+            if m["project_id"] == project_id and m["generation"] == generation
+        ]
         self.delete_ids(drop)
 
-    def query(self, project_id: str, generation: str, query_embedding: np.ndarray,
-              limit: int, doc_class: str | None = None) -> list[tuple[str, float, dict]]:
+    def query(
+        self,
+        project_id: str,
+        generation: str,
+        query_embedding: np.ndarray,
+        limit: int,
+        doc_class: str | None = None,
+    ) -> list[tuple[str, float, dict]]:
         q = np.asarray(query_embedding, dtype=np.float32).ravel()
         qn = np.linalg.norm(q) or 1.0
         scored: list[tuple[str, float, dict]] = []
@@ -130,16 +149,17 @@ class InMemoryVectorStore:
         return scored[:limit]
 
     def count(self, project_id: str, generation: str) -> int:
-        return sum(1 for m in self._meta
-                   if m["project_id"] == project_id and m["generation"] == generation)
+        return sum(
+            1 for m in self._meta if m["project_id"] == project_id and m["generation"] == generation
+        )
 
 
 class ChromaVectorStore:
     """Production baseline. Requires the `chroma` extra. Explicit cosine, explicit embeddings."""
 
     def __init__(self, cfg: VectorStoreConfig) -> None:
-        import chromadb  # noqa: PLC0415
-        from chromadb.config import Settings  # noqa: PLC0415
+        import chromadb
+        from chromadb.config import Settings
 
         self._cfg = cfg
         self._client = chromadb.PersistentClient(
@@ -178,8 +198,14 @@ class ChromaVectorStore:
     def delete_generation(self, project_id: str, generation: str) -> None:
         self._col.delete(where={"$and": [{"project_id": project_id}, {"generation": generation}]})
 
-    def query(self, project_id: str, generation: str, query_embedding: np.ndarray,
-              limit: int, doc_class: str | None = None) -> list[tuple[str, float, dict]]:
+    def query(
+        self,
+        project_id: str,
+        generation: str,
+        query_embedding: np.ndarray,
+        limit: int,
+        doc_class: str | None = None,
+    ) -> list[tuple[str, float, dict]]:
         clauses: list[dict] = [{"project_id": project_id}, {"generation": generation}]
         if doc_class is not None:
             clauses.append({"doc_class": doc_class})
@@ -192,8 +218,9 @@ class ChromaVectorStore:
         ids = res["ids"][0]
         dists = res["distances"][0]
         metas = res["metadatas"][0]
-        return [(cid, float(d), _result_payload(m))
-                for cid, d, m in zip(ids, dists, metas, strict=True)]
+        return [
+            (cid, float(d), _result_payload(m)) for cid, d, m in zip(ids, dists, metas, strict=True)
+        ]
 
     def count(self, project_id: str, generation: str) -> int:
         return self._col.get(

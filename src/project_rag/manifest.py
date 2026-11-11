@@ -56,8 +56,9 @@ class Manifest:
         self._conn.close()
 
     # ---- compatibility guard (v2 §D5 / v1 §4.6) ----
-    def check_compatibility(self, project_id: str, profile: EmbeddingProfile,
-                            collection: str) -> list[str]:
+    def check_compatibility(
+        self, project_id: str, profile: EmbeddingProfile, collection: str
+    ) -> list[str]:
         row = self._conn.execute(
             "SELECT embedding_profile_key, collection FROM projects WHERE project_id=?",
             (project_id,),
@@ -74,8 +75,9 @@ class Manifest:
             problems.append(f"collection mismatch: stored={row['collection']} live={collection}")
         return problems
 
-    def set_project_profile(self, project_id: str, profile: EmbeddingProfile,
-                            collection: str) -> None:
+    def set_project_profile(
+        self, project_id: str, profile: EmbeddingProfile, collection: str
+    ) -> None:
         self._conn.execute(
             "INSERT INTO projects(project_id, embedding_profile_key, collection) VALUES(?,?,?) "
             "ON CONFLICT(project_id) DO UPDATE SET embedding_profile_key=excluded.embedding_profile_key, "
@@ -85,19 +87,39 @@ class Manifest:
         self._conn.commit()
 
     # ---- generation + document records ----
-    def upsert_document(self, *, project_id: str, source_id: str, source_path: str,
-                        content_hash: str, version_id: str, state: str, generation: str,
-                        n_chunks: int, diagnostics: str = "") -> None:
+    def upsert_document(
+        self,
+        *,
+        project_id: str,
+        source_id: str,
+        source_path: str,
+        content_hash: str,
+        version_id: str,
+        state: str,
+        generation: str,
+        n_chunks: int,
+        diagnostics: str = "",
+    ) -> None:
         self._conn.execute(
             "INSERT OR REPLACE INTO documents(project_id, source_id, source_path, content_hash, "
             "version_id, state, generation, n_chunks, diagnostics) VALUES(?,?,?,?,?,?,?,?,?)",
-            (project_id, source_id, source_path, content_hash, version_id, state, generation,
-             n_chunks, diagnostics),
+            (
+                project_id,
+                source_id,
+                source_path,
+                content_hash,
+                version_id,
+                state,
+                generation,
+                n_chunks,
+                diagnostics,
+            ),
         )
         self._conn.commit()
 
-    def record_chunks(self, project_id: str, generation: str,
-                      chunk_refs: list[tuple[str, str, str]]) -> None:
+    def record_chunks(
+        self, project_id: str, generation: str, chunk_refs: list[tuple[str, str, str]]
+    ) -> None:
         self._conn.executemany(
             "INSERT OR REPLACE INTO chunks(chunk_id, project_id, source_id, version_id, generation) "
             "VALUES(?,?,?,?,?)",
@@ -142,8 +164,10 @@ class Manifest:
         ).fetchall()
 
     def delete_generation(self, project_id: str, generation: str) -> None:
-        self._conn.execute("DELETE FROM documents WHERE project_id=? AND generation=?",
-                           (project_id, generation))
-        self._conn.execute("DELETE FROM chunks WHERE project_id=? AND generation=?",
-                           (project_id, generation))
+        self._conn.execute(
+            "DELETE FROM documents WHERE project_id=? AND generation=?", (project_id, generation)
+        )
+        self._conn.execute(
+            "DELETE FROM chunks WHERE project_id=? AND generation=?", (project_id, generation)
+        )
         self._conn.commit()

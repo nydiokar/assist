@@ -31,8 +31,9 @@ POOL = 50  # candidates per channel for the sweep (production uses 16)
 KS = (5, 10, 20)
 
 
-def fuse_raw(dense: list[tuple[str, float, dict]],
-             lexical: list[tuple[str, float, dict]], k: int) -> list[tuple[str, dict]]:
+def fuse_raw(
+    dense: list[tuple[str, float, dict]], lexical: list[tuple[str, float, dict]], k: int
+) -> list[tuple[str, dict]]:
     ranks: dict[str, dict[str, int]] = {}
     payloads: dict[str, dict] = {}
     for r, (cid, _s, p) in enumerate(dense, start=1):
@@ -50,8 +51,9 @@ def main() -> None:
     rag = ProjectRAG(config_path=CONFIG)
     rag.register_project_root(PROJECT, ROOT)
     gen = rag._manifest.active_generation(PROJECT)
-    questions = [q for q in load_questions(QUESTIONS)
-                 if q.kind != "no_answer" and q.expect_source_paths]
+    questions = [
+        q for q in load_questions(QUESTIONS) if q.kind != "no_answer" and q.expect_source_paths
+    ]
 
     doc = {k: 0 for k in (*KS, "pool")}
     ev = {k: 0 for k in (*KS, "pool")}
@@ -63,13 +65,15 @@ def main() -> None:
         lexical = rag._lx.search(PROJECT, gen, q.query, POOL, None)
         fused = fuse_raw(dense, lexical, 60)
 
-        def doc_hit(n: int) -> bool:
-            return any(p.get("source_path", "") in q.expect_source_paths
-                       for _c, p in fused[:n])
+        def doc_hit(n: int, q=q, fused=fused) -> bool:
+            return any(p.get("source_path", "") in q.expect_source_paths for _c, p in fused[:n])
 
-        def ev_hit(n: int) -> bool:
-            texts = [p.get("citation_text", "") for _c, p in fused[:n]
-                     if p.get("source_path", "") in q.expect_source_paths]
+        def ev_hit(n: int, q=q, fused=fused) -> bool:
+            texts = [
+                p.get("citation_text", "")
+                for _c, p in fused[:n]
+                if p.get("source_path", "") in q.expect_source_paths
+            ]
             return bool(texts) and all(any(s in t for t in texts) for s in q.expect_substrings)
 
         for k in KS:
@@ -79,15 +83,34 @@ def main() -> None:
         ev["pool"] += int(ev_hit(len(fused)))
 
         # rank at which the expected doc / evidence first appears in the full fused list
-        drank = next((i for i, (_c, p) in enumerate(fused, 1)
-                      if p.get("source_path", "") in q.expect_source_paths), None)
-        erank = next((i for i, (_c, p) in enumerate(fused, 1)
-                      if p.get("source_path", "") in q.expect_source_paths
-                      and all(s in p.get("citation_text", "") for s in q.expect_substrings)), None)
+        drank = next(
+            (
+                i
+                for i, (_c, p) in enumerate(fused, 1)
+                if p.get("source_path", "") in q.expect_source_paths
+            ),
+            None,
+        )
+        erank = next(
+            (
+                i
+                for i, (_c, p) in enumerate(fused, 1)
+                if p.get("source_path", "") in q.expect_source_paths
+                and all(s in p.get("citation_text", "") for s in q.expect_substrings)
+            ),
+            None,
+        )
         if not (doc_hit(5) and ev_hit(5)):
-            miss_detail.append({"id": q.id, "kind": q.kind,
-                                "doc_rank": drank, "evidence_rank": erank,
-                                "in_pool_doc": drank is not None, "in_pool_ev": erank is not None})
+            miss_detail.append(
+                {
+                    "id": q.id,
+                    "kind": q.kind,
+                    "doc_rank": drank,
+                    "evidence_rank": erank,
+                    "in_pool_doc": drank is not None,
+                    "in_pool_ev": erank is not None,
+                }
+            )
 
     n = len(questions)
     print(f"n(scored)={n}  pool={POOL}/channel")
@@ -96,13 +119,19 @@ def main() -> None:
     print(f"  evidence {ev[5]/n:.3f}   {ev[10]/n:.3f} {ev[20]/n:.3f} {ev['pool']/n:.3f}")
     print("\nmiss detail (fused rank of expected doc / evidence chunk; None = not in pool):")
     for m in sorted(miss_detail, key=lambda x: int(x["id"][2:])):
-        print(f"  {m['id']:5} {m['kind']:14} doc_rank={m['doc_rank']}  ev_rank={m['evidence_rank']}")
+        print(
+            f"  {m['id']:5} {m['kind']:14} doc_rank={m['doc_rank']}  ev_rank={m['evidence_rank']}"
+        )
     rag.close()
 
     Path("eval/results/yp_v2_sweep.json").write_text(
-        json.dumps({"n": n, "pool_per_channel": POOL,
-                    "doc": doc, "evidence": ev, "misses": miss_detail},
-                   ensure_ascii=False, indent=1), encoding="utf-8")
+        json.dumps(
+            {"n": n, "pool_per_channel": POOL, "doc": doc, "evidence": ev, "misses": miss_detail},
+            ensure_ascii=False,
+            indent=1,
+        ),
+        encoding="utf-8",
+    )
 
 
 if __name__ == "__main__":

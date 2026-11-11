@@ -23,7 +23,7 @@ def test_profile_switch_reuses_parse_cache_no_reparse(make_rag, corpus_root, tmp
     # The parse cache is keyed by source+parser only, so parse must be fully reused.
     rag2 = make_rag(**{"embedding.hash_dim": 1024, "vector_store.collection": "alt_1024_v1"})
     report = rag2.ingest_project("demo2", str(root))
-    cache_line = [w for w in report.warnings if "stage_cache" in w][0]
+    cache_line = next(w for w in report.warnings if "stage_cache" in w)
     # new project id → chunk cache is per-project (lineage), but PARSE cache is shared by
     # content hash. Assert no parse misses beyond the already-cached artifacts where possible.
     assert "parse_hits" in cache_line

@@ -5,8 +5,6 @@ from __future__ import annotations
 import shutil
 from pathlib import Path
 
-import pytest
-
 
 def _copy_corpus(src: str, dst: Path) -> Path:
     shutil.copytree(src, dst)
@@ -32,8 +30,9 @@ def test_modified_file_removes_old_chunks(make_rag, corpus_root, tmp_path):
     rag.ingest_project("demo", str(root))
     before = rag.search_project("demo", "unicorn magic sparkle keyword")
     assert all("unicorn" not in r.excerpt.lower() for r in before.results)
-    (root / "proposal.md").write_text("# New\n\nunicorn magic sparkle keyword content.\n",
-                                      encoding="utf-8")
+    (root / "proposal.md").write_text(
+        "# New\n\nunicorn magic sparkle keyword content.\n", encoding="utf-8"
+    )
     r2 = rag.ingest_project("demo", str(root))
     assert r2.modified == 1
     after = rag.search_project("demo", "unicorn magic sparkle keyword")
@@ -57,8 +56,9 @@ def test_deleted_source_absent_from_active_set(make_rag, corpus_root, tmp_path):
 def test_shrunk_document_leaves_no_orphans(make_rag, tmp_path):
     root = tmp_path / "corpus"
     root.mkdir()
-    (root / "a.md").write_text("# H\n\nalpha beta gamma delta epsilon zeta eta theta.\n",
-                               encoding="utf-8")
+    (root / "a.md").write_text(
+        "# H\n\nalpha beta gamma delta epsilon zeta eta theta.\n", encoding="utf-8"
+    )
     rag = make_rag()
     rag.ingest_project("p", str(root))
     (root / "a.md").write_text("# H\n\nalpha.\n", encoding="utf-8")

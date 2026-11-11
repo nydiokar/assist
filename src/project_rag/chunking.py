@@ -40,23 +40,33 @@ def _drop_repeated_boilerplate(blocks: list[Block]) -> list[Block]:
     """Drop short paragraphs repeated >= 5 times (digits normalized), e.g. per-page form
     headers ("Form ID ... Deadline ...", "BG", "7 / 65"). They carry no evidence and dilute
     chunks and BM25 statistics (ledger F9). Tables and headings are never dropped."""
+
     def key(b: Block) -> str:
         t = b.text.strip()
         # page counters ("7 / 65") differ per page but are one kind of boilerplate; every
         # other text must repeat verbatim (so templated rows with different numbers survive).
         return "#PAGE#" if _PAGE_COUNTER.match(t) else t
 
-    paras = [b for b in blocks if b.block_type == BlockType.PARAGRAPH
-             and len(b.text) <= _BOILERPLATE_MAX_CHARS]
+    paras = [
+        b
+        for b in blocks
+        if b.block_type == BlockType.PARAGRAPH and len(b.text) <= _BOILERPLATE_MAX_CHARS
+    ]
     counts: dict[str, int] = {}
     for b in paras:
         counts[key(b)] = counts.get(key(b), 0) + 1
     noisy = {k for k, n in counts.items() if n >= _BOILERPLATE_MIN_REPEATS}
     if not noisy:
         return blocks
-    return [b for b in blocks if not (b.block_type == BlockType.PARAGRAPH
-                                      and len(b.text) <= _BOILERPLATE_MAX_CHARS
-                                      and key(b) in noisy)]
+    return [
+        b
+        for b in blocks
+        if not (
+            b.block_type == BlockType.PARAGRAPH
+            and len(b.text) <= _BOILERPLATE_MAX_CHARS
+            and key(b) in noisy
+        )
+    ]
 
 
 _SENTENCE_SPLIT = re.compile(r"(?<=[.!?;])\s+|\n+")
@@ -101,36 +111,60 @@ def _expand_oversized(blocks: list[Block], limit: int, count: Callable[[str], in
             continue
         parts = _split_oversized(b.text, limit, count)
         for k, part in enumerate(parts, start=1):
-            loc = b.location.model_copy(update={
-                "block_path": f"{b.location.block_path or 'blk'}.part{k}"})
-            label = (f"(row {b.location.row}, part {k}/{len(parts)}) "
-                     if b.block_type == BlockType.TABLE_ROW else "")
+            loc = b.location.model_copy(
+                update={"block_path": f"{b.location.block_path or 'blk'}.part{k}"}
+            )
+            label = (
+                f"(row {b.location.row}, part {k}/{len(parts)}) "
+                if b.block_type == BlockType.TABLE_ROW
+                else ""
+            )
             out.append(Block(block_type=b.block_type, text=label + part, location=loc))
     return out
 
 
-def _chunk_id(project_id: str, source_id: str, version_id: str, block_path: str,
-              ordinal: int) -> str:
+def _chunk_id(
+    project_id: str, source_id: str, version_id: str, block_path: str, ordinal: int
+) -> str:
     raw = f"{project_id}|{source_id}|{version_id}|{block_path}|{ordinal}|{CHUNKER_VERSION}"
     return "ck_" + hashlib.sha256(raw.encode("utf-8")).hexdigest()[:24]
 
 
-def chunk_document(doc: ParsedDocument, *, project_id: str, source_id: str,
-                   version_id: str, source_type: str, cfg: ChunkingConfig,
-                   token_counter: Callable[[str], int] | None = None) -> list[Chunk]:
+def chunk_document(
+    doc: ParsedDocument,
+    *,
+    project_id: str,
+    source_id: str,
+    version_id: str,
+    source_type: str,
+    cfg: ChunkingConfig,
+    token_counter: Callable[[str], int] | None = None,
+) -> list[Chunk]:
     count_tokens = token_counter or _approx_tokens
-    all_blocks = _expand_oversized(_drop_repeated_boilerplate(doc.blocks), cfg.target_tokens,
-                                   count_tokens)
-    text_blocks = [b for b in all_blocks if b.block_type in
-                   {BlockType.PARAGRAPH, BlockType.LIST_ITEM, BlockType.HEADING}]
-    table_blocks = [b for b in all_blocks if b.block_type in
-                    {BlockType.TABLE_ROW, BlockType.TABLE, BlockType.CELL}]
+    all_blocks = _expand_oversized(
+        _drop_repeated_boilerplate(doc.blocks), cfg.target_tokens, count_tokens
+    )
+    text_blocks = [
+        b
+        for b in all_blocks
+        if b.block_type in {BlockType.PARAGRAPH, BlockType.LIST_ITEM, BlockType.HEADING}
+    ]
+    table_blocks = [
+        b
+        for b in all_blocks
+        if b.block_type in {BlockType.TABLE_ROW, BlockType.TABLE, BlockType.CELL}
+    ]
 
     chunks: list[Chunk] = []
     ordinal = 0
 
-    def emit(embed_text: str, citation_text: str, btype: BlockType, heading: str | None,
-             loc: SourceLocation) -> None:
+    def emit(
+        embed_text: str,
+        citation_text: str,
+        btype: BlockType,
+        heading: str | None,
+        loc: SourceLocation,
+    ) -> None:
         nonlocal ordinal
         bp = loc.block_path or f"ord{ordinal}"
         cid = _chunk_id(project_id, source_id, version_id, bp, ordinal)
@@ -143,13 +177,25 @@ def chunk_document(doc: ParsedDocument, *, project_id: str, source_id: str,
             keep = max(1, int(len(words) * cfg.max_tokens / max(1, n_tok)))
             final_embed = " ".join(words[:keep])
             n_tok = count_tokens(final_embed)
-        chunks.append(Chunk(
-            chunk_id=cid, project_id=project_id, source_id=source_id, version_id=version_id,
-            document_id=source_id, embed_text=final_embed, citation_text=citation_text,
-            block_type=btype, heading=heading, location=loc, chunk_ordinal=ordinal,
-            source_path=doc.source_path, source_type=source_type,
-            token_count=n_tok, truncated=truncated,
-        ))
+        chunks.append(
+            Chunk(
+                chunk_id=cid,
+                project_id=project_id,
+                source_id=source_id,
+                version_id=version_id,
+                document_id=source_id,
+                embed_text=final_embed,
+                citation_text=citation_text,
+                block_type=btype,
+                heading=heading,
+                location=loc,
+                chunk_ordinal=ordinal,
+                source_path=doc.source_path,
+                source_type=source_type,
+                token_count=n_tok,
+                truncated=truncated,
+            )
+        )
         ordinal += 1
 
     # Free text: accumulate under nearest heading toward target_tokens.
@@ -201,8 +247,10 @@ def chunk_document(doc: ParsedDocument, *, project_id: str, source_id: str,
         body = "\n".join(b.text for b in group)
         embed = f"{ctx}\n{body}" if ctx else body
         loc = SourceLocation(
-            heading=group[0].location.heading, sheet=group[0].location.sheet,
-            row=group[0].location.row, block_path=group[0].location.block_path,
+            heading=group[0].location.heading,
+            sheet=group[0].location.sheet,
+            row=group[0].location.row,
+            block_path=group[0].location.block_path,
             page=group[0].location.page,
         )
         emit(embed, body, BlockType.TABLE, group[0].location.heading, loc)
@@ -210,8 +258,9 @@ def chunk_document(doc: ParsedDocument, *, project_id: str, source_id: str,
 
     for b in table_blocks:
         t = count_tokens(b.text)
-        if group and (group_tokens + t > cfg.target_tokens
-                      or group[0].location.sheet != b.location.sheet):
+        if group and (
+            group_tokens + t > cfg.target_tokens or group[0].location.sheet != b.location.sheet
+        ):
             flush_table()
         group.append(b)
         group_tokens += t

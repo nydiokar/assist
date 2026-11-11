@@ -12,7 +12,8 @@ import importlib.util
 from pathlib import Path
 
 _spec = importlib.util.spec_from_file_location(
-    "eval_agent", Path(__file__).resolve().parents[2] / "scripts" / "eval_agent.py")
+    "eval_agent", Path(__file__).resolve().parents[2] / "scripts" / "eval_agent.py"
+)
 assert _spec and _spec.loader
 eval_agent = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(eval_agent)
@@ -36,8 +37,11 @@ def test_check_no_answer_passes_on_abstention_fails_on_fabrication():
 
 
 def test_check_answerable_is_case_insensitive():
-    item = {"id": "r04", "kind": "report_section",
-            "expect_substrings": ["NATIONAL YOUTH FORUM BULGARIA"]}
+    item = {
+        "id": "r04",
+        "kind": "report_section",
+        "expect_substrings": ["NATIONAL YOUTH FORUM BULGARIA"],
+    }
     ok, _ = eval_agent._check(item, "The partner is National Youth Forum Bulgaria (E10179758).")
     assert ok
 

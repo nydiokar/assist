@@ -34,11 +34,15 @@ def _print_response(res: SearchResponse, show_context: bool) -> None:
     ev = res.evidence
     verdict = "SUFFICIENT" if ev.sufficient else "INSUFFICIENT — abstain"
     score = f"{ev.top_score:.3f}" if ev.top_score is not None else "n/a"
-    print(f"\n  evidence: {verdict}  (signal={ev.signal or 'off'} top_score={score} "
-          f"threshold={ev.threshold})")
+    print(
+        f"\n  evidence: {verdict}  (signal={ev.signal or 'off'} top_score={score} "
+        f"threshold={ev.threshold})"
+    )
     if not res.results:
-        print("  → No sufficient evidence in the accessible project documents. "
-              "(An assistant should decline rather than answer.)")
+        print(
+            "  → No sufficient evidence in the accessible project documents. "
+            "(An assistant should decline rather than answer.)"
+        )
     for r in res.results:
         rr = r.score_details.get("rerank_score")
         rr_s = f" rerank={rr:.3f}" if rr is not None else ""
@@ -68,10 +72,16 @@ def _log_row(res: SearchResponse, query: str, rating: int | None, note: str) -> 
         "evidence_signal": res.evidence.signal,
         "evidence_top_score": res.evidence.top_score,
         "n_results": len(res.results),
-        "citations": [{"rank": r.rank, "source_path": r.source_path,
-                       "rerank_score": r.score_details.get("rerank_score"),
-                       "excerpt": r.excerpt[:500]} for r in res.results],
-        "owner_rating": rating,       # 1-5 usefulness, owner's own judgement (None if skipped)
+        "citations": [
+            {
+                "rank": r.rank,
+                "source_path": r.source_path,
+                "rerank_score": r.score_details.get("rerank_score"),
+                "excerpt": r.excerpt[:500],
+            }
+            for r in res.results
+        ],
+        "owner_rating": rating,  # 1-5 usefulness, owner's own judgement (None if skipped)
         "owner_note": note,
     }
 
@@ -82,16 +92,27 @@ def main() -> None:
     ap.add_argument("--project", default="ypq")
     ap.add_argument("--root", default="yspdb")
     ap.add_argument("--top-k", type=int, default=5)
-    ap.add_argument("--questions", default=None,
-                    help="optional file of questions (one per line) for non-interactive replay")
-    ap.add_argument("--show-context", action="store_true", default=True,
-                    help="print the parent-section context handed to a future LLM")
-    ap.add_argument("--session-log", default=None,
-                    help="JSONL to append to (default eval/results/owner_session_<date>.jsonl)")
+    ap.add_argument(
+        "--questions",
+        default=None,
+        help="optional file of questions (one per line) for non-interactive replay",
+    )
+    ap.add_argument(
+        "--show-context",
+        action="store_true",
+        default=True,
+        help="print the parent-section context handed to a future LLM",
+    )
+    ap.add_argument(
+        "--session-log",
+        default=None,
+        help="JSONL to append to (default eval/results/owner_session_<date>.jsonl)",
+    )
     args = ap.parse_args()
 
-    log_path = Path(args.session_log or
-                    f"eval/results/owner_session_{dt.date.today().isoformat()}.jsonl")
+    log_path = Path(
+        args.session_log or f"eval/results/owner_session_{dt.date.today().isoformat()}.jsonl"
+    )
     log_path.parent.mkdir(parents=True, exist_ok=True)
 
     print("Loading retriever (warm for the whole session; cold start ~30 s)…")
@@ -100,8 +121,11 @@ def main() -> None:
 
     batch: list[str] | None = None
     if args.questions:
-        batch = [ln.strip() for ln in Path(args.questions).read_text(encoding="utf-8").splitlines()
-                 if ln.strip()]
+        batch = [
+            ln.strip()
+            for ln in Path(args.questions).read_text(encoding="utf-8").splitlines()
+            if ln.strip()
+        ]
 
     print(f"Ready. Project={args.project}. Session log: {log_path}")
     if batch is None:

@@ -8,9 +8,7 @@ from pathlib import Path
 
 from pydantic import BaseModel
 
-SUPPORTED_EXTENSIONS: frozenset[str] = frozenset(
-    {".pdf", ".docx", ".xlsx", ".csv", ".txt", ".md"}
-)
+SUPPORTED_EXTENSIONS: frozenset[str] = frozenset({".pdf", ".docx", ".xlsx", ".csv", ".txt", ".md"})
 
 # Temp/lock/derived/index artifacts to ignore (v1 §4.1).
 IGNORE_SUFFIXES: tuple[str, ...] = (".tmp", ".lock", "~")
@@ -21,12 +19,12 @@ IGNORE_FILE_PREFIXES: tuple[str, ...] = ("~$", ".~")
 
 
 class DiscoveredFile(BaseModel):
-    source_path: str          # relative to root, forward-slash normalized
+    source_path: str  # relative to root, forward-slash normalized
     abs_path: str
     ext: str
     size: int
-    mtime: float              # diagnostic only (v1 §4.1)
-    content_hash: str         # SHA-256
+    mtime: float  # diagnostic only (v1 §4.1)
+    content_hash: str  # SHA-256
     supported: bool
 
 
@@ -49,9 +47,7 @@ def _is_ignored(path: Path) -> bool:
     name = path.name
     if any(name.startswith(p) for p in IGNORE_FILE_PREFIXES):
         return True
-    if any(name.endswith(s) for s in IGNORE_SUFFIXES):
-        return True
-    return False
+    return bool(any(name.endswith(s) for s in IGNORE_SUFFIXES))
 
 
 def discover(root_path: str | Path) -> list[DiscoveredFile]:

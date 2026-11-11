@@ -46,10 +46,16 @@ def _generation_id(project_id: str, hashes: list[str], pipeline: str) -> str:
 
 
 class IndexingService:
-    def __init__(self, cfg: Config, embedder: EmbedderProtocol,
-                 vector_store: VectorStoreProtocol, lexical_store: LexicalStore,
-                 manifest: Manifest, registry: ParserRegistry,
-                 cache_root: str = "local_data/cache") -> None:
+    def __init__(
+        self,
+        cfg: Config,
+        embedder: EmbedderProtocol,
+        vector_store: VectorStoreProtocol,
+        lexical_store: LexicalStore,
+        manifest: Manifest,
+        registry: ParserRegistry,
+        cache_root: str = "local_data/cache",
+    ) -> None:
         self._cfg = cfg
         self._embedder = embedder
         self._vs = vector_store
@@ -64,38 +70,55 @@ class IndexingService:
 
         problems = self._manifest.check_compatibility(project_id, profile, collection)
         if problems:
-            return IngestReport(project_id=project_id, index_generation="",
-                                embedding_profile_key=profile.key(),
-                                warnings=["REFUSED: " + p for p in problems])
+            return IngestReport(
+                project_id=project_id,
+                index_generation="",
+                embedding_profile_key=profile.key(),
+                warnings=["REFUSED: " + p for p in problems],
+            )
 
         if profile.dim != self._embedder.dim:  # defensive
-            return IngestReport(project_id=project_id, index_generation="",
-                                warnings=["REFUSED: embedder dim != profile dim"])
+            return IngestReport(
+                project_id=project_id,
+                index_generation="",
+                warnings=["REFUSED: embedder dim != profile dim"],
+            )
 
         discovered = discover(root_path)
-        pipeline = "|".join([CHUNKER_VERSION, self._cfg.parsing.backend,
-                             self._cfg.chunking.model_dump_json(),
-                             self._cfg.classification.model_dump_json()])
-        new_gen = _generation_id(project_id, [d.content_hash + d.source_path for d in discovered],
-                                 pipeline)
+        pipeline = "|".join(
+            [
+                CHUNKER_VERSION,
+                self._cfg.parsing.backend,
+                self._cfg.chunking.model_dump_json(),
+                self._cfg.classification.model_dump_json(),
+            ]
+        )
+        new_gen = _generation_id(
+            project_id, [d.content_hash + d.source_path for d in discovered], pipeline
+        )
         prior_gen = self._manifest.active_generation(project_id)
-        prior_hashes = (self._manifest.prior_hashes(project_id, prior_gen)
-                        if prior_gen else {})
+        prior_hashes = self._manifest.prior_hashes(project_id, prior_gen) if prior_gen else {}
 
-        report = IngestReport(project_id=project_id, index_generation=new_gen,
-                              dry_run=dry_run, embedding_profile_key=profile.key())
+        report = IngestReport(
+            project_id=project_id,
+            index_generation=new_gen,
+            dry_run=dry_run,
+            embedding_profile_key=profile.key(),
+        )
 
         # Short-circuit true idempotency: identical corpus AND same generation already active.
         if prior_gen == new_gen and not dry_run:
             report.unchanged = len(discovered)
             report.warnings.append("no changes: active generation unchanged")
             for d in discovered:
-                report.files.append(FileReport(source_path=d.source_path,
-                                                state=DocState.READY if d.supported
-                                                else DocState.UNSUPPORTED,
-                                                source_id=_source_id(d.source_path),
-                                                version_id=_version_id(d.content_hash,
-                                                                       self._cfg.parsing.backend)))
+                report.files.append(
+                    FileReport(
+                        source_path=d.source_path,
+                        state=DocState.READY if d.supported else DocState.UNSUPPORTED,
+                        source_id=_source_id(d.source_path),
+                        version_id=_version_id(d.content_hash, self._cfg.parsing.backend),
+                    )
+                )
             return report
 
         cache = StageCache(self._cache_root, project_id)
@@ -114,46 +137,76 @@ class IndexingService:
                 report.unchanged += 1
 
             if not d.supported:
-                report.files.append(FileReport(source_path=d.source_path,
-                                                state=DocState.UNSUPPORTED, source_id=sid,
-                                                version_id=vid,
-                                                diagnostics=[f"unsupported ext {d.ext}"]))
+                report.files.append(
+                    FileReport(
+                        source_path=d.source_path,
+                        state=DocState.UNSUPPORTED,
+                        source_id=sid,
+                        version_id=vid,
+                        diagnostics=[f"unsupported ext {d.ext}"],
+                    )
+                )
                 continue
 
             parse_art = cache.get_or_parse(
-                abs_path=d.abs_path, source_path=d.source_path, ext=d.ext,
-                content_hash=d.content_hash, registry=self._registry,
-                parser_cfg=self._cfg.parsing)
+                abs_path=d.abs_path,
+                source_path=d.source_path,
+                ext=d.ext,
+                content_hash=d.content_hash,
+                registry=self._registry,
+                parser_cfg=self._cfg.parsing,
+            )
             doc: ParsedDocument = parse_art.doc
             if doc.state not in {DocState.PARSED}:
-                report.files.append(FileReport(source_path=d.source_path, state=doc.state,
-                                                source_id=sid, version_id=vid,
-                                                diagnostics=doc.diagnostics))
+                report.files.append(
+                    FileReport(
+                        source_path=d.source_path,
+                        state=doc.state,
+                        source_id=sid,
+                        version_id=vid,
+                        diagnostics=doc.diagnostics,
+                    )
+                )
                 continue
 
             chunk_art = cache.get_or_chunk(
-                parse_art=parse_art, project_id=project_id, source_id=sid, version_id=vid,
-                source_type=d.ext.lstrip("."), chunk_cfg=self._cfg.chunking,
-                token_counter=token_counter)
+                parse_art=parse_art,
+                project_id=project_id,
+                source_id=sid,
+                version_id=vid,
+                source_type=d.ext.lstrip("."),
+                chunk_cfg=self._cfg.chunking,
+                token_counter=token_counter,
+            )
             prefixes = tuple(self._cfg.classification.reference_prefixes)
-            doc_class = "reference" if prefixes and d.source_path.startswith(prefixes) \
-                else "project_record"
+            doc_class = (
+                "reference" if prefixes and d.source_path.startswith(prefixes) else "project_record"
+            )
             chunks = [c.model_copy(update={"doc_class": doc_class}) for c in chunk_art.chunks]
             staged_chunks.extend(chunks)
             diags = list(doc.diagnostics)
             if any(c.truncated for c in chunks):  # A01 §F: silent truncation is a failed check
-                diags.append(f"TRUNCATION: {sum(c.truncated for c in chunks)} chunk(s) exceeded "
-                             f"max_tokens={self._cfg.chunking.max_tokens}")
-            report.files.append(FileReport(source_path=d.source_path, state=DocState.READY,
-                                            source_id=sid, version_id=vid,
-                                            n_blocks=len(doc.blocks), n_chunks=len(chunks),
-                                            diagnostics=diags))
+                diags.append(
+                    f"TRUNCATION: {sum(c.truncated for c in chunks)} chunk(s) exceeded "
+                    f"max_tokens={self._cfg.chunking.max_tokens}"
+                )
+            report.files.append(
+                FileReport(
+                    source_path=d.source_path,
+                    state=DocState.READY,
+                    source_id=sid,
+                    version_id=vid,
+                    n_blocks=len(doc.blocks),
+                    n_chunks=len(chunks),
+                    diagnostics=diags,
+                )
+            )
 
         # Filesystem-presence evidence for unparseable files (DECISIONS 2026-10-28). Synthesized
         # from the discovery walk (no parse/chunk cache — it is cheap and derived purely from the
         # file inventory). doc_class=filesystem keeps it filterable and unmistakable for content.
         if self._cfg.classification.filesystem_evidence:
-            from .filesystem import build_filesystem_chunks  # noqa: PLC0415
+            from .filesystem import build_filesystem_chunks
 
             fs_chunks = build_filesystem_chunks(project_id, discovered)
             staged_chunks.extend(fs_chunks)
@@ -173,17 +226,26 @@ class IndexingService:
             self._vs.add(new_gen, staged_chunks, embeddings)
             self._lx.add_chunks(new_gen, staged_chunks)
             self._manifest.record_chunks(
-                project_id, new_gen,
-                [(c.chunk_id, c.source_id, c.version_id) for c in staged_chunks])
+                project_id,
+                new_gen,
+                [(c.chunk_id, c.source_id, c.version_id) for c in staged_chunks],
+            )
 
         for fr in report.files:
-            content_hash = next((d.content_hash for d in discovered
-                                 if d.source_path == fr.source_path), "")
+            content_hash = next(
+                (d.content_hash for d in discovered if d.source_path == fr.source_path), ""
+            )
             self._manifest.upsert_document(
-                project_id=project_id, source_id=fr.source_id, source_path=fr.source_path,
-                content_hash=content_hash, version_id=fr.version_id or "", state=fr.state,
-                generation=new_gen, n_chunks=fr.n_chunks,
-                diagnostics="; ".join(fr.diagnostics))
+                project_id=project_id,
+                source_id=fr.source_id,
+                source_path=fr.source_path,
+                content_hash=content_hash,
+                version_id=fr.version_id or "",
+                state=fr.state,
+                generation=new_gen,
+                n_chunks=fr.n_chunks,
+                diagnostics="; ".join(fr.diagnostics),
+            )
 
         # Publish new active generation, then remove superseded derivatives.
         self._manifest.set_project_profile(project_id, profile, collection)
@@ -197,8 +259,7 @@ class IndexingService:
         report.warnings.append(f"stage_cache={cache.stats()}")
         return report
 
-    def _embed_cached(self, chunks: list[Chunk], *, cache_root: str,
-                      batch: int = 64) -> np.ndarray:
+    def _embed_cached(self, chunks: list[Chunk], *, cache_root: str, batch: int = 64) -> np.ndarray:
         """Embed only chunks whose (text, profile) is not cached; commit each batch (resumable)."""
         profile_key = self._embedder.profile.key()
         dim = self._embedder.dim
@@ -206,8 +267,7 @@ class IndexingService:
         try:
             hashes = [text_hash(c.embed_text) for c in chunks]
             have = cache.get_many(profile_key, sorted(set(hashes)), dim)
-            todo = [(h, c.embed_text) for h, c in zip(hashes, chunks, strict=True)
-                    if h not in have]
+            todo = [(h, c.embed_text) for h, c in zip(hashes, chunks, strict=True) if h not in have]
             seen: set[str] = set()
             todo = [(h, t) for h, t in todo if not (h in seen or seen.add(h))]
             for i in range(0, len(todo), batch):
@@ -216,25 +276,40 @@ class IndexingService:
                 new = {h: v for (h, _), v in zip(part, vecs, strict=True)}
                 cache.put_many(profile_key, new)
                 have.update(new)
-            return np.stack([have[h] for h in hashes]) if hashes else np.zeros((0, dim),
-                                                                               dtype=np.float32)
+            return (
+                np.stack([have[h] for h in hashes])
+                if hashes
+                else np.zeros((0, dim), dtype=np.float32)
+            )
         finally:
             cache.close()
 
     def status(self, project_id: str):
-        from .schema import StatusReport  # noqa: PLC0415
+        from .schema import StatusReport
 
         gen = self._manifest.active_generation(project_id)
         if gen is None:
-            return StatusReport(project_id=project_id, index_generation=None, n_documents=0,
-                                n_chunks=0, healthy=False, warnings=["no active generation"])
+            return StatusReport(
+                project_id=project_id,
+                index_generation=None,
+                n_documents=0,
+                n_chunks=0,
+                healthy=False,
+                warnings=["no active generation"],
+            )
         docs = self._manifest.document_states(project_id, gen)
         states: dict[str, int] = {}
         n_chunks = 0
         for r in docs:
             states[r["state"]] = states.get(r["state"], 0) + 1
             n_chunks += r["n_chunks"] or 0
-        return StatusReport(project_id=project_id, index_generation=gen, n_documents=len(docs),
-                            n_chunks=n_chunks, states=states,
-                            embedding_profile_key=self._embedder.profile.key(),
-                            collection=self._cfg.vector_store.collection, healthy=True)
+        return StatusReport(
+            project_id=project_id,
+            index_generation=gen,
+            n_documents=len(docs),
+            n_chunks=n_chunks,
+            states=states,
+            embedding_profile_key=self._embedder.profile.key(),
+            collection=self._cfg.vector_store.collection,
+            healthy=True,
+        )

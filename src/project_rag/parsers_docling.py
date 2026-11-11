@@ -15,7 +15,7 @@ _DOCLING_EXTS = {".pdf", ".docx", ".xlsx"}
 
 class DoclingParser:
     def __init__(self) -> None:
-        from docling.document_converter import DocumentConverter  # noqa: PLC0415
+        from docling.document_converter import DocumentConverter
 
         self._converter = DocumentConverter()
 
@@ -26,8 +26,11 @@ class DoclingParser:
         try:
             result = self._converter.convert(abs_path)
         except Exception as e:  # noqa: BLE001
-            return ParsedDocument(source_path=source_path, state=DocState.FAILED,
-                                  diagnostics=[f"docling convert failed: {e}"])
+            return ParsedDocument(
+                source_path=source_path,
+                state=DocState.FAILED,
+                diagnostics=[f"docling convert failed: {e}"],
+            )
         doc = result.document
         blocks: list[Block] = []
         # Docling exposes a markdown/structured export; use it as the normalized block stream.
@@ -40,15 +43,33 @@ class DoclingParser:
                 continue
             if s.startswith("#"):
                 heading = s.lstrip("#").strip()
-                blocks.append(Block(block_type=BlockType.HEADING, text=heading,
-                                    location=SourceLocation(block_path=f"h{i}")))
+                blocks.append(
+                    Block(
+                        block_type=BlockType.HEADING,
+                        text=heading,
+                        location=SourceLocation(block_path=f"h{i}"),
+                    )
+                )
             elif s.startswith("|"):
-                blocks.append(Block(block_type=BlockType.TABLE_ROW, text=s.strip("|").strip(),
-                                    location=SourceLocation(heading=heading, block_path=f"t{i}")))
+                blocks.append(
+                    Block(
+                        block_type=BlockType.TABLE_ROW,
+                        text=s.strip("|").strip(),
+                        location=SourceLocation(heading=heading, block_path=f"t{i}"),
+                    )
+                )
             else:
-                blocks.append(Block(block_type=BlockType.PARAGRAPH, text=s,
-                                    location=SourceLocation(heading=heading, block_path=f"p{i}")))
+                blocks.append(
+                    Block(
+                        block_type=BlockType.PARAGRAPH,
+                        text=s,
+                        location=SourceLocation(heading=heading, block_path=f"p{i}"),
+                    )
+                )
         if not blocks:
-            return ParsedDocument(source_path=source_path, state=DocState.OCR_REQUIRED,
-                                  diagnostics=["docling produced no text; possible scan"])
+            return ParsedDocument(
+                source_path=source_path,
+                state=DocState.OCR_REQUIRED,
+                diagnostics=["docling produced no text; possible scan"],
+            )
         return ParsedDocument(source_path=source_path, state=DocState.PARSED, blocks=blocks)

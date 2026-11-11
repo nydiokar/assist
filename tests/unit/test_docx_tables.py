@@ -30,8 +30,10 @@ def test_merged_cells_emitted_once_and_order_preserved(tmp_path: Path) -> None:
     texts = [b.text for b in blocks]
     assert texts[0] == "Before table" and texts[-1] == "After table"
     rows = [b for b in blocks if b.block_type == BlockType.TABLE_ROW]
-    assert rows[0].text == "Activity programme"          # merged title once, not x3
-    assert any("Dates | 04-07.07.2025" in r.text for r in rows)  # first data row not eaten as header
+    assert rows[0].text == "Activity programme"  # merged title once, not x3
+    assert any(
+        "Dates | 04-07.07.2025" in r.text for r in rows
+    )  # first data row not eaten as header
 
 
 def test_real_header_row_is_used_as_header(tmp_path: Path) -> None:
@@ -51,4 +53,7 @@ def test_pdf_whitespace_only_lines_do_not_split_every_word() -> None:
     from project_rag.parsers import _split_paragraphs
 
     text = "Възложител:  Община \nВарна,\n \nдейност\n \n369\n\nНов абзац"
-    assert _split_paragraphs(text, strict_blank=True) == ["Възложител:  Община Варна, дейност 369", "Нов абзац"]
+    assert _split_paragraphs(text, strict_blank=True) == [
+        "Възложител:  Община Варна, дейност 369",
+        "Нов абзац",
+    ]

@@ -9,11 +9,10 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-from project_rag.api import ProjectRAG  # noqa: E402
-from project_rag.config import Config  # noqa: E402
+from project_rag.api import ProjectRAG
+from project_rag.config import Config
 
-FIXTURE_CORPUS = (Path(__file__).resolve().parent / "fixtures" / "synthetic"
-                  / "ngo_project_demo")
+FIXTURE_CORPUS = Path(__file__).resolve().parent / "fixtures" / "synthetic" / "ngo_project_demo"
 
 
 def _config(tmp_path: Path, **overrides) -> Config:
@@ -21,7 +20,7 @@ def _config(tmp_path: Path, **overrides) -> Config:
     cfg.lexical_store.path = str(tmp_path / "manifest.sqlite3")
     cfg.vector_store.persist_path = str(tmp_path / "store")
     for k, v in overrides.items():
-        *parents, field = k.split(".")   # supports nested e.g. retrieval.abstention.enabled
+        *parents, field = k.split(".")  # supports nested e.g. retrieval.abstention.enabled
         obj = cfg
         for p in parents:
             obj = getattr(obj, p)

@@ -46,7 +46,7 @@ class GroundedAnswer:
     question: str
     answer: str
     abstained_pre_llm: bool
-    citations: list[str]          # source_path strings of the passages offered to the LLM
+    citations: list[str]  # source_path strings of the passages offered to the LLM
     evidence_sufficient: bool
     evidence_top_score: float | None
 
@@ -63,7 +63,9 @@ def _format_passage(n: int, r: RetrievedResult) -> str:
     where_s = (" (" + ", ".join(where) + ")") if where else ""
     # Prefer the parent-section context (Task A) when present — it carries answers the top chunk
     # alone often did not (span@5 0.718 vs 0.667). Fall back to the verbatim excerpt.
-    body = r.expanded_context if r.expanded_context and r.expanded_context != r.excerpt else r.excerpt
+    body = (
+        r.expanded_context if r.expanded_context and r.expanded_context != r.excerpt else r.excerpt
+    )
     return f"[#{n}] source: {r.source_path}{where_s}\n{body.strip()}"
 
 
@@ -98,8 +100,7 @@ def build_grounding_prompt(question: str, res: SearchResponse) -> str:
     return "\n".join(parts)
 
 
-def answer_from_search(question: str, res: SearchResponse, *,
-                       call_llm=None) -> GroundedAnswer:
+def answer_from_search(question: str, res: SearchResponse, *, call_llm=None) -> GroundedAnswer:
     """Turn a SearchResponse into a grounded answer, retrieval-first.
 
     The real path is the AI-Team SDK-MCP session (the agent calls the RAG tools itself); this helper
@@ -114,8 +115,11 @@ def answer_from_search(question: str, res: SearchResponse, *,
     # line without consulting the LLM. (v1 §5.2 / §2.2; never fabricate a section with no evidence.)
     if not res.results:
         return GroundedAnswer(
-            question=question, answer=ABSTENTION_LINE, abstained_pre_llm=True,
-            citations=[], evidence_sufficient=ev.sufficient if ev.enabled else False,
+            question=question,
+            answer=ABSTENTION_LINE,
+            abstained_pre_llm=True,
+            citations=[],
+            evidence_sufficient=ev.sufficient if ev.enabled else False,
             evidence_top_score=ev.top_score,
         )
 
@@ -125,7 +129,10 @@ def answer_from_search(question: str, res: SearchResponse, *,
     user = build_grounding_prompt(question, res)
     answer = call_llm(SYSTEM_PROMPT, user)
     return GroundedAnswer(
-        question=question, answer=answer, abstained_pre_llm=False,
-        citations=citations, evidence_sufficient=ev.sufficient if ev.enabled else True,
+        question=question,
+        answer=answer,
+        abstained_pre_llm=False,
+        citations=citations,
+        evidence_sufficient=ev.sufficient if ev.enabled else True,
         evidence_top_score=ev.top_score,
     )

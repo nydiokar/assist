@@ -43,13 +43,15 @@ def test_expansion_recovers_section_sibling_fact(make_rag, corpus_root):
 
 
 def test_suppressed_response_not_expanded(make_rag, corpus_root):
-    rag = make_rag(**{
-        "retrieval.context_expansion.enabled": True,
-        "retrieval.abstention.enabled": True,
-        "retrieval.abstention.signal": "fusion_score",
-        "retrieval.abstention.min_top_score": 0.99,     # always insufficient
-        "retrieval.abstention.suppress_on_insufficient": True,
-    })
+    rag = make_rag(
+        **{
+            "retrieval.context_expansion.enabled": True,
+            "retrieval.abstention.enabled": True,
+            "retrieval.abstention.signal": "fusion_score",
+            "retrieval.abstention.min_top_score": 0.99,  # always insufficient
+            "retrieval.abstention.suppress_on_insufficient": True,
+        }
+    )
     rag.ingest_project("demo", corpus_root)
     res = rag.search_project("demo", "What indicators did the approved project define?")
-    assert res.results == []                            # withheld, nothing to expand
+    assert res.results == []  # withheld, nothing to expand

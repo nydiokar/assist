@@ -33,7 +33,7 @@ def test_xlsx_multisheet_numeric_and_none_cache(corpus_root):
     rows = [b.text for b in doc.blocks if b.block_type == BlockType.TABLE_ROW]
     assert any("target=120" in r for r in rows)
     # None cached formula result must NOT become 0
-    garden_row = [r for r in rows if "gardens" in r][0]
+    garden_row = next(r for r in rows if "gardens" in r)
     assert "reported_actual=" in garden_row
     assert "reported_actual=0" not in garden_row
     assert any(b.location.sheet == "Indicators" for b in doc.blocks)

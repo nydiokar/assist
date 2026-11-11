@@ -22,12 +22,20 @@ class _FakeRAG:
 
     def search_project(self, project_id, query, *, top_k=8):
         self.calls.append(("search", project_id, query, top_k))
-        return types.SimpleNamespace(model_dump=lambda: {"results": [], "query": query,
-                                                         "project_id": project_id, "warnings": []})
+        return types.SimpleNamespace(
+            model_dump=lambda: {
+                "results": [],
+                "query": query,
+                "project_id": project_id,
+                "warnings": [],
+            }
+        )
 
     def open_source(self, project_id, document_id, *, source_path=None, max_chars=6000):
         self.calls.append(("open", project_id, document_id, source_path))
-        return types.SimpleNamespace(model_dump=lambda: {"document_id": document_id, "warnings": []})
+        return types.SimpleNamespace(
+            model_dump=lambda: {"document_id": document_id, "warnings": []}
+        )
 
     def get_ingestion_status(self, project_id):
         self.calls.append(("status", project_id))
@@ -36,6 +44,7 @@ class _FakeRAG:
 
 def _build(rag):
     from project_rag.mcp_server import build_server
+
     return build_server(rag, "ypq")
 
 
@@ -60,7 +69,7 @@ def test_call_routes_to_handler_with_server_project_id():
     result = asyncio.run(server.call_tool("search_project", {"query": "бюджет", "top_k": 3}))
     payload = json.loads(_text(result))
     assert payload["query"] == "бюджет"
-    assert payload["project_id"] == "ypq"            # server-resolved, not from args
+    assert payload["project_id"] == "ypq"  # server-resolved, not from args
     assert rag.calls[0] == ("search", "ypq", "бюджет", 3)
 
 
@@ -68,7 +77,8 @@ def test_fatal_payload_raises_so_agent_sees_error():
     class _Unreg(_FakeRAG):
         def search_project(self, project_id, query, *, top_k=8):
             return types.SimpleNamespace(
-                model_dump=lambda: {"warnings": ["project root not registered server-side"]})
+                model_dump=lambda: {"warnings": ["project root not registered server-side"]}
+            )
 
     server = _build(_Unreg())
     # MCPServer raises a ToolError up to the protocol layer (reported to the agent as a tool error);
