@@ -105,7 +105,7 @@ flowchart TD
 | Stage | Status | Depends on | Owner preconditions | Evidence commit | Closed |
 |---|---|---|---|---|---|
 | S0 | done | — | — | `36b1ec9` | 2026-11-11 |
-| S1 | todo | S0 | — | | |
+| S1 | done | S0 | — | `5ad1e55` | 2026-11-11 |
 | S2 | todo | S1 | — | | |
 | S3 | todo | S1 | — | | |
 | S4 | todo | S2, S3 | — | | |
@@ -417,6 +417,14 @@ Format: `YYYY-MM-DD · Stage · event · evidence (commands + one-line results, 
   - `UV_PROJECT_ENVIRONMENT=<scratch> uv sync --frozen --extra dev` on an empty venv → ok (8.8 s); offline tiers 106 passed, 1 skipped.
   - `uv run pyright` (basic, `src/`) baseline → **7 errors** (api.py:200 + retrieval.py:173-174 `channels` annotated `dict[str,int]` but a `tuple[str,...]` flows; vector_store.py:219-222 chroma Optional/Mapping typing). Fixed in S1 when the packages go strict.
   - Toolchain note: the pip-era `.venv\Scripts\pytest.exe` launcher was stale (exit 1, no output); `uv sync --reinstall-package pytest` fixed it.
+- 2026-11-11 · S1 · closed · branch `v3/s1-architecture`, one layer per commit: `73970d0` domain (frozen models/config, port errors), `8069f85` core (+hypothesis properties), `b8fcdf2` ports, `1ba6885` adapters (+contract suites), `6218c68` services + interfaces + wiring (one commit: removing the temporary shims needed all three together), `5ad1e55` import-linter/pyright strict/CI. Checks:
+  - Golden snapshot **byte-identical** to S0: `git diff --stat 36b1ec9 -- tests/evaluation/golden/` → empty; `uv run pytest tests/evaluation` → 2 passed.
+  - Contract suites: `uv run pytest tests/contracts -m "not live"` → 52 passed (hash, identity, native parsers, local_fs, fts5, memory ×2, chroma, sqlite catalog, fs/sqlite caches, memory feedback, null telemetry/OCR, clocks). **Torch adapters run** in WSL: `HF_HUB_OFFLINE=1 PYTHONPATH=src <rocm venv>/python -m pytest tests/contracts/test_embedder.py tests/contracts/test_reranker.py -m live` → **8 passed** (Qwen3-4B pinned rev `5cf2132`, bf16 on RX 7900 XT; bge-reranker-v2-m3).
+  - `uv run lint-imports` → 11 kept, 0 broken. Adding `import chromadb` to `core/fusion.py` → "R2 … BROKEN", `core.fusion -> chromadb`, exit 1; reverted → 11 kept.
+  - `uv run pyright` → 0 errors (strict on domain/core/ports/services/wiring; probe file in core confirmed strict rules apply). S0's 7 basic-mode errors are fixed.
+  - Scripts through the facade on the fixture corpus (scratch hash/memory config): `python -m project_rag.cli ingest` → `g_7f0b15d76fcac5c5`, 6 added; `scripts/eval_yp.py --questions eval/archive/questions_synthetic_gv.jsonl --channels lexical lexical+dense` → R@5 0.9286 / 1.0; `scripts/ask.py --questions <2 lines>` → 2 session-log rows. Every `project_rag` import in `scripts/*.py` resolves (AST check).
+  - `grep -R "import chromadb\|import torch\|from mcp" src/project_rag --include=*.py` → only `adapters/embed_torch.py`, `adapters/vector_chroma.py`, `interfaces/mcp/tools.py` (+ two comment lines in adapters).
+  - Regression floor: unit+contracts+integration 163 passed (8 live deselected); evaluation 2 passed; ruff clean; format clean. CI run on `5ad1e55` → success (161 passed, 4 chroma skips without `dev-gpu`).
 
 ## 6. Owner queue and open issues
 
