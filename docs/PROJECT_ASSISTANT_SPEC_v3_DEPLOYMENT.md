@@ -678,6 +678,7 @@ flowchart TD
 
 | # | Item | Who | Acceptance |
 |---|---|---|---|
+| A0 | Restructure into the §15.3 layout as a **pure refactor** (`api.py` → `rag.py` facade + `wiring.py` composition root; migration runner; `uv` lock; pyright in CI) | AGENT | all existing tests green, zero behaviour change, one commit per move |
 | A1 | `openai_compat` embedder (query prompt client-side, last-token pooling, L2, batching, timeout, retry) | AGENT | unit tests against a stub server; a live test against llama-server matches the bf16 vectors on fixtures (cosine ≥ 0.99 for the same model at Q8) |
 | A2 | `RerankerProtocol` + `openai_compat_rerank` | AGENT | the same scores ordering as the torch reranker on 20 fixture pairs (Spearman ≥ 0.95) |
 | A3 | Token counting via `/tokenize`, cached | AGENT | chunk boundaries identical to the HF tokenizer on fixtures |
@@ -731,7 +732,7 @@ T1–T10 in §7. T1, T2 (final) and T9 are yours. The rest are agent tasks, veri
 
 | Phase | Content | Runs on | **Agent stops for** |
 |---|---|---|---|
-| P0 | A1–A4, A5 (E1) on your PC; containers CPU/RAM-limited to emulate the host | your PC | **D-1 quant choice; A6 label confirmation** |
+| P0 | A0 first (refactor, behaviour-neutral), then A1–A4, A5 (E1) on your PC; containers CPU/RAM-limited to emulate the host | your PC | **D-1 quant choice; A6 label confirmation** |
 | P1 | A7–A10, A12–A15, A19 | your PC | D-3 if the spike is inconclusive |
 | P2 | A11 (OCR), A16–A18 | your PC | D-7 API key provisioning; OCR spot-check |
 | P3 | A20, I4, I5 on a **staging VM** (a cheap 1-month box, which doubles as B1) | staging VM | **D-2 host choice; I3 allowlist approval** |
@@ -804,7 +805,68 @@ This is a reading of published terms, not legal advice. The wording changed seve
 
 ---
 
-## 15. Sources (external facts used, checked 2026-11-11)
+## 15. Codebase structure and libraries (assist)
+
+### 15.1 Current state (verified 2026-11-11)
+
+27 modules, ~3.7k lines, one flat package `src/project_rag/`. This is better than it looks:
+
+- Pydantic models for all contracts (`schema.py`, `config.py`).
+- `Protocol` seams for embedder and vector store, with factory functions (`build_embedder`, `build_vector_store`).
+- A clean dependency direction: `schema`/`config` at the bottom, `api.py` on top, nothing importing upward.
+- Third-party heavy imports are **lazy and isolated**: torch and sentence-transformers only in `embeddings.py`, `mcp` only in `mcp_server.py`, docling behind `parsers.py`.
+- Tests are already split into `unit/`, `integration/` and `evaluation/`.
+
+The real weaknesses:
+
+1. **A flat layout that won't scale.** v3 roughly doubles the code (service, providers, OCR, registry, feedback, metrics, eval tiers).
+2. **`api.py` is not an HTTP API.** It's the in-process facade, and the name will collide with the real HTTP API.
+3. **`ProjectRAG` builds its own dependencies** internally, so wiring different providers or stores per deployment means editing the class.
+4. **Hand-written SQLite with no migrations.** The manifest schema is created inline, and v3 adds tables.
+5. **Third-party API churn is already visible.** `mcp_server.py` has a try/except fallback for the MCP SDK's import path.
+
+### 15.2 Decisions
+
+| Question | Decision | Why |
+|---|---|---|
+| Adopt a RAG framework (LlamaIndex, LangChain, Haystack)? | **No.** | Their value is ready-made integrations. Your differentiators (fingerprinted generations, the abstention gate, per-file cap, measured eval) would fight their abstractions. Their APIs churn faster than your code. You would also lose the learning goal. |
+| An ORM for Chroma / the vector store? | **No ORM.** Keep the **repository pattern** you already have (`VectorStoreProtocol`). | Vector databases aren't relational, so no ORM targets them. The protocol *is* the abstraction an ORM would give you, and it's what makes D-3 (Chroma → sqlite-vec) a swap rather than a rewrite. |
+| SQLAlchemy/Alembic for the manifest, feedback and registry? | **No.** Keep `sqlite3`. Add a **numbered migration runner** keyed on `PRAGMA user_version` (≈ 50 lines), and **one `Store` module** that owns the connection and transactions. | FTS5 and sqlite-vec are virtual tables written in raw SQL either way. With everything in one SQLite file, an ORM adds a layer without removing the SQL. Migrations are the actual need, and a runner covers them. |
+| FastAPI? | **Yes, for the v3 service only** (admin API, `/healthz`, `/metrics`). The MCP SDK's Streamable HTTP app is mounted on it as an ASGI sub-app. | Pydantic-native, and it's the same stack as AI-Team. The core stays framework-free and synchronous (SQLite is synchronous; one store thread, §6.3). |
+| HTTP client for providers | **`httpx`** (one client for both `/v1/embeddings` and `/v1/rerank`). Retries: bounded, written in the provider (≈ 20 lines) or `tenacity`. | The `openai` SDK covers embeddings but not rerank, so it would be two clients for one server type. |
+| Config layering | **`pydantic-settings`**: base YAML + deployment overlay + environment variables for secrets. | Exactly the §6.7 model, without custom merge code. |
+| Metrics | **`prometheus-client`** | Standard `/metrics`, and Kuma can read it. |
+| Packaging and lock | **`uv`** (`uv.lock`), extras cleaned up: `serve` (production), `dev-gpu` (torch, sentence-transformers, docling), `dev`. | Reproducible images. torch never enters the production image. |
+| Type checking | **`pyright` (or `mypy --strict`)** in CI, plus `ruff` (already configured). | The project rules ask for strict types; the codebase is already close. |
+| CLI | Keep `argparse`. | Works. Changing it would add nothing. |
+
+### 15.3 Target layout
+
+```
+src/project_rag/
+  domain/        schema.py, config.py (pydantic-settings), errors.py
+  providers/     embed_base.py, embed_openai_compat.py, embed_hash.py, embed_torch.py (dev-gpu only)
+                 rerank_base.py, rerank_openai_compat.py, rerank_torch.py (dev-gpu only), gpu_env.py
+  ingest/        discovery.py, filesystem.py, parsers.py, parsers_docling.py, ocr.py, chunking.py,
+                 stages.py, indexing.py, registry.py
+  store/         db.py (connection + transactions), migrations/ (001_….sql …), manifest.py,
+                 lexical.py, vector.py (protocol + sqlite-vec / chroma), embedding_cache.py, feedback.py
+  retrieval/     retriever.py, abstention.py (assess_evidence), expand.py, query_expansion.py
+  eval/          metrics.py, gold.py, smoke.py (tier S), gate.py, digest.py
+  service/       app.py (FastAPI composition), mcp_tools.py (+ trust envelope), admin.py, telemetry.py
+  rag.py         ProjectRAG facade (renamed from api.py); takes its dependencies as arguments
+  wiring.py      composition root: build(config) → providers, stores, ProjectRAG
+  cli.py
+```
+
+**Rules for the move:**
+
+- **Each third-party library is imported in exactly one adapter module**, and gets a contract test: chromadb or sqlite-vec in `store/vector.py`, `mcp` in `service/mcp_tools.py`, llama-server HTTP in `providers/*_openai_compat.py`, torch only in `*_torch.py`.
+- **Contract tests run against the real dependency** in the integration tier (a pinned llama-server container, the pinned Chroma/sqlite-vec version). An upstream breaking change then fails one named test, not production.
+- `ai_team_adapter.py` + `mcp_server.py` merge into `service/mcp_tools.py`. `answerer.py` (only used by `scripts/eval_agent.py`) moves to `eval/`.
+- **Do the move as a pure refactor first:** the existing 102 tests stay green, and there are no behaviour changes in the same commit. Only after that do the v3 features land.
+
+## 16. Sources (external facts used, checked 2026-11-11)
 
 - Qwen3-Embedding-4B GGUF + llama-server usage: <https://huggingface.co/Qwen/Qwen3-Embedding-4B-GGUF>
 - CPU data point (4B Q4_K_M, 4 threads, ~275 ms, ~4.8 GB peak): <https://github.com/ID-Robots/clawbox/pull/1472>
