@@ -1,59 +1,25 @@
-"""SQLite document state + build versions + collection compatibility (v1 §4.3/§4.6).
-
-Stores per-source document state, the active index_generation per project, the pinned
-embedding_profile and collection schema. Refuses writes on profile/schema mismatch (v2 §D5).
+"""SQLite catalog: document state, generations, pinned embedding profile, staging journal
+(v1 §4.3/§4.6; v3 S2). Shares the SqliteDb connection with the FTS5 (and sqlite-vec) indexes so
+staging + the active-pointer flip are one transaction. Every write joins an outer transaction
+when one is open, else commits on its own.
 """
 
 from __future__ import annotations
 
-import sqlite3
-from pathlib import Path
+from datetime import datetime
 
 from ...domain.models import DocumentRecord, EmbeddingProfile
-
-_SCHEMA = """
-CREATE TABLE IF NOT EXISTS projects (
-    project_id TEXT PRIMARY KEY,
-    active_generation TEXT,
-    embedding_profile_key TEXT,
-    collection TEXT
-);
-CREATE TABLE IF NOT EXISTS documents (
-    project_id TEXT NOT NULL,
-    source_id TEXT NOT NULL,
-    source_path TEXT NOT NULL,
-    content_hash TEXT NOT NULL,
-    version_id TEXT NOT NULL,
-    state TEXT NOT NULL,
-    generation TEXT NOT NULL,
-    n_chunks INTEGER DEFAULT 0,
-    diagnostics TEXT DEFAULT '',
-    PRIMARY KEY (project_id, source_id, generation)
-);
-CREATE TABLE IF NOT EXISTS chunks (
-    chunk_id TEXT NOT NULL,
-    project_id TEXT NOT NULL,
-    source_id TEXT NOT NULL,
-    version_id TEXT NOT NULL,
-    generation TEXT NOT NULL,
-    PRIMARY KEY (chunk_id, generation)
-);
-CREATE INDEX IF NOT EXISTS idx_chunks_gen ON chunks(project_id, generation);
-CREATE INDEX IF NOT EXISTS idx_docs_gen ON documents(project_id, generation);
-"""
+from .db import SqliteDb
 
 
 class SqliteCatalog:
-    def __init__(self, path: str | Path) -> None:
-        self._path = Path(path)
-        self._path.parent.mkdir(parents=True, exist_ok=True)
-        self._conn = sqlite3.connect(str(self._path))
-        self._conn.row_factory = sqlite3.Row
-        self._conn.executescript(_SCHEMA)
-        self._conn.commit()
+    def __init__(self, db: SqliteDb) -> None:
+        self._db = db
+        self._conn = db.conn
 
     def close(self) -> None:
-        self._conn.close()
+        """The SqliteDb owns the connection; closing is the composition root's job."""
+        return None
 
     # ---- compatibility guard (v2 §D5 / v1 §4.6) ----
     def check_compatibility(
@@ -78,42 +44,44 @@ class SqliteCatalog:
     def set_project_profile(
         self, project_id: str, profile: EmbeddingProfile, collection: str
     ) -> None:
-        self._conn.execute(
-            "INSERT INTO projects(project_id, embedding_profile_key, collection) VALUES(?,?,?) "
-            "ON CONFLICT(project_id) DO UPDATE SET embedding_profile_key=excluded.embedding_profile_key, "
-            "collection=excluded.collection",
-            (project_id, profile.key(), collection),
-        )
-        self._conn.commit()
+        with self._db.transaction():
+            self._conn.execute(
+                "INSERT INTO projects(project_id, embedding_profile_key, collection) "
+                "VALUES(?,?,?) ON CONFLICT(project_id) DO UPDATE SET "
+                "embedding_profile_key=excluded.embedding_profile_key, "
+                "collection=excluded.collection",
+                (project_id, profile.key(), collection),
+            )
 
     # ---- generation + document records ----
     def upsert_document(self, record: DocumentRecord) -> None:
-        self._conn.execute(
-            "INSERT OR REPLACE INTO documents(project_id, source_id, source_path, content_hash, "
-            "version_id, state, generation, n_chunks, diagnostics) VALUES(?,?,?,?,?,?,?,?,?)",
-            (
-                record.project_id,
-                record.source_id,
-                record.source_path,
-                record.content_hash,
-                record.version_id,
-                record.state,
-                record.generation,
-                record.n_chunks,
-                record.diagnostics,
-            ),
-        )
-        self._conn.commit()
+        with self._db.transaction():
+            self._conn.execute(
+                "INSERT OR REPLACE INTO documents(project_id, source_id, source_path, "
+                "content_hash, version_id, state, generation, n_chunks, diagnostics) "
+                "VALUES(?,?,?,?,?,?,?,?,?)",
+                (
+                    record.project_id,
+                    record.source_id,
+                    record.source_path,
+                    record.content_hash,
+                    record.version_id,
+                    record.state,
+                    record.generation,
+                    record.n_chunks,
+                    record.diagnostics,
+                ),
+            )
 
     def record_chunks(
         self, project_id: str, generation: str, chunk_refs: list[tuple[str, str, str]]
     ) -> None:
-        self._conn.executemany(
-            "INSERT OR REPLACE INTO chunks(chunk_id, project_id, source_id, version_id, generation) "
-            "VALUES(?,?,?,?,?)",
-            [(cid, project_id, sid, vid, generation) for cid, sid, vid in chunk_refs],
-        )
-        self._conn.commit()
+        with self._db.transaction():
+            self._conn.executemany(
+                "INSERT OR REPLACE INTO chunks(chunk_id, project_id, source_id, version_id, "
+                "generation) VALUES(?,?,?,?,?)",
+                [(cid, project_id, sid, vid, generation) for cid, sid, vid in chunk_refs],
+            )
 
     def active_generation(self, project_id: str) -> str | None:
         row = self._conn.execute(
@@ -121,13 +89,26 @@ class SqliteCatalog:
         ).fetchone()
         return row["active_generation"] if row else None
 
+    def active_generations(self) -> dict[str, str]:
+        rows = self._conn.execute(
+            "SELECT project_id, active_generation FROM projects "
+            "WHERE active_generation IS NOT NULL"
+        ).fetchall()
+        return {r["project_id"]: r["active_generation"] for r in rows}
+
     def publish_generation(self, project_id: str, generation: str) -> None:
-        self._conn.execute(
-            "INSERT INTO projects(project_id, active_generation) VALUES(?,?) "
-            "ON CONFLICT(project_id) DO UPDATE SET active_generation=excluded.active_generation",
-            (project_id, generation),
-        )
-        self._conn.commit()
+        """Flip the active pointer and close the generation's staging journal entry."""
+        with self._db.transaction():
+            self._conn.execute(
+                "INSERT INTO projects(project_id, active_generation) VALUES(?,?) "
+                "ON CONFLICT(project_id) DO UPDATE SET "
+                "active_generation=excluded.active_generation",
+                (project_id, generation),
+            )
+            self._conn.execute(
+                "DELETE FROM staged_generations WHERE project_id=? AND generation=?",
+                (project_id, generation),
+            )
 
     def prior_hashes(self, project_id: str, generation: str) -> dict[str, tuple[str, str]]:
         """Return {source_path: (content_hash, source_id)} for a generation."""
@@ -166,10 +147,33 @@ class SqliteCatalog:
         ]
 
     def delete_generation(self, project_id: str, generation: str) -> None:
-        self._conn.execute(
-            "DELETE FROM documents WHERE project_id=? AND generation=?", (project_id, generation)
+        with self._db.transaction():
+            for table in ("documents", "chunks", "staged_generations"):
+                self._conn.execute(
+                    f"DELETE FROM {table} WHERE project_id=? AND generation=?",
+                    (project_id, generation),
+                )
+
+    # ---- two-phase publish journal + GC (S2) ----
+    def begin_staging(self, project_id: str, generation: str, at: datetime) -> None:
+        with self._db.transaction():
+            self._conn.execute(
+                "INSERT OR REPLACE INTO staged_generations(project_id, generation, started_at) "
+                "VALUES(?,?,?)",
+                (project_id, generation, at.isoformat()),
+            )
+
+    def stale_generations(self) -> list[tuple[str, str]]:
+        """(project_id, generation) pairs that are not active: crashed staging runs (journal)
+        and superseded generations whose deletion did not finish."""
+        rows = self._conn.execute(
+            "SELECT project_id, generation FROM staged_generations "
+            "UNION SELECT project_id, generation FROM documents "
+            "UNION SELECT project_id, generation FROM chunks"
+        ).fetchall()
+        active = self.active_generations()
+        return sorted(
+            (r["project_id"], r["generation"])
+            for r in rows
+            if active.get(r["project_id"]) != r["generation"]
         )
-        self._conn.execute(
-            "DELETE FROM chunks WHERE project_id=? AND generation=?", (project_id, generation)
-        )
-        self._conn.commit()

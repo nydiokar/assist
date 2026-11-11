@@ -62,20 +62,18 @@ class InMemoryVectorStore:
             self._meta.append(chunk_metadata(c, generation))
         self._save()
 
-    def delete_ids(self, ids: list[str]) -> None:
-        keep = [i for i, cid in enumerate(self._ids) if cid not in set(ids)]
+    def delete_generation(self, project_id: str, generation: str) -> None:
+        # Chunk ids repeat across generations (an unchanged file keeps its ids), so rows are
+        # selected by (project, generation), never by chunk id alone (ledger F23).
+        keep = [
+            i
+            for i, m in enumerate(self._meta)
+            if not (m["project_id"] == project_id and m["generation"] == generation)
+        ]
         self._ids = [self._ids[i] for i in keep]
         self._vecs = [self._vecs[i] for i in keep]
         self._meta = [self._meta[i] for i in keep]
         self._save()
-
-    def delete_generation(self, project_id: str, generation: str) -> None:
-        drop = [
-            self._ids[i]
-            for i, m in enumerate(self._meta)
-            if m["project_id"] == project_id and m["generation"] == generation
-        ]
-        self.delete_ids(drop)
 
     def query(
         self,

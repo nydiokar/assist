@@ -109,6 +109,7 @@ class ParsingConfig(_Cfg):
 
 
 class VectorStoreConfig(_Cfg):
+    # memory (tests) | chroma (D-3 choice, S2) | sqlite_vec (D-3 spike, same SQLite file)
     provider: str = "memory"
     collection: str = "rag_chunks_qwen3_4b_2560_v1"  # A01 §G rename
     distance: str = "cosine"

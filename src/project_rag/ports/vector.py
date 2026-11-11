@@ -15,9 +15,10 @@ class VectorIndex(Protocol):
         self, generation: str, chunks: list[Chunk], embeddings: npt.NDArray[np.float32]
     ) -> None: ...
 
-    def delete_ids(self, ids: list[str]) -> None: ...
-
-    def delete_generation(self, project_id: str, generation: str) -> None: ...
+    def delete_generation(self, project_id: str, generation: str) -> None:
+        """Remove exactly this generation's vectors. Chunk ids repeat across generations (an
+        unchanged file keeps its ids), so there is deliberately no delete-by-chunk-id."""
+        ...
 
     def query(
         self,

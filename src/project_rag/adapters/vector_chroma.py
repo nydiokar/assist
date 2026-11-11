@@ -12,6 +12,12 @@ from ..domain.models import ChannelHit, Chunk
 from .vector_payload import chunk_metadata, hit_payload
 
 
+def _record_id(generation: str, chunk_id: str) -> str:
+    """Chroma ids must be unique per generation: an unchanged file keeps its chunk ids across
+    generations, and Chroma silently ignores `add` of an existing id (ledger F23)."""
+    return f"{generation}:{chunk_id}"
+
+
 class ChromaVectorStore:
     """Production baseline. Requires the `chroma` extra. Explicit cosine, explicit embeddings."""
 
@@ -42,16 +48,11 @@ class ChromaVectorStore:
         for i in self._batches(len(chunks)):
             part = chunks[i : i + step]
             self._col.add(
-                ids=[c.chunk_id for c in part],
+                ids=[_record_id(generation, c.chunk_id) for c in part],
                 embeddings=[v.tolist() for v in mat[i : i + step]],
                 documents=[c.citation_text for c in part],
                 metadatas=[chunk_metadata(c, generation) for c in part],
             )
-
-    def delete_ids(self, ids: list[str]) -> None:
-        step = max(1, self._client.get_max_batch_size())
-        for i in range(0, len(ids), step):
-            self._col.delete(ids=ids[i : i + step])
 
     def delete_generation(self, project_id: str, generation: str) -> None:
         self._col.delete(where={"$and": [{"project_id": project_id}, {"generation": generation}]})
@@ -79,7 +80,9 @@ class ChromaVectorStore:
         dists = res["distances"][0]
         metas = res["metadatas"][0]
         return [
-            ChannelHit(chunk_id=cid, score=float(d), payload=hit_payload(m))
+            ChannelHit(
+                chunk_id=str(m.get("chunk_id") or cid), score=float(d), payload=hit_payload(m)
+            )
             for cid, d, m in zip(ids, dists, metas, strict=True)
         ]
 

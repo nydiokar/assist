@@ -37,10 +37,21 @@ def _chroma(tmp_path: Path) -> VectorIndex:
     )
 
 
+def _sqlite_vec(tmp_path: Path) -> VectorIndex:
+    from project_rag.adapters.sqlite.db import SqliteDb
+    from project_rag.adapters.sqlite.vec import SqliteVecIndex
+
+    db = SqliteDb(tmp_path / "vec.sqlite3")
+    if not db.vec_loaded:
+        pytest.skip("sqlite-vec extension not loadable")
+    return SqliteVecIndex(db)
+
+
 ADAPTERS: list[object] = [
     pytest.param(_memory, id="memory"),
     pytest.param(_memory_persisted, id="memory_persisted"),
     pytest.param(_chroma, id="chroma"),
+    pytest.param(_sqlite_vec, id="sqlite_vec"),
 ]
 
 
@@ -77,9 +88,21 @@ def test_doc_class_filter_and_limit(index: VectorIndex) -> None:
     assert len(index.query("p1", "g1", _unit(1), 1)) == 1
 
 
-def test_delete_ids_and_generation(index: VectorIndex) -> None:
+def test_delete_generation(index: VectorIndex) -> None:
     index.add("g1", [make_chunk("c0", "a"), make_chunk("c1", "b")], np.stack([_unit(0), _unit(1)]))
-    index.delete_ids(["c0"])
-    assert [h.chunk_id for h in index.query("p1", "g1", _unit(0), 5)] == ["c1"]
     index.delete_generation("p1", "g1")
     assert index.count("p1", "g1") == 0
+    assert index.query("p1", "g1", _unit(0), 5) == []
+
+
+def test_same_chunk_ids_in_two_generations_are_independent(index: VectorIndex) -> None:
+    """An unchanged file keeps its chunk ids in the next generation (ledger F23)."""
+    chunks = [make_chunk("c0", "a"), make_chunk("c1", "b")]
+    vecs = np.stack([_unit(0), _unit(1)])
+    index.add("g1", chunks, vecs)
+    index.add("g2", chunks, vecs)
+    assert index.count("p1", "g1") == 2 and index.count("p1", "g2") == 2
+    index.delete_generation("p1", "g1")
+    assert index.count("p1", "g1") == 0
+    assert index.count("p1", "g2") == 2
+    assert [h.chunk_id for h in index.query("p1", "g2", _unit(0), 5)] == ["c0", "c1"]

@@ -7,6 +7,7 @@ from pathlib import Path
 
 import pytest
 
+from project_rag.adapters.sqlite.db import SqliteDb
 from project_rag.adapters.sqlite.fts5 import Fts5LexicalIndex
 from project_rag.ports.lexical import LexicalIndex
 from tests.contracts.conftest import make_chunk
@@ -14,9 +15,9 @@ from tests.contracts.conftest import make_chunk
 
 @pytest.fixture(params=["sqlite_fts5"])
 def index(request: pytest.FixtureRequest, tmp_path: Path) -> Iterator[LexicalIndex]:
-    idx = Fts5LexicalIndex(tmp_path / "lex.sqlite3")
-    yield idx
-    idx.close()
+    db = SqliteDb(tmp_path / "lex.sqlite3")
+    yield Fts5LexicalIndex(db)
+    db.close()
 
 
 def test_search_is_scoped_to_project_and_generation(index: LexicalIndex) -> None:

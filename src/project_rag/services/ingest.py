@@ -33,6 +33,7 @@ from ..core.fingerprint import (
     version_id,
 )
 from ..domain.config import ChunkingConfig, Config, ParsingConfig
+from ..domain.errors import StoreError
 from ..domain.models import (
     Chunk,
     ChunkArtifact,
@@ -46,10 +47,12 @@ from ..domain.models import (
 )
 from ..ports.cache import ArtifactStore, EmbeddingCache
 from ..ports.catalog import Catalog
+from ..ports.clock import Clock
 from ..ports.corpus import CorpusReader
 from ..ports.embedder import Embedder
 from ..ports.lexical import LexicalIndex
 from ..ports.parser import DocumentParser
+from ..ports.store import UnitOfWork
 from ..ports.vector import VectorIndex
 
 
@@ -147,6 +150,8 @@ class IngestService:
         catalog: Catalog,
         artifacts: ArtifactStore,
         open_embedding_cache: Callable[[], EmbeddingCache],
+        store: UnitOfWork,
+        clock: Clock,
     ) -> None:
         self._cfg = cfg
         self._corpus = corpus
@@ -157,6 +162,8 @@ class IngestService:
         self._catalog = catalog
         self._artifacts = artifacts
         self._open_embedding_cache = open_embedding_cache
+        self._store = store
+        self._clock = clock
 
     @property
     def embedder(self) -> Embedder:
@@ -312,46 +319,98 @@ class IngestService:
             warnings.append("dry run: no writes performed")
             return report()
 
-        # Stage: embed + write the new generation.
-        if staged_chunks:
-            embeddings = self._embed_cached(staged_chunks)
-            self._vector.add(new_gen, staged_chunks, embeddings)
-            self._lexical.add_chunks(new_gen, staged_chunks)
-            self._catalog.record_chunks(
-                project_id,
-                new_gen,
-                [(c.chunk_id, c.source_id, c.version_id) for c in staged_chunks],
+        # Embed first (resumable cache, outside any transaction), then publish in two phases.
+        embeddings = (
+            self._embed_cached(staged_chunks)
+            if staged_chunks
+            else np.zeros((0, self._embedder.dim), dtype=np.float32)
+        )
+        content_hashes = {d.source_path: d.content_hash for d in discovered}
+        records = [
+            DocumentRecord(
+                project_id=project_id,
+                source_id=fr.source_id,
+                source_path=fr.source_path,
+                content_hash=content_hashes.get(fr.source_path, ""),
+                version_id=fr.version_id or "",
+                state=fr.state,
+                generation=new_gen,
+                n_chunks=fr.n_chunks,
+                diagnostics="; ".join(fr.diagnostics),
             )
-
-        for fr in files:
-            content_hash = next(
-                (d.content_hash for d in discovered if d.source_path == fr.source_path), ""
-            )
-            self._catalog.upsert_document(
-                DocumentRecord(
-                    project_id=project_id,
-                    source_id=fr.source_id,
-                    source_path=fr.source_path,
-                    content_hash=content_hash,
-                    version_id=fr.version_id or "",
-                    state=fr.state,
-                    generation=new_gen,
-                    n_chunks=fr.n_chunks,
-                    diagnostics="; ".join(fr.diagnostics),
-                )
-            )
-
-        # Publish the new active generation, then remove superseded derivatives.
-        self._catalog.set_project_profile(project_id, profile, collection)
-        self._catalog.publish_generation(project_id, new_gen)
-        if prior_gen and prior_gen != new_gen:
-            old_ids = self._catalog.chunk_ids_for_generation(project_id, prior_gen)
-            self._vector.delete_ids(old_ids)
-            self._lexical.delete_generation(project_id, prior_gen)
-            self._catalog.delete_generation(project_id, prior_gen)
+            for fr in files
+        ]
+        self._publish(project_id, new_gen, prior_gen, staged_chunks, embeddings, records)
 
         warnings.append(f"stage_cache={stages.stats()}")
         return report()
+
+    def _publish(
+        self,
+        project_id: str,
+        new_gen: str,
+        prior_gen: str | None,
+        chunks: list[Chunk],
+        embeddings: npt.NDArray[np.float32],
+        records: list[DocumentRecord],
+    ) -> None:
+        """Two-phase publish (S2, D-3 = Chroma). The active-pointer flip is the commit point.
+
+        0. Journal the staging (committed): from here on a crash leaves a trace the GC can use.
+        1. One store transaction: purge leftovers of `new_gen`, stage vectors + lexical + catalog
+           rows, verify the counts, set the profile, flip the pointer. Indexes inside the store
+           (FTS5, catalog, sqlite-vec) roll back together; an index outside it (Chroma, memory)
+           may keep staged vectors, which the journal lets the GC remove.
+        2. Delete the superseded generation. A crash here leaves the new generation active and
+           complete; `stale_generations()` finds the old rows at the next start.
+        """
+        profile = self._embedder.profile
+        collection = self._cfg.vector_store.collection
+        self._catalog.begin_staging(project_id, new_gen, self._clock.now())
+        with self._store.transaction():
+            self._drop_generation(project_id, new_gen)
+            if chunks:
+                self._vector.add(new_gen, chunks, embeddings)
+                self._lexical.add_chunks(new_gen, chunks)
+                self._catalog.record_chunks(
+                    project_id, new_gen, [(c.chunk_id, c.source_id, c.version_id) for c in chunks]
+                )
+            for record in records:
+                self._catalog.upsert_document(record)
+            self._verify_staged(project_id, new_gen, len(chunks))
+            self._catalog.set_project_profile(project_id, profile, collection)
+            self._catalog.publish_generation(project_id, new_gen)
+        if prior_gen and prior_gen != new_gen:
+            with self._store.transaction():
+                self._drop_generation(project_id, prior_gen)
+
+    def _verify_staged(self, project_id: str, generation: str, expected: int) -> None:
+        counts = {
+            "vector": self._vector.count(project_id, generation),
+            "lexical": self._lexical.count(project_id, generation),
+            "catalog": len(self._catalog.chunk_ids_for_generation(project_id, generation)),
+        }
+        wrong = {k: v for k, v in counts.items() if v != expected}
+        if wrong:
+            raise StoreError(f"staged {generation}: expected {expected} chunks, got {wrong}")
+
+    def _drop_generation(self, project_id: str, generation: str) -> None:
+        self._vector.delete_generation(project_id, generation)
+        self._lexical.delete_generation(project_id, generation)
+        self._catalog.delete_generation(project_id, generation)
+
+    def collect_garbage(self) -> list[tuple[str, str]]:
+        """Startup GC (S2): remove every non-active generation from all indexes.
+
+        Covers crashed stagings (journal rows, whose Chroma/memory vectors may exist) and
+        superseded generations whose phase-2 delete did not finish. Returns what was removed.
+        Single-writer assumption: no ingest may run while this executes.
+        """
+        stale = self._catalog.stale_generations()
+        for project_id, generation in stale:
+            with self._store.transaction():
+                self._drop_generation(project_id, generation)
+        return stale
 
     def _embed_cached(self, chunks: list[Chunk], *, batch: int = 64) -> npt.NDArray[np.float32]:
         """Embed only chunks whose (text, profile) is not cached; commit each batch (resumable)."""

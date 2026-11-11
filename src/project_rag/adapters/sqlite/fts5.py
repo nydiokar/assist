@@ -8,26 +8,8 @@ retrieval can build results without a second lookup.
 
 from __future__ import annotations
 
-import sqlite3
-from pathlib import Path
-
 from ...domain.models import ChannelHit, Chunk, HitPayload, SourceLocation
-
-_SCHEMA = """
-CREATE VIRTUAL TABLE IF NOT EXISTS chunk_fts USING fts5(
-    chunk_id UNINDEXED,
-    project_id UNINDEXED,
-    generation UNINDEXED,
-    document_id UNINDEXED,
-    source_path UNINDEXED,
-    heading UNINDEXED,
-    location_json UNINDEXED,
-    citation_text UNINDEXED,
-    doc_class UNINDEXED,
-    body,
-    tokenize = 'unicode61 remove_diacritics 0'
-);
-"""
+from .db import SqliteDb
 
 
 def _escape_fts_query(query: str) -> str:
@@ -39,53 +21,51 @@ def _escape_fts_query(query: str) -> str:
 
 
 class Fts5LexicalIndex:
-    def __init__(self, path: str | Path) -> None:
-        self._path = Path(path)
-        self._path.parent.mkdir(parents=True, exist_ok=True)
-        self._conn = sqlite3.connect(str(self._path))
-        self._conn.row_factory = sqlite3.Row
-        self._ensure_fts5()
-        self._conn.executescript(_SCHEMA)
-        self._conn.commit()
+    """FTS5 lexical channel on the shared SqliteDb (schema from migration 001)."""
 
-    def _ensure_fts5(self) -> None:
-        try:
-            self._conn.execute("CREATE VIRTUAL TABLE IF NOT EXISTS _fts_probe USING fts5(x)")
-            self._conn.execute("DROP TABLE IF EXISTS _fts_probe")
-        except sqlite3.OperationalError as e:  # pragma: no cover
-            raise RuntimeError("SQLite build lacks FTS5 support") from e
+    def __init__(self, db: SqliteDb) -> None:
+        self._db = db
+        self._conn = db.conn
 
     def close(self) -> None:
-        self._conn.close()
+        """The SqliteDb owns the connection; closing is the composition root's job."""
+        return None
 
     def add_chunks(self, generation: str, chunks: list[Chunk]) -> None:
-        self._conn.executemany(
-            "INSERT INTO chunk_fts(chunk_id, project_id, generation, document_id, source_path, "
-            "heading, location_json, citation_text, doc_class, body) VALUES(?,?,?,?,?,?,?,?,?,?)",
-            [
-                (
-                    c.chunk_id,
-                    c.project_id,
-                    generation,
-                    c.document_id,
-                    c.source_path,
-                    c.heading or "",
-                    c.location.model_dump_json(),
-                    c.citation_text,
-                    c.doc_class,
-                    c.embed_text,
-                )
-                for c in chunks
-            ],
-        )
-        self._conn.commit()
+        with self._db.transaction():
+            self._conn.executemany(
+                "INSERT INTO chunk_fts(chunk_id, project_id, generation, document_id, source_path, "
+                "heading, location_json, citation_text, doc_class, body) VALUES(?,?,?,?,?,?,?,?,?,?)",
+                [
+                    (
+                        c.chunk_id,
+                        c.project_id,
+                        generation,
+                        c.document_id,
+                        c.source_path,
+                        c.heading or "",
+                        c.location.model_dump_json(),
+                        c.citation_text,
+                        c.doc_class,
+                        c.embed_text,
+                    )
+                    for c in chunks
+                ],
+            )
 
     def delete_generation(self, project_id: str, generation: str) -> None:
-        self._conn.execute(
-            "DELETE FROM chunk_fts WHERE project_id=? AND generation=?",
+        with self._db.transaction():
+            self._conn.execute(
+                "DELETE FROM chunk_fts WHERE project_id=? AND generation=?",
+                (project_id, generation),
+            )
+
+    def count(self, project_id: str, generation: str) -> int:
+        row = self._conn.execute(
+            "SELECT count(*) FROM chunk_fts WHERE project_id=? AND generation=?",
             (project_id, generation),
-        )
-        self._conn.commit()
+        ).fetchone()
+        return int(row[0])
 
     def search(
         self, project_id: str, generation: str, query: str, limit: int, doc_class: str | None = None

@@ -8,6 +8,7 @@ from pathlib import Path
 import pytest
 
 from project_rag.adapters.sqlite.catalog import SqliteCatalog
+from project_rag.adapters.sqlite.db import SqliteDb
 from project_rag.domain.config import EmbeddingConfig
 from project_rag.domain.models import DocumentRecord
 from project_rag.ports.catalog import Catalog
@@ -15,9 +16,9 @@ from project_rag.ports.catalog import Catalog
 
 @pytest.fixture(params=["sqlite"])
 def catalog(request: pytest.FixtureRequest, tmp_path: Path) -> Iterator[Catalog]:
-    c = SqliteCatalog(tmp_path / "catalog.sqlite3")
-    yield c
-    c.close()
+    db = SqliteDb(tmp_path / "catalog.sqlite3")
+    yield SqliteCatalog(db)
+    db.close()
 
 
 def _doc(path: str, gen: str, n: int = 1) -> DocumentRecord:

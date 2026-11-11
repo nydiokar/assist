@@ -6,6 +6,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
+from .adapters.sqlite.db import SqliteDb
 from .domain.config import Config, EmbeddingConfig, RerankConfig, VectorStoreConfig
 from .ports.cache import EmbeddingCache
 from .ports.catalog import Catalog
@@ -40,7 +41,13 @@ def build_embedder(cfg: EmbeddingConfig) -> Embedder:
     raise ValueError(f"unknown embedding.provider: {cfg.provider}")
 
 
-def build_vector_store(cfg: VectorStoreConfig) -> VectorIndex:
+def build_vector_store(cfg: VectorStoreConfig, db: SqliteDb | None = None) -> VectorIndex:
+    if cfg.provider == "sqlite_vec":
+        from .adapters.sqlite.vec import SqliteVecIndex
+
+        if db is None:
+            raise ValueError("vector_store.provider=sqlite_vec needs the shared SqliteDb")
+        return SqliteVecIndex(db)
     if cfg.provider == "memory":
         from .adapters.vector_memory import InMemoryVectorStore
 
@@ -71,13 +78,19 @@ class Services:
     vector: VectorIndex
     lexical: LexicalIndex
     catalog: Catalog
+    db: SqliteDb
+    gc_removed: tuple[tuple[str, str], ...] = ()
 
     def close(self) -> None:
         self.lexical.close()
         self.catalog.close()
+        self.db.close()
 
 
-def build(config: Config) -> Services:
+def build(config: Config, *, collect_garbage: bool = True) -> Services:
+    """Wire every port to its adapter. `collect_garbage` runs the S2 startup GC (single writer:
+    do not build a second writer against a store another process is ingesting into)."""
+    from .adapters.clock_system import SystemClock
     from .adapters.corpus_local_fs import LocalFsCorpus
     from .adapters.parse_registry import ParserRegistry
     from .adapters.sqlite.catalog import SqliteCatalog
@@ -85,10 +98,11 @@ def build(config: Config) -> Services:
     from .adapters.sqlite.fts5 import Fts5LexicalIndex
     from .adapters.stage_cache_fs import FsArtifactStore
 
+    db = SqliteDb(config.lexical_store.path)
     embedder = build_embedder(config.embedding)
-    vector = build_vector_store(config.vector_store)
-    lexical = Fts5LexicalIndex(config.lexical_store.path)
-    catalog = SqliteCatalog(config.lexical_store.path)
+    vector = build_vector_store(config.vector_store, db)
+    lexical = Fts5LexicalIndex(db)
+    catalog = SqliteCatalog(db)
     parser = ParserRegistry(config.parsing)
     corpus = LocalFsCorpus()
     cache_root = Path(config.lexical_store.path).resolve().parent / "cache"
@@ -106,7 +120,10 @@ def build(config: Config) -> Services:
         catalog=catalog,
         artifacts=FsArtifactStore(cache_root),
         open_embedding_cache=open_embedding_cache,
+        store=db,
+        clock=SystemClock(),
     )
+    removed = tuple(ingest.collect_garbage()) if collect_garbage else ()
     search = SearchService(
         config,
         embedder=embedder,
@@ -125,4 +142,6 @@ def build(config: Config) -> Services:
         vector=vector,
         lexical=lexical,
         catalog=catalog,
+        db=db,
+        gc_removed=removed,
     )

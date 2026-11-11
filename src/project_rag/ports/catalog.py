@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Protocol
 
 from ..domain.models import DocumentRecord, EmbeddingProfile
@@ -28,7 +29,13 @@ class Catalog(Protocol):
 
     def active_generation(self, project_id: str) -> str | None: ...
 
-    def publish_generation(self, project_id: str, generation: str) -> None: ...
+    def active_generations(self) -> dict[str, str]:
+        """{project_id: active generation} for every published project."""
+        ...
+
+    def publish_generation(self, project_id: str, generation: str) -> None:
+        """Flip the active pointer (the publish commit point) and close the staging entry."""
+        ...
 
     def prior_hashes(self, project_id: str, generation: str) -> dict[str, tuple[str, str]]:
         """{source_path: (content_hash, source_id)} for a generation."""
@@ -39,5 +46,13 @@ class Catalog(Protocol):
     def document_states(self, project_id: str, generation: str) -> list[DocumentRecord]: ...
 
     def delete_generation(self, project_id: str, generation: str) -> None: ...
+
+    def begin_staging(self, project_id: str, generation: str, at: datetime) -> None:
+        """Journal a generation before any of its rows or vectors are written (two-phase)."""
+        ...
+
+    def stale_generations(self) -> list[tuple[str, str]]:
+        """Non-active (project_id, generation) pairs: crashed stagings and unfinished deletes."""
+        ...
 
     def close(self) -> None: ...

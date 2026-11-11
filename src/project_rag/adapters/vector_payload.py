@@ -13,6 +13,7 @@ from ..domain.models import Chunk, HitPayload, SourceLocation
 
 def chunk_metadata(c: Chunk, generation: str) -> dict[str, str]:
     return {
+        "chunk_id": c.chunk_id,
         "project_id": c.project_id,
         "document_id": c.document_id,
         "version_id": c.version_id,
