@@ -1,0 +1,8 @@
+# Starting allowlist (spec §8.4). T5 (S9) finalises it from captured Claude Code traffic.
+.anthropic.com
+api.telegram.org
+www.googleapis.com
+oauth2.googleapis.com
+.googleusercontent.com
+ghcr.io
+.pkg.github.com

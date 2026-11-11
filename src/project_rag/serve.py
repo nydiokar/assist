@@ -12,7 +12,7 @@ import asyncio
 import uvicorn
 
 from .runtime import build_runtime
-from .wiring import load_config
+from .wiring import load_settings
 
 
 async def _serve(public_app: object, admin_app: object, cfg_service: object) -> None:
@@ -28,9 +28,10 @@ async def _serve(public_app: object, admin_app: object, cfg_service: object) -> 
 
 def main() -> None:
     ap = argparse.ArgumentParser(description="assist service")
-    ap.add_argument("--config", required=True)
+    ap.add_argument("--config", required=True, help="base config (configs/base.yaml)")
+    ap.add_argument("--overlay", default=None, help="per-host /config/deployment.yaml")
     args = ap.parse_args()
-    runtime = build_runtime(load_config(args.config))
+    runtime = build_runtime(load_settings(args.config, args.overlay))
     try:
         asyncio.run(_serve(runtime.public_app, runtime.admin_app, runtime.config.service))
     finally:

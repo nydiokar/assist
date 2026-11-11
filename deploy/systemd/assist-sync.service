@@ -1,0 +1,9 @@
+[Unit]
+Description=assist: Drive -> /corpus sync, then ingest if anything changed (spec §8.5)
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/assist/deploy
+ExecStart=/usr/bin/docker compose --env-file .env -f compose.yaml run --rm sync

@@ -188,6 +188,10 @@ def build_runtime(config: Config, *, token: str | None = None) -> Runtime:
     """Start-up order: refuse unsafe configs, build services ON the store thread (GC runs there),
     sync the registry, then build the apps."""
     problems = config.assert_release_safe()
+    if config.service.verify_models:
+        from .adapters.model_check import gguf_problems
+
+        problems += gguf_problems(config, config.service.models_dir)
     if problems and os.environ.get("ASSIST_ALLOW_DEV_PROFILE") != "1":
         raise SystemExit("refusing to start: " + "; ".join(problems))
     mcp_token = token if token is not None else os.environ.get(TOKEN_ENV, "")

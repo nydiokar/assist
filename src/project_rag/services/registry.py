@@ -9,16 +9,44 @@ of the folder name, documented as not rename-stable.
 
 from __future__ import annotations
 
+import json
 from typing import Protocol
 
 from pydantic import ValidationError
 
 from ..core.slug import fallback_drive_key, unique_slug
-from ..domain.models import IngestReport, ProjectIdentity, ProjectRecord, SyncManifest
+from ..domain.models import (
+    IngestReport,
+    ProjectIdentity,
+    ProjectRecord,
+    SyncFile,
+    SyncFolder,
+    SyncManifest,
+)
 from ..ports.catalog import Catalog
 from ..ports.corpus import CorpusReader
 
 SIDECAR = ".sync/manifest.json"
+RCLONE_SIDECAR = ".sync/lsjson.json"  # raw `rclone lsjson -R --original` (deploy/rclone/sync.sh)
+DRIVE_LINK = "https://drive.google.com/open?id={id}"
+
+
+def manifest_from_lsjson(entries: list[dict[str, object]]) -> SyncManifest:
+    """Convert rclone's lsjson listing into the sidecar model: top-level folders with their
+    Drive ids, and files with id + web link. Entries without an `ID` (non-Drive remotes) are
+    skipped, so those folders fall back to name keys."""
+    folders: list[SyncFolder] = []
+    files: list[SyncFile] = []
+    for e in entries:
+        path, ident = e.get("Path"), e.get("ID")
+        if not isinstance(path, str) or not isinstance(ident, str) or not ident:
+            continue
+        if e.get("IsDir") is True:
+            if "/" not in path:
+                folders.append(SyncFolder(path=path, drive_id=ident))
+        else:
+            files.append(SyncFile(path=path, drive_id=ident, web_link=DRIVE_LINK.format(id=ident)))
+    return SyncManifest(folders=folders, files=files)
 
 
 class ProjectRegistryService:
@@ -28,12 +56,21 @@ class ProjectRegistryService:
 
     def read_manifest(self, corpus_root: str) -> SyncManifest | None:
         raw = self._corpus.read_text(corpus_root, SIDECAR)
-        if raw is None:
+        if raw is not None:
+            try:
+                return SyncManifest.model_validate_json(raw)
+            except ValidationError:
+                return None  # a corrupt sidecar falls back to path keys
+        listing = self._corpus.read_text(corpus_root, RCLONE_SIDECAR)
+        if listing is None:
             return None
         try:
-            return SyncManifest.model_validate_json(raw)
-        except ValidationError:
-            return None  # a corrupt sidecar falls back to path keys; the run report says so
+            entries = json.loads(listing)
+        except ValueError:
+            return None
+        if not isinstance(entries, list):
+            return None
+        return manifest_from_lsjson([e for e in entries if isinstance(e, dict)])  # pyright: ignore[reportUnknownVariableType,reportUnknownArgumentType]
 
     def sync(self, corpus_root: str) -> list[ProjectRecord]:
         """Register every top-level folder; renames update display_name only."""

@@ -256,6 +256,7 @@ class OpenAICompatRerankConfig(_Cfg):
 
     base_url: str = "http://127.0.0.1:8082"
     model: str = "bge-reranker-v2-m3"
+    gguf_file: str = "bge-reranker-v2-m3-Q8_0.gguf"
     gguf_sha256: str = ""
     # llama-server returns raw logits; the torch CrossEncoder returned sigmoid probabilities and
     # the abstention threshold (0.26) is on that scale. S3 parity: sigmoid(served) spans the same
@@ -393,6 +394,8 @@ class ServiceConfig(_Cfg):
     status_deadline_s: float = 10.0
     max_body_bytes: int = 65536
     allowed_hosts: list[str] = Field(default_factory=lambda: ["*"])  # MCP Host-header allowlist
+    models_dir: str = "/models"  # read-only; the start-up check hashes the pinned GGUFs here
+    verify_models: bool = True
 
 
 class Config(_Cfg):

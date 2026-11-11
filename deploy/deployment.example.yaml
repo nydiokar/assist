@@ -1,0 +1,5 @@
+# Per-host overlay mounted at /config/deployment.yaml (spec §6.7). No secrets, no host paths.
+service:
+  corpus_root: /corpus
+  admin_host: 172.31.20.10
+  models_dir: /models

@@ -128,3 +128,24 @@ def test_slugs() -> None:
     assert slugify("  Youth Participation (2025)! ") == "youth-participation-2025"
     assert slugify("???") == "project"
     assert unique_slug("Demo", {"demo", "demo-2"}) == "demo-3"
+
+
+def test_rclone_lsjson_sidecar_gives_drive_ids_and_links(tmp_path: Path) -> None:
+    root = tmp_path / "drive"
+    shutil.copytree(FIXTURE_CORPUS, root / "Green")
+    (root / ".sync").mkdir()
+    listing = [
+        {"Path": "Green", "Name": "Green", "IsDir": True, "ID": "1FolderId"},
+        {"Path": "Green/proposal.md", "Name": "proposal.md", "IsDir": False, "ID": "1FileId"},
+        {"Path": "Green/memo_bg.md", "Name": "memo_bg.md", "IsDir": False},  # no ID: skipped
+    ]
+    (root / ".sync" / "lsjson.json").write_text(json.dumps(listing), encoding="utf-8")
+    s = _services(tmp_path)
+    (rec,) = s.registry.sync(str(root))
+    assert rec.key_source == "drive" and rec.identity.drive_id == "1FolderId"
+    manifest = s.registry.read_manifest(str(root))
+    assert manifest is not None
+    assert [(f.path, f.web_link) for f in manifest.files] == [
+        ("Green/proposal.md", "https://drive.google.com/open?id=1FileId")
+    ]
+    s.close()

@@ -1,0 +1,8 @@
+[Unit]
+Description=assist: nightly full reconcile ingest (retries failed documents, catches missed triggers)
+After=docker.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/assist/deploy
+ExecStart=/usr/bin/docker compose --env-file .env -f compose.yaml exec -T assist curl -fsS -X POST http://172.31.20.10:8001/admin/ingest

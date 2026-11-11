@@ -30,6 +30,15 @@ def load_config(path: str | Path | None = None) -> Config:
     return _load(path)
 
 
+def load_settings(base: str | Path, overlay: str | Path | None = None) -> Config:
+    """Base YAML + per-host overlay + secrets from the environment (spec §6.7, R7)."""
+    import os
+
+    from .adapters.config_yaml import load_layered
+
+    return load_layered(base, overlay, env=dict(os.environ))
+
+
 def build_embedder(cfg: EmbeddingConfig) -> Embedder:
     if cfg.provider == "hash":
         from .adapters.embed_hash import HashEmbedder
