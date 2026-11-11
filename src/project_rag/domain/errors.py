@@ -38,3 +38,7 @@ class StoreError(PortError):
 
 class ProfileMismatch(StoreError):
     """The live embedding profile/collection differs from the one pinned for the project."""
+
+
+class BudgetExceeded(PortError):
+    """A paid adapter reached its configured spend cap (tier-S question writer, D-7)."""

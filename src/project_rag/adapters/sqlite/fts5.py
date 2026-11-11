@@ -8,7 +8,7 @@ retrieval can build results without a second lookup.
 
 from __future__ import annotations
 
-from ...domain.models import ChannelHit, Chunk, HitPayload, SourceLocation
+from ...domain.models import ChannelHit, Chunk, ChunkView, HitPayload, SourceLocation
 from .db import SqliteDb
 
 
@@ -59,6 +59,17 @@ class Fts5LexicalIndex:
                 "DELETE FROM chunk_fts WHERE project_id=? AND generation=?",
                 (project_id, generation),
             )
+
+    def chunk_views(self, project_id: str, generation: str) -> list[ChunkView]:
+        rows = self._conn.execute(
+            "SELECT chunk_id, source_path, citation_text FROM chunk_fts "
+            "WHERE project_id=? AND generation=? ORDER BY chunk_id",
+            (project_id, generation),
+        ).fetchall()
+        return [
+            ChunkView(chunk_id=r["chunk_id"], source_path=r["source_path"], text=r["citation_text"])
+            for r in rows
+        ]
 
     def count(self, project_id: str, generation: str) -> int:
         row = self._conn.execute(

@@ -33,8 +33,8 @@ sync:              ## one Drive sync now (the systemd timer runs this every 15 m
 ## ---- quality (S7) ----
 eval:
 	uv run python scripts/eval_yp.py --config configs/base.yaml
-eval-gate:
-	uv run python -m project_rag.cli eval-gate
+eval-gate:          ## gold eval vs the promoted baseline (PROJECT, ROOT, QUESTIONS required)
+	uv run python scripts/eval_gate.py --config configs/base.yaml --project "$(PROJECT)" --root "$(ROOT)" --questions "$(QUESTIONS)"
 
 ## ---- state (S8, R6) ----
 backup:            ## snapshot the store + run reports out of the assist-state volume

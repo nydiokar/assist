@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Protocol
 
-from ..domain.models import ChannelHit, Chunk
+from ..domain.models import ChannelHit, Chunk, ChunkView
 
 
 class LexicalIndex(Protocol):
@@ -24,5 +24,9 @@ class LexicalIndex(Protocol):
         ...
 
     def count(self, project_id: str, generation: str) -> int: ...
+
+    def chunk_views(self, project_id: str, generation: str) -> list[ChunkView]:
+        """Every chunk of a generation (id, source path, citation text), ordered by id."""
+        ...
 
     def close(self) -> None: ...

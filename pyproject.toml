@@ -33,6 +33,8 @@ serve = [
     "fastapi>=0.115,<1",
     "uvicorn>=0.30,<1",
     "prometheus-client>=0.20,<1",
+    # Tier-S smoke question writer (D-7 owner key; S7). Used only when the key is configured.
+    "anthropic>=1,<2",
 ]
 dev = [
     "pytest>=8,<9",

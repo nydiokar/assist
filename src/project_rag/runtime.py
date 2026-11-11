@@ -151,18 +151,56 @@ def _probe(provider: object) -> str:
         return f"error: {type(e).__name__}"
 
 
-class WriterImpl:
-    """Writer-side services for the ingest worker (own store connection, built on its thread)."""
+MAINT_KEY_ENV = "ANTHROPIC_API_KEY_MAINT"  # D-7: owner key for tier-S only
 
-    def __init__(self, config: Config) -> None:
+
+class WriterImpl:
+    """Writer-side services for the ingest worker (own store connection, built on its thread).
+    After a project's FIRST published ingest it runs tier-S smoke (spec §6.8.3) and stores the
+    result + operator message next to the run reports."""
+
+    def __init__(self, config: Config, question_writer: object | None = None) -> None:
         self._s = build(config, collect_garbage=False)
+        self._writer = question_writer
+        self.smoke_runs: list[object] = []
 
     def ingest_corpus(self, corpus_root: str, project_id: str | None) -> list[IngestReport]:
         reports: list[IngestReport] = []
         for rec in self._s.registry.sync(corpus_root):
             if project_id is None or rec.identity.project_id == project_id:
-                reports.append(self._s.ingest.ingest(rec.identity.project_id, rec.root_path))
+                report = self._s.ingest.ingest(rec.identity.project_id, rec.root_path)
+                reports.append(report)
+                run = report.run
+                if run is not None and run.published and run.prior_generation is None:
+                    self._smoke(rec.identity.project_id, rec.identity.display_name, rec.root_path)
         return reports
+
+    def _smoke(self, project_id: str, display_name: str, root: str) -> None:
+        from pathlib import Path
+
+        from .services.smoke import TierSService
+
+        out_dir = Path(self._s.config.lexical_store.path).resolve().parent / "runs"
+        out_dir.mkdir(parents=True, exist_ok=True)
+        if self._writer is None:
+            (out_dir / f"smoke_{project_id}.json").write_text(
+                '{"skipped": "no tier-S writer configured (ANTHROPIC_API_KEY_MAINT unset, D-7)"}',
+                encoding="utf-8",
+            )
+            return
+        self._s.search.register_project_root(project_id, root)
+        svc = TierSService(
+            self._writer,  # type: ignore[arg-type]
+            self._s.lexical,
+            self._s.catalog,
+            lambda pid, q: self._s.search.search_project(pid, q, top_k=5),
+            self._s.ingest.status,
+        )
+        result = svc.run(project_id, display_name)
+        self.smoke_runs.append(result)
+        (out_dir / f"smoke_{project_id}.json").write_text(
+            result.model_dump_json(indent=1), encoding="utf-8"
+        )
 
     def close(self) -> None:
         self._s.close()
@@ -202,7 +240,19 @@ def build_runtime(config: Config, *, token: str | None = None) -> Runtime:
     services = executor.submit_sync(lambda: build(config, telemetry=telemetry, feedback=True))
     api = ServiceApiImpl(services, telemetry, config)
     executor.submit_sync(api.sync_registry)
-    worker = IngestWorker(lambda: WriterImpl(config), config.service.corpus_root)
+    maint_key = os.environ.get(MAINT_KEY_ENV, "")
+
+    def open_writer() -> WriterImpl:
+        qw = None
+        if maint_key:
+            import anthropic
+
+            from .adapters.writer_anthropic import AnthropicQuestionWriter
+
+            qw = AnthropicQuestionWriter(client=anthropic.Anthropic(api_key=maint_key))
+        return WriterImpl(config, qw)
+
+    worker = IngestWorker(open_writer, config.service.corpus_root)
     return Runtime(
         config=config,
         services=services,

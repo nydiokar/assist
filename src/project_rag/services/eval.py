@@ -13,6 +13,7 @@ from typing import Protocol
 
 from pydantic import BaseModel
 
+from ..core.gate import GateMetrics
 from ..domain.models import SearchResponse
 
 
@@ -37,6 +38,8 @@ class EvalQuestion(BaseModel):
     expect_source_paths: list[str]
     expect_substrings: list[str]
     filters: dict[str, object] = {}  # forwarded to search_project (doc_class, ...)
+    # §6.8.4: content hash of each expected source when the label was confirmed (stale check)
+    expect_source_hashes: dict[str, str] = {}
 
 
 class QuestionResult(BaseModel):
@@ -172,4 +175,18 @@ def evaluate(
             f"scored={scored} (excludes no_answer)",
             "embedder/store are configurable; results are fixture-only until real corpus",
         ],
+    )
+
+
+def metrics_for_gate(report: EvalReport) -> GateMetrics:
+    """The three primary gate metrics (spec §6.8.1). Abstention accuracy = no-answer questions
+    withheld + answerable questions not withheld, over all questions."""
+    total = report.noanswer_total + report.answerable_total
+    correct = report.noanswer_abstained + (report.answerable_total - report.answerable_abstained)
+    return GateMetrics(
+        recall_at_5=report.recall_at_5,
+        evidence_at_5=report.evidence_recall_at_5,
+        abstention_accuracy=round(correct / total, 4) if total else 0.0,
+        n_answerable=report.answerable_total,
+        n_total=total,
     )

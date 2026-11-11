@@ -408,3 +408,11 @@ class ProjectRecord(Frozen):
     root_path: str  # absolute path of the folder
     key_source: str  # "drive" | "path-fallback"
     renamed_from: str | None = None
+
+
+class ChunkView(Frozen):
+    """A stored chunk as the smoke generator sees it (S7)."""
+
+    chunk_id: str
+    source_path: str
+    text: str

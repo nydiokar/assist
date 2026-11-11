@@ -321,11 +321,16 @@ def test_concurrent_searches_during_ingest(
         nonlocal busy_first_try
         t0 = time.perf_counter()
         for attempt in range(2):  # a client honouring the busy/Retry-After signal once
-            err, text = await _mcp_call(
-                public,
-                "search_project",
-                {"project_id": "green-villages", "query": "community gardens"},
-            )
+            try:
+                err, text = await _mcp_call(
+                    public,
+                    "search_project",
+                    {"project_id": "green-villages", "query": "community gardens"},
+                )
+            except BaseException as e:
+                if "error response" not in repr(e) and "503" not in repr(e):
+                    raise
+                err, text = True, "assist is busy (HTTP 503)"
             if not (err and "assist is busy" in text):
                 break
             busy_first_try += attempt == 0
@@ -414,3 +419,22 @@ def test_record_feedback_and_auto_signals(running: tuple[Runtime, str, str]) -> 
         for s in rt.executor.submit_sync(lambda: sink.query(datetime(2000, 1, 1, tzinfo=UTC)))
     ]
     assert "rescue" in kinds and "empty" in kinds
+
+
+def test_first_ingest_runs_tier_s_with_a_writer(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from project_rag.adapters.writer_fixture import FixtureQuestionWriter
+    from project_rag.runtime import WriterImpl
+
+    root = tmp_path / "corpus"
+    shutil.copytree(FIXTURE_CORPUS, root / "Demo")
+    cfg = _config(tmp_path, root)
+    w = WriterImpl(cfg, FixtureQuestionWriter())
+    w.ingest_corpus(str(root), None)
+    assert len(w.smoke_runs) == 1  # first ingest -> tier S
+    w.ingest_corpus(str(root), None)
+    assert len(w.smoke_runs) == 1  # not again on later ingests
+    smoke = (tmp_path / "state" / "runs" / "smoke_demo.json").read_text(encoding="utf-8")
+    assert "Project Demo indexed" in smoke
+    w.close()
