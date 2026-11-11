@@ -61,11 +61,11 @@ Single source of provider selection + tuning. Key switches:
 
 | Key | Test/dev default | Production candidate (A01) |
 |---|---|---|
-| `embedding.provider` | `hash` (offline, deterministic, 2560-dim) | `qwen3` (`Qwen/Qwen3-Embedding-4B`, 2560-dim, CUDA, extra `dev-gpu`) |
-| `vector_store.provider` | `memory` (numpy cosine, JSON-persisted) | `chroma` (extra `dev-gpu`) |
+| `embedding.provider` | `hash` (offline, deterministic, 2560-dim) | v3: `openai_compat` (llama-server, Qwen3-Embedding-4B GGUF pinned in `configs/models.lock.yaml`; `make models`, `make models-up`, profile `configs/dev_llama_server.yaml`). Reference: `qwen3` (torch, extra `dev-gpu`, WSL ROCm) |
+| `vector_store.provider` | `memory` (numpy cosine, JSON-persisted) | `chroma` (D-3, extra `dev-gpu`); `sqlite_vec` (spike, same SQLite file as FTS5 + catalog) |
 | `parsing.backend` | `native` (pypdf/python-docx/openpyxl/csv) | `docling` (extra `dev-gpu`) |
 | `retrieval.per_file_cap` | `3` | max chunks from one source in the result window; WP3 2026-10-27 measured evidence@5 peak at 3 (`null` = legacy `top_k//2`) |
-| `retrieval.rerank.enabled` | `false` | cross-encoder reranker over the fused pool (spec §7; extra `dev-gpu`, pin revision) — staged, see EVAL_LOG 2026-10-27 / ledger F19 |
+| `retrieval.rerank.enabled` | `false` | reranker over the fused pool; `retrieval.rerank.provider`: `openai_compat` (llama-server `/v1/rerank`, v3) or `torch` (cross-encoder, extra `dev-gpu`) — see EVAL_LOG 2026-10-27 / ledger F19 |
 
 `e5` remains an optional legacy comparator. Switching `embedding.provider`/model/dim forces a
 **new index generation** (ADR-009); the startup compatibility guard refuses writes on a mismatch.
