@@ -31,4 +31,4 @@ retrieval:
     openai_compat:
       base_url: http://127.0.0.1:8082
       gguf_sha256: a43c7c9b11a4c1517e5bf95151960e1621d1b72f7a493364b01e386cf1aaa1d3
-      score_transform: none
+      score_transform: sigmoid

@@ -42,3 +42,11 @@ models:
     quant: Q8_0
     size: 635676416
     sha256: a43c7c9b11a4c1517e5bf95151960e1621d1b72f7a493364b01e386cf1aaa1d3
+  bge-reranker-v2-m3-f16:
+    role: rerank
+    repo: gpustack/bge-reranker-v2-m3-GGUF
+    revision: 3093af03b1a635e67b084b1d8c03c5f5e020fd05
+    file: bge-reranker-v2-m3-FP16.gguf
+    quant: F16
+    size: 1159776896
+    sha256: 5df93be121c09c43432102ad2b9569d369ccb85c209ca7583e8ccd28f0e41b88

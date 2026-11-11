@@ -167,7 +167,7 @@ def test_profile_carries_gguf_identity() -> None:
 # ---- reranker ----
 
 
-def _reranker(transform: str = "none") -> OpenAICompatReranker:
+def _reranker(transform: str = "none") -> OpenAICompatReranker:  # raw scores unless asked
     o = OpenAICompatRerankConfig(base_url=RBASE, retry=FAST, score_transform=transform)
     return OpenAICompatReranker(
         RerankConfig(enabled=True, provider="openai_compat", openai_compat=o)

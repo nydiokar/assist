@@ -199,9 +199,10 @@ class OpenAICompatRerankConfig(_Cfg):
     base_url: str = "http://127.0.0.1:8082"
     model: str = "bge-reranker-v2-m3"
     gguf_sha256: str = ""
-    # The torch CrossEncoder returns sigmoid probabilities (the abstention threshold 0.26 is on
-    # that scale). Set to "sigmoid" when the server returns raw logits (S3 parity measurement).
-    score_transform: str = "none"  # none | sigmoid
+    # llama-server returns raw logits; the torch CrossEncoder returned sigmoid probabilities and
+    # the abstention threshold (0.26) is on that scale. S3 parity: sigmoid(served) spans the same
+    # 0-0.9991 range as the reference on the fixture pairs.
+    score_transform: str = "sigmoid"  # sigmoid | none
     timeout_s: float = 30.0
     connect_timeout_s: float = 3.0
     retry: RetryPolicy = Field(default_factory=RetryPolicy)

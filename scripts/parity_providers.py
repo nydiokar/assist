@@ -79,10 +79,50 @@ def _boundaries(counter: Callable[[str], int]) -> list[str]:
     return ids
 
 
-def _pairs() -> list[tuple[str, str]]:
+def _pairs_arbitrary() -> list[tuple[str, str]]:
+    """First S3 run's set: first 4 queries x first 5 passages longer than 40 chars. Mostly
+    unrelated pairs (sigmoid ~1e-5), kept for the record (pooled Spearman 0.947)."""
     queries = _queries()[:4]
     passages = [p for p in _passages() if len(p) > 40][:5]
     return [(q, p) for q in queries for p in passages]
+
+
+def _pairs_pipeline() -> list[tuple[str, str]]:
+    """Rework round 2 set (declared before measuring): what the reranker actually receives. For
+    each of the first 4 queries, its top-5 fused candidates from hybrid retrieval on the fixture
+    corpus with the deterministic hash embedder + FTS5, rerank off."""
+    import tempfile
+
+    from project_rag.api import ProjectRAG
+    from project_rag.domain.config import Config, with_overrides
+
+    tmp = Path(tempfile.mkdtemp(prefix="parity_pairs_"))
+    cfg = with_overrides(
+        Config(),
+        {
+            "lexical_store.path": str(tmp / "s.sqlite3"),
+            "vector_store.persist_path": "",
+            "retrieval.top_k": 5,
+        },
+    )
+    rag = ProjectRAG(config=cfg)
+    try:
+        rag.ingest_project("demo", str(FIXTURES))
+        pairs: list[tuple[str, str]] = []
+        for q in _queries()[:4]:
+            res = rag.search_project("demo", q, top_k=5)
+            pairs.extend((q, r.excerpt) for r in res.results)
+        return pairs
+    finally:
+        rag.close()
+
+
+PAIR_SETS = {"arbitrary": _pairs_arbitrary, "pipeline": _pairs_pipeline}
+_PAIRS = _pairs_pipeline
+
+
+def _pairs() -> list[tuple[str, str]]:
+    return _PAIRS()
 
 
 def _measure(
@@ -181,7 +221,13 @@ def cmd_compare(ref_path: str, served_path: str) -> None:
             "gate_mean_ge_0.99": bool(cos.mean() >= 0.99),
         }
     rho = _spearman(ref["rerank_scores"], srv["rerank_scores"])
+    n_pairs = len(ref["rerank_scores"])
+    per_query = [
+        round(_spearman(ref["rerank_scores"][i : i + 5], srv["rerank_scores"][i : i + 5]), 3)
+        for i in range(0, n_pairs, 5)
+    ]
     report["rerank"] = {
+        "within_query_spearman": per_query,
         "n_pairs": len(ref["rerank_scores"]),
         "spearman": round(rho, 4),
         "gate_ge_0.95": rho >= 0.95,
@@ -208,14 +254,19 @@ def main() -> None:
     sub = ap.add_subparsers(dest="cmd", required=True)
     r = sub.add_parser("reference")
     r.add_argument("--out", required=True)
+    r.add_argument("--pairs", default="pipeline", choices=sorted(PAIR_SETS))
     s = sub.add_parser("served")
     s.add_argument("--out", required=True)
     s.add_argument("--append-text", default="")
     s.add_argument("--rerank-transform", default="none", choices=["none", "sigmoid"])
+    s.add_argument("--pairs", default="pipeline", choices=sorted(PAIR_SETS))
     c = sub.add_parser("compare")
     c.add_argument("ref")
     c.add_argument("served")
     args = ap.parse_args()
+    global _PAIRS
+    if args.cmd in {"reference", "served"}:
+        _PAIRS = PAIR_SETS[args.pairs]
     if args.cmd == "reference":
         cmd_reference(args.out)
     elif args.cmd == "served":
