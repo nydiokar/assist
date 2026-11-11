@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from pathlib import Path
 
 import numpy as np
 import pytest
@@ -10,6 +11,7 @@ import pytest
 from project_rag.adapters.embed_hash import HashEmbedder
 from project_rag.domain.config import EmbeddingConfig
 from project_rag.ports.embedder import Embedder
+from project_rag.wiring import load_config
 
 
 def _hash() -> Embedder:
@@ -25,7 +27,9 @@ def _qwen3() -> Embedder:
     prepare_gpu_env()
     if not torch.cuda.is_available():
         pytest.skip("Qwen3 reference needs the WSL ROCm/CUDA venv")
-    return Qwen3Embedder(EmbeddingConfig(provider="qwen3"))
+    # The pinned A01/A02 reference profile (bf16 inference, FP32 storage, pinned HF revision).
+    cfg = load_config(Path(__file__).resolve().parents[2] / "configs" / "yp_qwen4b_gpu.yaml")
+    return Qwen3Embedder(cfg.embedding)
 
 
 ADAPTERS: list[object] = [

@@ -426,4 +426,4 @@ Format: `YYYY-MM-DD · Stage · event · evidence (commands + one-line results, 
 
 **Open issues** (spec/code contradictions, X4):
 
-- *(empty)*
+- 2026-11-11 · S1 · *Plan wording vs code (resolved by recording, no behaviour change).* S1 task 2 asks for the property "cap: never more than the cap per file". The per-file cap deliberately **refills** the window from over-cap candidates when it would otherwise be short (WP3 2026-10-27 design: never return fewer than `window` results when candidates exist), so the literal property is false by design. `tests/unit/test_core_properties.py::test_cap_order_length_and_refill_rule` encodes the real contract: order preserved, length = min(window, candidates), and a file exceeds the cap **only** when every under-cap candidate is already in the window. Proposed amendment: reword the S1 property in the plan. Owner may instead ask for a strict cap (that would be a behaviour change and needs a measured eval).

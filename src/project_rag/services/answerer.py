@@ -13,6 +13,7 @@ helper were retracted in favour of the stdio-MCP-server wiring — see docs/DECI
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 
 from ..domain.models import RetrievedResult, SearchResponse
@@ -100,7 +101,9 @@ def build_grounding_prompt(question: str, res: SearchResponse) -> str:
     return "\n".join(parts)
 
 
-def answer_from_search(question: str, res: SearchResponse, *, call_llm=None) -> GroundedAnswer:
+def answer_from_search(
+    question: str, res: SearchResponse, *, call_llm: Callable[[str, str], str] | None = None
+) -> GroundedAnswer:
     """Turn a SearchResponse into a grounded answer, retrieval-first.
 
     The real path is the AI-Team SDK-MCP session (the agent calls the RAG tools itself); this helper

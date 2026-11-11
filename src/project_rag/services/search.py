@@ -12,9 +12,10 @@ without resolving it inside the registered root.
 from __future__ import annotations
 
 import time
-from collections.abc import Iterator, Mapping, Sequence
+from collections.abc import Iterable, Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from pathlib import PurePath
+from typing import cast
 
 import numpy as np
 
@@ -121,9 +122,9 @@ class SearchService:
         if rcfg.query_expansion.enabled:
             search_query = expand_query(query, corpus_script=rcfg.query_expansion.corpus_script)
         if "dense" in channels:
-            qvec = self._embedder.embed_queries([search_query])[0]
+            qvec = np.asarray(self._embedder.embed_queries([search_query])[0], dtype=np.float32)
             dense = self._vector.query(
-                project_id, generation, np.asarray(qvec), rcfg.candidates_per_channel, doc_class
+                project_id, generation, qvec, rcfg.candidates_per_channel, doc_class
             )
         if "lexical" in channels:
             lexical = self._lexical.search(
@@ -161,15 +162,15 @@ class SearchService:
         doc_class: str | None = None
         channels: tuple[str, ...] = ("dense", "lexical")
         for key, val in (filters or {}).items():
+            requested = (
+                [str(v) for v in cast("Iterable[object]", val)]
+                if isinstance(val, list | tuple | set | frozenset)
+                else []
+            )
             if key == "doc_class" and isinstance(val, str) and val in _DOC_CLASSES:
                 doc_class = val
-            elif (
-                key == "channels"
-                and isinstance(val, list | tuple | set | frozenset)
-                and val
-                and {str(v) for v in val} <= _CHANNELS  # pyright: ignore[reportUnknownVariableType]
-            ):
-                channels = tuple(str(v) for v in val)  # pyright: ignore[reportUnknownVariableType]
+            elif key == "channels" and requested and set(requested) <= _CHANNELS:
+                channels = tuple(requested)  # evaluation baselines (v1 §6.1 B/C/D)
             else:
                 warnings.append(f"unsupported filter ignored: {key}")
 

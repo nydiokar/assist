@@ -26,5 +26,12 @@ jobs:
         run: uv run --frozen ruff check .
       - name: Ruff format
         run: uv run --frozen ruff format --check .
+      - name: Layer rules (import-linter)
+        run: uv run --frozen lint-imports
+      - name: Types (pyright strict packages)
+        # Only the strict layers: adapters import dev-gpu libraries CI does not install.
+        run: >-
+          uv run --frozen pyright src/project_rag/domain src/project_rag/core src/project_rag/ports
+          src/project_rag/services src/project_rag/wiring.py
       - name: Tests (offline)
-        run: uv run --frozen pytest tests/unit tests/integration tests/evaluation -m "not live"
+        run: uv run --frozen pytest tests/unit tests/contracts tests/integration tests/evaluation -m "not live"

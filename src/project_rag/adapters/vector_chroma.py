@@ -7,6 +7,7 @@ from __future__ import annotations
 import numpy as np
 
 from ..domain.config import VectorStoreConfig
+from ..domain.errors import StoreError
 from ..domain.models import ChannelHit, Chunk
 from .vector_payload import chunk_metadata, hit_payload
 
@@ -72,6 +73,8 @@ class ChromaVectorStore:
             where={"$and": clauses},
             include=["metadatas", "distances"],
         )
+        if res["distances"] is None or res["metadatas"] is None:
+            raise StoreError("chroma query returned no distances/metadatas")
         ids = res["ids"][0]
         dists = res["distances"][0]
         metas = res["metadatas"][0]

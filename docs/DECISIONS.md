@@ -533,3 +533,35 @@ Context: the k-sweep localized the loss to *ranking* (answer in pool 0.82–0.94
   pinned revision, regression-tested (`tests/unit/test_rerank.py`, fake scorer, no download).
   Reversible: `retrieval.rerank.enabled: false` restores the per_file_cap-only pipeline.
   Design choice under spec §7 (reranker preconditioned on the measured k-sweep), not a spec change.
+
+## 2026-11-11 — S1 / A0 refactor: design choices where the spec was silent
+
+All behaviour-neutral (golden snapshot byte-identical to S0, `git diff 36b1ec9 -- tests/evaluation/golden/` empty).
+
+- **Embedder port keeps the prototype shape** (`dim`/`profile`/`max_input_tokens` properties,
+  `token_count(text)`, `embed_passages`, `embed_queries`). Spec §15.3 lists `profile()` and
+  batched `count_tokens(texts)`; S3 (HTTP providers) changes the port together with its new
+  adapter, so S1 does not churn every caller twice. Reversible, no spec reinterpretation.
+- **Reranker port = `score(query, passages) -> list[float]`** (spec §15.3). The reorder that used to
+  live inside the torch reranker is the pure `core.ranking.apply_rerank_scores` (same sort key
+  `(-score, chunk_id)`, same tail handling).
+- **Typed channel hits.** Stores return `ChannelHit(chunk_id, score, payload: HitPayload)` instead
+  of `(id, score, dict)` tuples, so core/services can be pyright-strict. Fusion takes the payload
+  from the first channel that returned a chunk (the prototype took dense, then lexical only if
+  dense's dict was empty, which never happened).
+- **Stage caches are ports** (`ArtifactStore`, `EmbeddingCache`; not in the spec's port table).
+  The parse/chunk hit/miss logic is `services.ingest.StageRunner`; the filesystem layout is the
+  `FsArtifactStore` adapter (same paths as before).
+- **Entry modules stay at `project_rag.cli` and `project_rag.mcp_server`.** They are the composition
+  edge (build via the facade, then call `interfaces/`), so the pyproject script and every live
+  `.mcp.json` registration keep working. `interfaces/` depends only on the `AssistantAPI` Protocol.
+- **`api.py` (`ProjectRAG`) is a logic-free facade** over `wiring.build()`; scripts and tests reach
+  components through `rag.services.<vector|lexical|catalog|embedder|ingest|search>` instead of
+  private attributes.
+- **`load_config` (YAML) is an adapter** (`adapters/config_yaml.py`), re-exported by `wiring`; the
+  domain config is frozen and derived copies come from `domain.config.with_overrides`.
+- **Filter hardening (error inputs only):** a non-string `doc_class` filter value is now ignored
+  with a warning instead of raising `TypeError` on an unhashable value; channel lists accept
+  list/tuple/set. Valid inputs behave as before.
+- **`core/filesystem_evidence.py` uses `posixpath` instead of `PurePosixPath`** so the core imports
+  no `pathlib` (R5). Identical results for discovery's normalised forward-slash paths.

@@ -70,10 +70,109 @@ ignore = ["E501", "RUF001", "RUF002", "RUF003"]
 
 
 [tool.pyright]
-# S0: basic mode over src/ with the recorded baseline (build plan §5). S1 turns on strict per
-# package (domain, core, ports, services, wiring) via `strict = [...]`.
+# Basic mode over src/; strict on the layers the spec requires (A03 §15.3 R9). Adapters and the
+# interfaces stay basic: they sit on untyped third-party edges.
 include = ["src"]
+strict = [
+    "src/project_rag/domain",
+    "src/project_rag/core",
+    "src/project_rag/ports",
+    "src/project_rag/services",
+    "src/project_rag/wiring.py",
+]
 pythonVersion = "3.12"
 typeCheckingMode = "basic"
 venvPath = "."
 venv = ".venv"
+
+# Layer rules (spec A03 §15.3 R1, R2, R5, R7), enforced by `uv run lint-imports`.
+[tool.importlinter]
+root_package = "project_rag"
+include_external_packages = true
+
+[[tool.importlinter.contracts]]
+name = "R1 domain imports nothing from the package"
+type = "forbidden"
+source_modules = ["project_rag.domain"]
+forbidden_modules = [
+    "project_rag.core", "project_rag.ports", "project_rag.adapters", "project_rag.services",
+    "project_rag.interfaces", "project_rag.wiring", "project_rag.api",
+]
+
+[[tool.importlinter.contracts]]
+name = "R1 core and ports import only the domain"
+type = "forbidden"
+source_modules = ["project_rag.core", "project_rag.ports"]
+forbidden_modules = [
+    "project_rag.adapters", "project_rag.services", "project_rag.interfaces",
+    "project_rag.wiring", "project_rag.api",
+]
+
+[[tool.importlinter.contracts]]
+name = "R1 core and ports are independent"
+type = "independence"
+modules = ["project_rag.core", "project_rag.ports"]
+
+[[tool.importlinter.contracts]]
+name = "R1 services and interfaces never reach adapters (even indirectly)"
+type = "forbidden"
+source_modules = ["project_rag.services", "project_rag.interfaces"]
+forbidden_modules = ["project_rag.adapters"]
+
+[[tool.importlinter.contracts]]
+name = "R1 entry modules reach adapters only through wiring"
+type = "forbidden"
+allow_indirect_imports = true
+source_modules = ["project_rag.api", "project_rag.cli", "project_rag.mcp_server"]
+forbidden_modules = ["project_rag.adapters"]
+
+[[tool.importlinter.contracts]]
+name = "R1 services never import interfaces or the composition root"
+type = "forbidden"
+source_modules = ["project_rag.services"]
+forbidden_modules = ["project_rag.interfaces", "project_rag.wiring", "project_rag.api"]
+
+[[tool.importlinter.contracts]]
+name = "R1 interfaces never import the composition root"
+type = "forbidden"
+source_modules = ["project_rag.interfaces"]
+forbidden_modules = ["project_rag.wiring", "project_rag.api"]
+
+[[tool.importlinter.contracts]]
+name = "R1 adapters never import services, interfaces or wiring"
+type = "forbidden"
+source_modules = ["project_rag.adapters"]
+forbidden_modules = [
+    "project_rag.services", "project_rag.interfaces", "project_rag.wiring", "project_rag.api",
+]
+
+[[tool.importlinter.contracts]]
+name = "R2 third-party libraries only in adapters (mcp also in interfaces.mcp)"
+type = "forbidden"
+allow_indirect_imports = true  # direct imports only: layering is covered by the R1 contracts
+source_modules = [
+    "project_rag.domain", "project_rag.core", "project_rag.ports", "project_rag.services",
+    "project_rag.interfaces.cli", "project_rag.interfaces.api_protocol", "project_rag.wiring",
+    "project_rag.api", "project_rag.cli",
+]
+forbidden_modules = [
+    "yaml", "torch", "sentence_transformers", "transformers", "chromadb", "docx", "openpyxl",
+    "pypdf", "docling", "mcp", "httpx", "tenacity", "fastapi", "prometheus_client",
+]
+
+[[tool.importlinter.contracts]]
+name = "R5/R7 no hidden I/O, clock, logging or environment in the core"
+type = "forbidden"
+allow_indirect_imports = true  # direct imports only: layering is covered by the R1 contracts
+source_modules = ["project_rag.core", "project_rag.domain", "project_rag.ports"]
+forbidden_modules = [
+    "os", "time", "logging", "pathlib", "sqlite3", "socket", "subprocess", "shutil",
+    "tempfile", "random",
+]
+
+[[tool.importlinter.contracts]]
+name = "R7 nothing below wiring reads the environment"
+type = "forbidden"
+allow_indirect_imports = true  # direct imports only: layering is covered by the R1 contracts
+source_modules = ["project_rag.services", "project_rag.interfaces"]
+forbidden_modules = ["os"]
