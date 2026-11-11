@@ -565,3 +565,36 @@ All behaviour-neutral (golden snapshot byte-identical to S0, `git diff 36b1ec9 -
   list/tuple/set. Valid inputs behave as before.
 - **`core/filesystem_evidence.py` uses `posixpath` instead of `PurePosixPath`** so the core imports
   no `pathlib` (R5). Identical results for discovery's normalised forward-slash paths.
+
+## 2026-11-11 — S2 storage foundation: D-3 and the publish protocol
+
+- **D-3 = Chroma (rule applied, not a judgement call).** Build plan S2 rule: sqlite-vec only if
+  contract ✓, KNN p95 < 100 ms at 50k × 2560 float32, atomic publish ✓. Measured with
+  `scripts/bench_vec.py` (vec0, partition key project_id, metadata generation/doc_class, cosine,
+  k=16, 200 queries, all 50k rows in the queried project): **Linux (WSL, Ryzen 7 7800X3D,
+  AVX2/AVX-512) p95 163.4 ms**, p50 159.2 ms, insert 35.9 s, peak RSS 117 MB, file 520 MB;
+  **Windows p95 317.9 ms** (no SIMD path in the win wheel; l2 = cosine speed). Contract ✓ and
+  in-one-transaction rollback ✓ (`test_sqlite_vec_staging_rolls_back_inside_one_transaction`),
+  but the latency bar fails. Chroma 1.5.9, same synthetic data, Windows: p95 102.6 ms, p50
+  94.8 ms, insert 37.1 s, **peak RSS 1676 MB**. The spec premise "brute force is milliseconds at
+  this scale" does not hold at 50k × 2560 (it does at YP scale: 5k rows → 16 ms Linux). The
+  sqlite-vec adapter stays in the tree (`vector_store.provider: sqlite_vec`) so D-3 can be
+  revisited at B1 on the target VM (smaller corpus or RAM pressure from Chroma's 1.7 GB).
+- **Two-phase publish for every vector store** (spec S2 fallback branch). 0) journal row
+  `staged_generations` committed; 1) one store transaction: purge leftovers of the new
+  generation, stage vectors/FTS5/catalog rows, verify the three counts equal the staged chunk
+  count, pin the profile, flip `active_generation` (= the commit point; the journal row is
+  deleted in the same transaction); 2) delete the superseded generation. Inside the store
+  (FTS5, catalog, sqlite-vec) phase 1 is atomic; Chroma/memory vectors may outlive a failed
+  phase 1 and are removed by the GC via the journal. Embedding happens before phase 1 (the
+  embedding cache commits per batch, so a long run stays resumable without holding a write tx).
+- **Startup GC runs in `wiring.build()`** (`collect_garbage=True` by default) and deletes every
+  non-active generation found in the journal or the catalog. Single-writer assumption: do not
+  start a second writer process against a store another process is ingesting into (the S6
+  service enforces one writer).
+- **One shared connection**: `SqliteDb` owns it; catalog, FTS5 and sqlite-vec adapters take the
+  `SqliteDb` and never commit inside an outer transaction (re-entrant `transaction()`).
+- **Migrations**: `PRAGMA user_version`, files `NNN_name.sql`, numbering 1..N without gaps, each in
+  its own transaction. 001 is the prototype schema with `IF NOT EXISTS`, so pre-migration
+  databases open (their data is not migrated; L6 re-indexes). 002 staging journal, 003 registry
+  columns (`drive_id` unique, `slug`, `display_name`), 004 `run_reports`, 005 `feedback`.

@@ -123,7 +123,7 @@ flowchart TD
 |---|---|---|---|---|
 | D-1 quant | pending (after E1) | | | OWNER |
 | D-2 host | pending (after B1) | | | OWNER |
-| D-3 vector store | pending (S2 spike; the agent decides by the criteria in S2) | | | AGENT |
+| D-3 vector store | decided | **Chroma** (two-phase publish). sqlite-vec failed the latency bar: KNN p95 163 ms Linux / 318 ms Windows at 50k×2560 (bar 100 ms); contract + atomic publish passed. Chroma p95 103 ms (Windows), RSS 1.68 GB. sqlite-vec adapter kept for a B1 revisit. DECISIONS 2026-11-11 | 2026-11-11 | AGENT (S2 rule) |
 | D-4 account owner | default: client | | | OWNER ↔ CLIENT |
 | D-5 web scope | default: WebSearch + allowlisted WebFetch | | | OWNER |
 | D-6 uploads | default: session-only | | | OWNER |
