@@ -7,7 +7,7 @@ from ..domain.models import OcrText
 
 
 class NullOcr:
-    def ocr_pdf(self, path: str) -> str:
+    def ocr_pdf(self, path: str) -> list[str]:
         raise OcrFailed(f"OCR not configured: {path}")
 
     def ocr_image(self, path: str) -> OcrText:

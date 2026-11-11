@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from ...domain.models import DocumentRecord, EmbeddingProfile
+from ...domain.models import DocumentRecord, EmbeddingProfile, RunReport
 from .db import SqliteDb
 
 
@@ -153,6 +153,33 @@ class SqliteCatalog:
                     f"DELETE FROM {table} WHERE project_id=? AND generation=?",
                     (project_id, generation),
                 )
+
+    # ---- run reports (S4) ----
+    def record_run(self, report: RunReport) -> None:
+        with self._db.transaction():
+            self._conn.execute(
+                "INSERT OR REPLACE INTO run_reports(run_id, project_id, started_at, finished_at, "
+                "prior_generation, new_generation, published, report_json) "
+                "VALUES(?,?,?,?,?,?,?,?)",
+                (
+                    report.run_id,
+                    report.project_id,
+                    report.started_at,
+                    report.finished_at,
+                    report.prior_generation,
+                    report.new_generation,
+                    int(report.published),
+                    report.model_dump_json(),
+                ),
+            )
+
+    def runs(self, project_id: str, limit: int = 20) -> list[RunReport]:
+        rows = self._conn.execute(
+            "SELECT report_json FROM run_reports WHERE project_id=? "
+            "ORDER BY started_at DESC LIMIT ?",
+            (project_id, limit),
+        ).fetchall()
+        return [RunReport.model_validate_json(r["report_json"]) for r in rows]
 
     # ---- two-phase publish journal + GC (S2) ----
     def begin_staging(self, project_id: str, generation: str, at: datetime) -> None:

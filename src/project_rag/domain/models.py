@@ -30,6 +30,7 @@ class DocState(StrEnum):
     UNSUPPORTED = "UNSUPPORTED"
     QUARANTINED = "QUARANTINED"
     OCR_REQUIRED = "OCR_REQUIRED"
+    NO_TEXT = "NO_TEXT"  # OCR ran (or the file is an image) and kept no usable text (S4)
 
 
 class BlockType(StrEnum):
@@ -203,6 +204,39 @@ class FileReport(Frozen):
     diagnostics: list[str] = Field(default_factory=list)
 
 
+class FailedDoc(Frozen):
+    source_path: str
+    state: str
+    reason: str
+
+
+class RunReport(Frozen):
+    """One ingest run (spec §6.5): counts by state, coverage, failures, timings, generations.
+    Stored in `run_reports` and as JSON next to the state. No document text."""
+
+    run_id: str
+    project_id: str
+    started_at: str
+    finished_at: str
+    prior_generation: str | None = None
+    new_generation: str = ""
+    published: bool = False
+    dry_run: bool = False
+    n_discovered: int = 0
+    n_excluded: int = 0
+    n_in_scope: int = 0
+    counts_by_state: dict[str, int] = Field(default_factory=dict)
+    coverage_pct: float = 0.0  # READY / in-scope documents
+    failed: list[FailedDoc] = Field(default_factory=list)  # FAILED + NO_TEXT now
+    newly_failed: list[FailedDoc] = Field(default_factory=list)  # not failing in the prior run
+    ocr_indexed: list[str] = Field(default_factory=list)  # READY via OCR
+    antiword_indexed: list[str] = Field(default_factory=list)  # READY via antiword
+    embeddings_computed: int = 0
+    embeddings_cached: int = 0
+    stage_seconds: dict[str, float] = Field(default_factory=dict)
+    warnings: list[str] = Field(default_factory=list)
+
+
 class IngestReport(Frozen):
     project_id: str
     index_generation: str
@@ -214,6 +248,7 @@ class IngestReport(Frozen):
     unchanged: int = 0
     embedding_profile_key: str = ""
     warnings: list[str] = Field(default_factory=list)
+    run: RunReport | None = None
 
 
 class StatusReport(Frozen):

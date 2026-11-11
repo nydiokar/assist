@@ -100,20 +100,30 @@ class Services:
 def build(config: Config, *, collect_garbage: bool = True) -> Services:
     """Wire every port to its adapter. `collect_garbage` runs the S2 startup GC (single writer:
     do not build a second writer against a store another process is ingesting into)."""
-    from .adapters.clock_system import SystemClock
+    from .adapters.clock_system import SystemClock, UuidIdGen
     from .adapters.corpus_local_fs import LocalFsCorpus
     from .adapters.parse_registry import ParserRegistry
+    from .adapters.report_json import JsonReportWriter
     from .adapters.sqlite.catalog import SqliteCatalog
     from .adapters.sqlite.embedding_cache import SqliteEmbeddingCache
     from .adapters.sqlite.fts5 import Fts5LexicalIndex
     from .adapters.stage_cache_fs import FsArtifactStore
+    from .services.parsing import OcrAwareParser
 
     db = SqliteDb(config.lexical_store.path)
     embedder = build_embedder(config.embedding)
     vector = build_vector_store(config.vector_store, db)
     lexical = Fts5LexicalIndex(db)
     catalog = SqliteCatalog(db)
-    parser = ParserRegistry(config.parsing)
+    registry = ParserRegistry(config.parsing)
+    ocr = None
+    if config.parsing.ocr.enabled:
+        from .adapters.ocr_tesseract import TesseractOcr
+
+        ocr = TesseractOcr(
+            languages=config.parsing.ocr.languages, timeout_s=config.parsing.ocr.timeout_s
+        )
+    ingest_parser = OcrAwareParser(registry, ocr, config.parsing)
     corpus = LocalFsCorpus()
     cache_root = Path(config.lexical_store.path).resolve().parent / "cache"
 
@@ -123,7 +133,7 @@ def build(config: Config, *, collect_garbage: bool = True) -> Services:
     ingest = IngestService(
         config,
         corpus=corpus,
-        parser=parser,
+        parser=ingest_parser,
         embedder=embedder,
         vector=vector,
         lexical=lexical,
@@ -132,6 +142,8 @@ def build(config: Config, *, collect_garbage: bool = True) -> Services:
         open_embedding_cache=open_embedding_cache,
         store=db,
         clock=SystemClock(),
+        ids=UuidIdGen(),
+        reports=JsonReportWriter(cache_root.parent / "runs"),
     )
     removed = tuple(ingest.collect_garbage()) if collect_garbage else ()
     search = SearchService(
@@ -142,7 +154,9 @@ def build(config: Config, *, collect_garbage: bool = True) -> Services:
         lexical=lexical,
         catalog=catalog,
         corpus=corpus,
-        parser=parser,
+        # Query time re-reads sources without OCR (open_source / context expansion fall back to
+        # the stored excerpt for OCR'd documents).
+        parser=registry,
     )
     return Services(
         config=config,

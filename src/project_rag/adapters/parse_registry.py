@@ -6,6 +6,7 @@ from __future__ import annotations
 from ..domain.config import ParsingConfig
 from ..domain.models import DocState, ParsedDocument
 from ..ports.parser import FormatParser
+from .parse_antiword import AntiwordParser
 from .parse_native import CsvParser, DocxParser, PdfParser, TextParser, XlsxParser
 
 
@@ -21,6 +22,14 @@ class ParserRegistry:
             XlsxParser(),
             CsvParser(),
         ]
+        if cfg.antiword:
+            self._parsers.append(AntiwordParser(timeout_s=cfg.antiword_timeout_s))
+
+    def supported_extensions(self) -> frozenset[str]:
+        exts = {".pdf", ".docx", ".xlsx", ".csv", ".txt", ".md"}
+        if self._cfg.antiword:
+            exts.add(".doc")
+        return frozenset(exts)
 
     def parse(self, abs_path: str, source_path: str, ext: str) -> ParsedDocument:
         if self._cfg.backend == "docling":

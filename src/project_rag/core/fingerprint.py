@@ -44,7 +44,7 @@ def pipeline_fingerprint(
     return "|".join(
         [
             CHUNKER_VERSION,
-            parsing.backend,
+            parsing.model_dump_json(),  # backend + OCR/antiword switches and thresholds (S4)
             chunking.model_dump_json(),
             classification.model_dump_json(),
             embedding_profile_key,

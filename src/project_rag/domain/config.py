@@ -163,9 +163,67 @@ class EmbeddingConfig(_Cfg):
         )
 
 
+class OcrConfig(_Cfg):
+    """OCR for scanned PDFs (ocrmypdf) and images (tesseract), spec §6.5 / A11.
+
+    Image text is kept only when it has >= `min_chars` characters at >= `min_mean_conf` mean word
+    confidence (tesseract 0-100); otherwise the image is NO_TEXT (event photos). The thresholds are
+    tuned on the YP corpus in S4 and recorded in DECISIONS.
+    """
+
+    enabled: bool = False
+    languages: str = "bul+eng"
+    min_chars: int = 40
+    min_mean_conf: float = 60.0
+    image_extensions: list[str] = Field(
+        default_factory=lambda: [".png", ".jpg", ".jpeg", ".tif", ".tiff", ".bmp"]
+    )
+    timeout_s: float = 300.0
+
+
 class ParsingConfig(_Cfg):
     backend: str = "native"
     detect_scanned_pdf: bool = True
+    ocr: OcrConfig = Field(default_factory=OcrConfig)
+    antiword: bool = False  # legacy .doc via antiword (D-10); needs the binary
+    antiword_timeout_s: float = 60.0
+
+
+class IngestConfig(_Cfg):
+    """Exclusions and isolation policy (S4). Exclusions mirror the rclone filters (S8, D-9):
+    excluded files never enter the catalog, the generation id or coverage."""
+
+    exclude_extensions: list[str] = Field(
+        default_factory=lambda: [
+            ".mp4",
+            ".mov",
+            ".m4a",
+            ".mp3",
+            ".wav",
+            ".avi",
+            ".mkv",
+            ".webm",
+            ".m4v",
+            ".wmv",
+        ]
+    )
+    exclude_name_globs: list[str] = Field(
+        default_factory=lambda: [
+            "~$*",
+            ".~*",
+            "*.tmp",
+            "*.lock",
+            "*~",
+            "Thumbs.db",
+            "desktop.ini",
+            ".DS_Store",
+        ]
+    )
+    max_file_bytes: int = 200_000_000
+    # A run aborts (nothing published, previous generation stays) when embedding fails for at
+    # least `abort_min_failures` documents AND more than this fraction of those needing vectors.
+    max_embed_failure_fraction: float = 0.25
+    abort_min_failures: int = 3
 
 
 class VectorStoreConfig(_Cfg):
@@ -330,6 +388,7 @@ class Config(_Cfg):
     retrieval: RetrievalConfig = Field(default_factory=RetrievalConfig)
     security: SecurityConfig = Field(default_factory=SecurityConfig)
     classification: ClassificationConfig = Field(default_factory=ClassificationConfig)
+    ingest: IngestConfig = Field(default_factory=IngestConfig)
 
     def assert_release_safe(self) -> list[str]:
         """Release guard (v2 §D1/D3, A01): fakes are not valid production backends.

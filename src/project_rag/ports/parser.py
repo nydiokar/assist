@@ -19,3 +19,7 @@ class DocumentParser(Protocol):
     """Dispatches any file to the right format parser (UNSUPPORTED when none applies)."""
 
     def parse(self, abs_path: str, source_path: str, ext: str) -> ParsedDocument: ...
+
+    def supported_extensions(self) -> frozenset[str]:
+        """Lower-case extensions (with dot) this parser turns into text."""
+        ...

@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Protocol
 
-from ..domain.models import DocumentRecord, EmbeddingProfile
+from ..domain.models import DocumentRecord, EmbeddingProfile, RunReport
 
 
 class Catalog(Protocol):
@@ -53,6 +53,10 @@ class Catalog(Protocol):
 
     def stale_generations(self) -> list[tuple[str, str]]:
         """Non-active (project_id, generation) pairs: crashed stagings and unfinished deletes."""
+        ...
+
+    def record_run(self, report: RunReport) -> None:
+        """Persist one ingest run report (table `run_reports`)."""
         ...
 
     def close(self) -> None: ...
