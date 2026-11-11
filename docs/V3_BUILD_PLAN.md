@@ -104,7 +104,7 @@ flowchart TD
 
 | Stage | Status | Depends on | Owner preconditions | Evidence commit | Closed |
 |---|---|---|---|---|---|
-| S0 | todo | — | — | | |
+| S0 | done | — | — | `36b1ec9` | 2026-11-11 |
 | S1 | todo | S0 | — | | |
 | S2 | todo | S1 | — | | |
 | S3 | todo | S1 | — | | |
@@ -409,6 +409,14 @@ The agent records all three in §3.
 Format: `YYYY-MM-DD · Stage · event · evidence (commands + one-line results, commit SHAs)`
 
 - 2026-11-11 · — · plan created; spec v3.0 adopted as A03 · spec commits `bda229a`, `4980e48`
+- 2026-11-11 · S0 · closed · commits `4c60919` (uv lock + extras serve/dev/dev-gpu + dev tools; ruff rules pinned in pyproject: the old run relied on ambient defaults), `f8226a3` (ruff --fix/format, behaviour-neutral), `36b1ec9` (golden snapshot, CI, pyright baseline, `.gitattributes`). Checks:
+  - `uv run pytest -p no:cacheprovider` → **107 passed** (was 103 passed + 1 skipped; `mcp` now in `dev`, so `test_rag_mcp_server.py` runs; +1 golden test).
+  - `uv run pytest tests/evaluation/test_golden_snapshot.py` → 1 passed; after changing one `top_score` in `golden/v2_baseline.json` (0.032787→0.032788) → **1 failed** (AssertionError); reverted → 1 passed. Snapshot = 2 variants (defaults; fusion-score abstention + suppression + context expansion: 1 suppressed query, 70 expanded passages), ingest + idempotent re-ingest + status + 15 queries.
+  - Finding: on this Windows checkout (`core.autocrlf=true`) the fixture `.md`/`.csv` were CRLF in the worktree but LF in the index, so content hashes (→ version/generation ids) differed by OS. Fixed with `.gitattributes` `tests/fixtures/** -text`; CI on Linux reproduces the Windows golden byte-for-byte.
+  - `gh run view 43034898571` → **success**: ruff "All checks passed!", "78 files already formatted", "106 passed, 1 skipped" (chroma test skips without `dev-gpu`).
+  - `UV_PROJECT_ENVIRONMENT=<scratch> uv sync --frozen --extra dev` on an empty venv → ok (8.8 s); offline tiers 106 passed, 1 skipped.
+  - `uv run pyright` (basic, `src/`) baseline → **7 errors** (api.py:200 + retrieval.py:173-174 `channels` annotated `dict[str,int]` but a `tuple[str,...]` flows; vector_store.py:219-222 chroma Optional/Mapping typing). Fixed in S1 when the packages go strict.
+  - Toolchain note: the pip-era `.venv\Scripts\pytest.exe` launcher was stale (exit 1, no output); `uv sync --reinstall-package pytest` fixed it.
 
 ## 6. Owner queue and open issues
 
