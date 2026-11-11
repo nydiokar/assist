@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from project_rag.evaluation import evaluate, load_questions
+from project_rag.services.eval import evaluate, load_questions
 
 QUESTIONS = (
     Path(__file__).resolve().parents[2] / "eval" / "archive" / "questions_synthetic_gv.jsonl"

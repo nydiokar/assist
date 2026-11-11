@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from project_rag.config import ParsingConfig
-from project_rag.parsers import ParserRegistry
-from project_rag.schema import BlockType, DocState
+from project_rag.adapters.parse_registry import ParserRegistry
+from project_rag.domain.config import ParsingConfig
+from project_rag.domain.models import BlockType, DocState
 
 
 def _reg() -> ParserRegistry:

@@ -8,10 +8,10 @@ renumbered 1..n and rerank_score is recorded for audit.
 
 from __future__ import annotations
 
-from project_rag.config import RerankConfig
+from project_rag.adapters.rerank_torch import CrossEncoderReranker
 from project_rag.core.ranking import apply_rerank_scores
-from project_rag.rerank import CrossEncoderReranker
-from project_rag.schema import RetrievedResult, SourceLocation
+from project_rag.domain.config import RerankConfig
+from project_rag.domain.models import RetrievedResult, SourceLocation
 
 
 class _FakeCrossEncoder:

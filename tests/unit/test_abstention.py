@@ -10,9 +10,9 @@ numbers.
 
 from __future__ import annotations
 
-from project_rag.api import assess_evidence
-from project_rag.config import AbstentionConfig
-from project_rag.schema import RetrievedResult, SourceLocation
+from project_rag.core.abstention import assess_evidence
+from project_rag.domain.config import AbstentionConfig
+from project_rag.domain.models import RetrievedResult, SourceLocation
 
 
 def _result(score_key: str, score: float) -> RetrievedResult:

@@ -10,8 +10,9 @@ import argparse
 from pathlib import Path
 
 from project_rag.api import ProjectRAG
-from project_rag.config import load_config, with_overrides
-from project_rag.evaluation import load_questions
+from project_rag.domain.config import with_overrides
+from project_rag.services.eval import load_questions
+from project_rag.wiring import load_config
 
 
 def main() -> None:

@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from project_rag.config import RetrievalConfig
-from project_rag.retrieval import fuse_and_rank
-from project_rag.schema import ChannelHit, HitPayload, SourceLocation
+from project_rag.core.ranking import fuse_and_rank
+from project_rag.domain.config import RetrievalConfig
+from project_rag.domain.models import ChannelHit, HitPayload, SourceLocation
 
 
 def _ingest(rag, root):

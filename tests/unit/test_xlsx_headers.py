@@ -6,8 +6,8 @@ from pathlib import Path
 
 from openpyxl import Workbook
 
-from project_rag.config import ParsingConfig
-from project_rag.parsers import ParserRegistry
+from project_rag.adapters.parse_registry import ParserRegistry
+from project_rag.domain.config import ParsingConfig
 
 
 def _rows(path: Path) -> list[str]:

@@ -66,7 +66,7 @@ def _check_imports() -> None:
 
 def run_ingest(config_path: str, project: str, root: str) -> None:
     from project_rag.api import ProjectRAG
-    from project_rag.schema import DocState
+    from project_rag.domain.models import DocState
 
     log(f"=== INGEST  config={config_path}  project={project}  root={root}")
     rag = ProjectRAG(config_path=config_path)
@@ -140,9 +140,9 @@ def run_ingest(config_path: str, project: str, root: str) -> None:
 
 
 def validate_labels(questions: list, root: Path) -> None:
-    from project_rag.config import load_config
-    from project_rag.discovery import _long_path
-    from project_rag.parsers import ParserRegistry
+    from project_rag.adapters.corpus_local_fs import _long_path
+    from project_rag.adapters.parse_registry import ParserRegistry
+    from project_rag.wiring import load_config
 
     reg = ParserRegistry(load_config(None).parsing)
     cache: dict[str, str] = {}
@@ -178,7 +178,7 @@ def run_eval(
     do_validate: bool,
 ) -> dict:
     from project_rag.api import ProjectRAG
-    from project_rag.evaluation import evaluate, load_questions
+    from project_rag.services.eval import evaluate, load_questions
 
     all_results: dict[str, object] = {}
     out_path = Path("eval/results") / f"{run_name}.json"

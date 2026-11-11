@@ -1,64 +1,41 @@
-"""Public tool contracts (v1 §3.2). The single entrypoint AI-Team binds to at WP4.
+"""In-process compatibility facade over the services (spec A03 §15.3 move rules).
 
-ProjectRAG wires config → embedder/stores/manifest/parsers and exposes:
-  ingest_project, search_project, open_source, get_ingestion_status.
-Project root paths are held server-side per project (never taken from the LLM) to honor the
-path-safety and project-scope rules (v1 §8). Query text is bounded and validated.
+`ProjectRAG` keeps the prototype's public surface (ingest_project, search_project, open_source,
+get_ingestion_status, register_project_root, traces, close) for `scripts/` and the tests. It holds
+no logic: everything is built by `wiring.build` and delegated to IngestService / SearchService.
+It is removed once the scripts call the services directly.
 """
 
 from __future__ import annotations
 
-from pathlib import Path
+from collections.abc import Mapping
 
-from .adapters.parse_registry import ParserRegistry
-from .adapters.sqlite.catalog import SqliteCatalog as Manifest
-from .adapters.sqlite.fts5 import Fts5LexicalIndex as LexicalStore
-from .config import Config, load_config
-from .core.abstention import assess_evidence
-from .expand import attach_expanded_context
-from .indexing import IndexingService
-from .retrieval import Retriever
-from .schema import (
+from .domain.config import Config
+from .domain.models import (
     IngestReport,
+    QueryTrace,
     SearchResponse,
     SourceLocation,
     SourceResponse,
     StatusReport,
 )
-from .sources import open_source as _open_source
-from .trace import QueryTrace, new_query_id, query_hash, timer
-from .wiring import build_embedder, build_vector_store
+from .wiring import Services, build, load_config
 
 
 class ProjectRAG:
     def __init__(self, config: Config | None = None, config_path: str | None = None) -> None:
-        self._cfg = config or load_config(config_path)
-        self._embedder = build_embedder(self._cfg.embedding)
-        self._vs = build_vector_store(self._cfg.vector_store)
-        self._lx = LexicalStore(self._cfg.lexical_store.path)
-        self._manifest = Manifest(self._cfg.lexical_store.path)
-        self._registry = ParserRegistry(self._cfg.parsing)
-        cache_root = str(Path(self._cfg.lexical_store.path).resolve().parent / "cache")
-        self._indexer = IndexingService(
-            self._cfg,
-            self._embedder,
-            self._vs,
-            self._lx,
-            self._manifest,
-            self._registry,
-            cache_root=cache_root,
-        )
-        self._retriever = Retriever(self._embedder, self._vs, self._lx, self._cfg.retrieval)
-        self._roots: dict[str, str] = {}  # project_id -> server-side root
-        self._last_traces: list[QueryTrace] = []
+        self._services = build(config or load_config(config_path))
 
     @property
     def config(self) -> Config:
-        return self._cfg
+        return self._services.config
+
+    @property
+    def services(self) -> Services:
+        return self._services
 
     def register_project_root(self, project_id: str, root_path: str) -> None:
-        """Server-side binding of project scope (v1 §4.6: never trust client project_id alone)."""
-        self._roots[project_id] = str(Path(root_path).resolve())
+        self._services.search.register_project_root(project_id, root_path)
 
     # ---- tool contracts ----
 
@@ -66,7 +43,7 @@ class ProjectRAG:
         self, project_id: str, root_path: str, *, dry_run: bool = False
     ) -> IngestReport:
         self.register_project_root(project_id, root_path)
-        return self._indexer.ingest(project_id, root_path, dry_run=dry_run)
+        return self._services.ingest.ingest(project_id, root_path, dry_run=dry_run)
 
     def search_project(
         self,
@@ -74,107 +51,11 @@ class ProjectRAG:
         query: str,
         *,
         top_k: int | None = None,
-        filters: dict | None = None,
+        filters: Mapping[str, object] | None = None,
         as_of: str | None = None,
     ) -> SearchResponse:
-        warnings: list[str] = []
-        if len(query) > self._cfg.security.max_query_chars:
-            query = query[: self._cfg.security.max_query_chars]
-            warnings.append("query truncated to max_query_chars")
-        if as_of is not None:
-            warnings.append("as_of ignored: source-effective dates not established (v1 §4.8)")
-        doc_class: str | None = None
-        channels: tuple[str, ...] = ("dense", "lexical")
-        for key, val in (filters or {}).items():
-            if key == "doc_class" and val in {"project_record", "reference", "filesystem"}:
-                doc_class = val
-            elif key == "channels" and val and set(val) <= {"dense", "lexical"}:
-                channels = tuple(val)  # evaluation baselines (v1 §6.1 B/C/D)
-            else:
-                warnings.append(f"unsupported filter ignored: {key}")
-
-        gen = self._manifest.active_generation(project_id)
-        qid = new_query_id(project_id, query, nonce=gen or "none")
-        if gen is None:
-            self._last_traces.append(
-                QueryTrace(
-                    query_id=qid,
-                    tool="search_project",
-                    project_id=project_id,
-                    query_hash=query_hash(query),
-                    index_generation="",
-                    result_count=0,
-                    warnings=["no active generation"],
-                )
-            )
-            return SearchResponse(
-                query_id=qid,
-                project_id=project_id,
-                index_generation="",
-                results=[],
-                warnings=[*warnings, "no active generation"],
-            )
-
-        t = timer()
-        with t.span("retrieve"):
-            results, channel_counts = self._retriever.retrieve(
-                project_id,
-                gen,
-                query,
-                self._cfg.security.max_result_excerpt_chars,
-                doc_class=doc_class,
-                channels=channels,
-            )
-        if top_k is not None:
-            results = results[:top_k]
-
-        # Evidence-sufficiency gate (v1 §6.2 abstention, F16). Computed from the top-1 relevance
-        # score; the verdict is always attached. If configured, insufficient evidence suppresses
-        # the passages so a downstream LLM gets an explicit no-evidence signal (v1 §5.2) rather
-        # than plausible-but-irrelevant chunks to confabulate over.
-        verdict, ev_warnings = assess_evidence(results, self._cfg.retrieval.abstention)
-        warnings.extend(ev_warnings)
-        served = results
-        if (
-            verdict.enabled
-            and not verdict.sufficient
-            and self._cfg.retrieval.abstention.suppress_on_insufficient
-        ):
-            served = []
-            warnings.append(
-                "insufficient evidence: top relevance "
-                f"{verdict.top_score:.3f} < {verdict.threshold:.3f}; passages withheld"
-            )
-
-        # Parent-section context expansion (v1 §7, F12/F9 chunk-granularity gap). Query-time,
-        # additive: widen the evidence window around each served chunk so a WP4 answerer can
-        # recover answers the top chunk alone did not carry (measured span@5 0.718 vs 0.667).
-        # Only on served (non-suppressed) passages; the verbatim excerpt is kept.
-        if served and self._cfg.retrieval.context_expansion.enabled:
-            served = attach_expanded_context(
-                self, project_id, served, max_chars=self._cfg.retrieval.context_expansion.max_chars
-            )
-
-        trace = QueryTrace(
-            query_id=qid,
-            tool="search_project",
-            project_id=project_id,
-            query_hash=query_hash(query),
-            index_generation=gen,
-            retrieved_chunk_ids=[r.chunk_id for r in served],
-            channels=channel_counts,
-            result_count=len(served),
-            timings_ms=t.timings_ms,
-            warnings=warnings,
-        )
-        self._last_traces.append(trace)
-        return SearchResponse(
-            query_id=qid,
-            project_id=project_id,
-            index_generation=gen,
-            results=served,
-            evidence=verdict,
-            warnings=warnings,
+        return self._services.search.search_project(
+            project_id, query, top_k=top_k, filters=filters, as_of=as_of
         )
 
     def open_source(
@@ -186,43 +67,21 @@ class ProjectRAG:
         location: SourceLocation | None = None,
         max_chars: int | None = None,
     ) -> SourceResponse:
-        root = self._roots.get(project_id)
-        if root is None:
-            return SourceResponse(
-                project_id=project_id,
-                document_id=document_id,
-                source_path=source_path or "",
-                location=location,
-                excerpt="",
-                warnings=["project root not registered server-side"],
-            )
-        if source_path is None:
-            return SourceResponse(
-                project_id=project_id,
-                document_id=document_id,
-                source_path="",
-                location=location,
-                excerpt="",
-                warnings=["source_path required to resolve document"],
-            )
-        return _open_source(
-            project_id=project_id,
-            document_id=document_id,
-            root_path=root,
+        return self._services.search.open_source(
+            project_id,
+            document_id,
             source_path=source_path,
-            registry=self._registry,
             location=location,
-            max_chars=max_chars or self._cfg.retrieval.max_source_chars,
+            max_chars=max_chars,
         )
 
     def get_ingestion_status(self, project_id: str) -> StatusReport:
-        return self._indexer.status(project_id)
+        return self._services.ingest.status(project_id)
 
     # ---- diagnostics (grounding gate support, v1 §5.2) ----
     @property
     def traces(self) -> list[QueryTrace]:
-        return self._last_traces
+        return self._services.search.traces
 
     def close(self) -> None:
-        self._lx.close()
-        self._manifest.close()
+        self._services.close()

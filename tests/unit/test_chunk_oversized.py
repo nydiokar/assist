@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from project_rag.chunking import chunk_document
-from project_rag.config import ChunkingConfig
-from project_rag.schema import Block, BlockType, DocState, ParsedDocument, SourceLocation
+from project_rag.core.chunking import chunk_document
+from project_rag.domain.config import ChunkingConfig
+from project_rag.domain.models import Block, BlockType, DocState, ParsedDocument, SourceLocation
 
 
 def test_giant_xlsx_row_is_split_not_truncated() -> None:

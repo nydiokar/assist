@@ -15,7 +15,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from .schema import RetrievedResult, SearchResponse
+from ..domain.models import RetrievedResult, SearchResponse
 
 # v1 §5.2 — the exact abstention statement the retriever's verdict maps to.
 ABSTENTION_LINE = "Not established from accessible project documents."

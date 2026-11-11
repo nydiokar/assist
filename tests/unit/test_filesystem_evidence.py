@@ -7,8 +7,8 @@ present; filenames are listed (capped); ids are deterministic and change when th
 
 from __future__ import annotations
 
-from project_rag.discovery import DiscoveredFile
-from project_rag.filesystem import FILESYSTEM_DOC_CLASS, build_filesystem_chunks
+from project_rag.core.filesystem_evidence import FILESYSTEM_DOC_CLASS, build_filesystem_chunks
+from project_rag.domain.models import DiscoveredFile
 
 
 def _df(path: str, supported: bool, chash: str = "h") -> DiscoveredFile:

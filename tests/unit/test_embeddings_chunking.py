@@ -4,10 +4,10 @@ from __future__ import annotations
 
 import numpy as np
 
-from project_rag.chunking import chunk_document
-from project_rag.config import ChunkingConfig, EmbeddingConfig
-from project_rag.embeddings import HashEmbedder
-from project_rag.schema import Block, BlockType, DocState, ParsedDocument, SourceLocation
+from project_rag.adapters.embed_hash import HashEmbedder
+from project_rag.core.chunking import chunk_document
+from project_rag.domain.config import ChunkingConfig, EmbeddingConfig
+from project_rag.domain.models import Block, BlockType, DocState, ParsedDocument, SourceLocation
 
 
 def test_hash_embedder_dim_and_normalized():

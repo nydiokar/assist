@@ -16,9 +16,10 @@ from pathlib import Path
 
 from pydantic import BaseModel, Field
 
-from project_rag.config import ParsingConfig
-from project_rag.discovery import DiscoveredFile, discover
-from project_rag.parsers import ParserRegistry
+from project_rag.adapters.corpus_local_fs import discover
+from project_rag.adapters.parse_registry import ParserRegistry
+from project_rag.domain.config import ParsingConfig
+from project_rag.domain.models import DiscoveredFile
 
 MEDIA: frozenset[str] = frozenset({".mp4", ".mov", ".m4a", ".mp3", ".wav", ".avi"})
 IMAGES: frozenset[str] = frozenset({".png", ".jpg", ".jpeg", ".gif", ".bmp", ".webp", ".tif"})

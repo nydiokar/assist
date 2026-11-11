@@ -19,7 +19,7 @@ import sys
 import time
 from pathlib import Path
 
-from project_rag.gpu_env import describe_gpu_env, prepare_gpu_env
+from project_rag.adapters.gpu_env import describe_gpu_env, prepare_gpu_env
 
 REPORT = Path(__file__).resolve().parents[1] / "eval" / "results" / "feasibility_smoke.json"
 
@@ -66,8 +66,8 @@ def main() -> int:
     report["cuda_runtime"] = torch.version.cuda
 
     # 2) load model + encode
-    from project_rag.config import load_config, with_overrides
-    from project_rag.embeddings import build_embedder
+    from project_rag.domain.config import with_overrides
+    from project_rag.wiring import build_embedder, load_config
 
     cfg = with_overrides(load_config(), {"embedding.provider": "qwen3"})
     report["model_id"] = cfg.embedding.qwen3.model

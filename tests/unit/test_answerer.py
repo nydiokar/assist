@@ -8,17 +8,17 @@ stdio MCP server (`project_rag.mcp_server`), not here.
 
 from __future__ import annotations
 
-from project_rag.answerer import (
-    ABSTENTION_LINE,
-    SYSTEM_PROMPT,
-    answer_from_search,
-    build_grounding_prompt,
-)
-from project_rag.schema import (
+from project_rag.domain.models import (
     EvidenceVerdict,
     RetrievedResult,
     SearchResponse,
     SourceLocation,
+)
+from project_rag.services.answerer import (
+    ABSTENTION_LINE,
+    SYSTEM_PROMPT,
+    answer_from_search,
+    build_grounding_prompt,
 )
 
 

@@ -21,7 +21,7 @@ from pathlib import Path
 import pytest
 
 from project_rag.api import ProjectRAG
-from project_rag.evaluation import load_questions
+from project_rag.services.eval import load_questions
 from tests.conftest import _config
 
 ROOT = Path(__file__).resolve().parents[2]

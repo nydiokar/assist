@@ -5,7 +5,7 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-from project_rag.discovery import discover
+from project_rag.adapters.corpus_local_fs import discover
 
 
 def test_discover_path_longer_than_260(tmp_path: Path) -> None:

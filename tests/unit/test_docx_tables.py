@@ -6,9 +6,9 @@ from pathlib import Path
 
 import docx
 
-from project_rag.config import ParsingConfig
-from project_rag.parsers import ParserRegistry
-from project_rag.schema import BlockType
+from project_rag.adapters.parse_registry import ParserRegistry
+from project_rag.domain.config import ParsingConfig
+from project_rag.domain.models import BlockType
 
 
 def _parse(path: Path):
@@ -50,7 +50,7 @@ def test_real_header_row_is_used_as_header(tmp_path: Path) -> None:
 
 
 def test_pdf_whitespace_only_lines_do_not_split_every_word() -> None:
-    from project_rag.parsers import _split_paragraphs
+    from project_rag.adapters.parse_native import _split_paragraphs
 
     text = "Възложител:  Община \nВарна,\n \nдейност\n \n369\n\nНов абзац"
     assert _split_paragraphs(text, strict_blank=True) == [

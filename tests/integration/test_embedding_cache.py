@@ -9,7 +9,7 @@ def test_only_changed_chunks_are_reembedded(make_rag, corpus_root, tmp_path):
     root = tmp_path / "corpus"
     shutil.copytree(corpus_root, root)
     rag = make_rag()
-    emb = rag._indexer._embedder
+    emb = rag.services.ingest.embedder
     seen: list[int] = []
     orig = emb.embed_passages
     emb.embed_passages = lambda texts: (seen.append(len(texts)), orig(texts))[1]

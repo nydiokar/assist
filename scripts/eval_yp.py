@@ -13,11 +13,11 @@ import argparse
 import json
 from pathlib import Path
 
+from project_rag.adapters.corpus_local_fs import _long_path
+from project_rag.adapters.parse_registry import ParserRegistry
 from project_rag.api import ProjectRAG
-from project_rag.config import load_config
-from project_rag.discovery import _long_path
-from project_rag.evaluation import EvalQuestion, evaluate, load_questions
-from project_rag.parsers import ParserRegistry
+from project_rag.services.eval import EvalQuestion, evaluate, load_questions
+from project_rag.wiring import load_config
 
 
 def validate_labels(questions: list[EvalQuestion], root: Path) -> list[str]:

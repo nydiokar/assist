@@ -19,8 +19,7 @@ import json
 from pathlib import Path
 
 from project_rag.api import ProjectRAG
-from project_rag.evaluation import load_questions
-from project_rag.expand import expand_result_context
+from project_rag.services.eval import load_questions
 
 
 def main() -> None:
@@ -54,7 +53,9 @@ def main() -> None:
             # span@5: substring in the EXPANDED context of any top-5 expected-source hit
             expanded_texts: list[str] = []
             for r in from_expected:
-                ctx = expand_result_context(rag, args.project, r, max_chars=args.max_chars)
+                ctx = rag.services.search.expand_result_context(
+                    args.project, r, max_chars=args.max_chars
+                )
                 expanded_texts.append(ctx)
             span = bool(expanded_texts) and all(
                 any(sub in ex for ex in expanded_texts) for sub in q.expect_substrings

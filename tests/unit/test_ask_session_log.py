@@ -10,7 +10,7 @@ from __future__ import annotations
 import importlib.util
 from pathlib import Path
 
-from project_rag.schema import (
+from project_rag.domain.models import (
     EvidenceVerdict,
     RetrievedResult,
     SearchResponse,

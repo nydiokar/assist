@@ -34,8 +34,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
-from project_rag.ai_team_adapter import RAG_SERVER_NAME, RAG_TOOL_NAMES
-from project_rag.answerer import ABSTENTION_LINE, SYSTEM_PROMPT
+from project_rag.interfaces.mcp.tools import RAG_SERVER_NAME, RAG_TOOL_NAMES
+from project_rag.services.answerer import ABSTENTION_LINE, SYSTEM_PROMPT
 
 # Execution directive layered ON TOP of the pure grounding contract (SYSTEM_PROMPT). It makes the
 # agent actually CALL the tool instead of answering from a first glance, and read the exact value

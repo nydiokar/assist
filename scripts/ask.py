@@ -27,7 +27,7 @@ import json
 from pathlib import Path
 
 from project_rag.api import ProjectRAG
-from project_rag.schema import SearchResponse
+from project_rag.domain.models import SearchResponse
 
 
 def _print_response(res: SearchResponse, show_context: bool) -> None:

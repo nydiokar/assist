@@ -22,7 +22,7 @@ import numpy as np
 from project_rag.api import ProjectRAG
 from project_rag.core.fusion import rrf_fuse
 from project_rag.domain.models import ChannelHit
-from project_rag.evaluation import load_questions
+from project_rag.services.eval import load_questions
 
 CONFIG = "configs/yp_qwen4b_gpu.yaml"
 PROJECT = "ypq"
@@ -43,7 +43,7 @@ def fuse_raw(dense: list[ChannelHit], lexical: list[ChannelHit], k: int) -> list
 def main() -> None:
     rag = ProjectRAG(config_path=CONFIG)
     rag.register_project_root(PROJECT, ROOT)
-    gen = rag._manifest.active_generation(PROJECT)
+    gen = rag.services.catalog.active_generation(PROJECT)
     questions = [
         q for q in load_questions(QUESTIONS) if q.kind != "no_answer" and q.expect_source_paths
     ]
@@ -53,9 +53,9 @@ def main() -> None:
     miss_detail: list[dict] = []
 
     for q in questions:
-        qvec = rag._embedder.embed_queries([q.query])[0]
-        dense = rag._vs.query(PROJECT, gen, np.asarray(qvec), POOL, None)
-        lexical = rag._lx.search(PROJECT, gen, q.query, POOL, None)
+        qvec = rag.services.embedder.embed_queries([q.query])[0]
+        dense = rag.services.vector.query(PROJECT, gen, np.asarray(qvec), POOL, None)
+        lexical = rag.services.lexical.search(PROJECT, gen, q.query, POOL, None)
         fused = fuse_raw(dense, lexical, 60)
 
         def doc_hit(n: int, q=q, fused=fused) -> bool:

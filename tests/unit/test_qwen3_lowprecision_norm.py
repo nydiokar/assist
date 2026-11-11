@@ -6,8 +6,8 @@ from typing import ClassVar
 
 import numpy as np
 
-from project_rag.config import EmbeddingConfig, Qwen3Config
-from project_rag.embeddings import Qwen3Embedder
+from project_rag.adapters.embed_torch import Qwen3Embedder
+from project_rag.domain.config import EmbeddingConfig, Qwen3Config
 
 
 class _FakeBf16Model:

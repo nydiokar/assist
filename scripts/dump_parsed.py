@@ -9,9 +9,9 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from project_rag.config import load_config
-from project_rag.discovery import _long_path
-from project_rag.parsers import ParserRegistry
+from project_rag.adapters.corpus_local_fs import _long_path
+from project_rag.adapters.parse_registry import ParserRegistry
+from project_rag.wiring import load_config
 
 
 def main() -> None:

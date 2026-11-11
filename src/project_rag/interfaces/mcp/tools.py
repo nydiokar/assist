@@ -2,7 +2,7 @@
 
 Defines the read-only tool descriptors (name, description, JSON schema, bound handler) that RAG
 exposes to any agent. The live transport is a standalone **stdio MCP server**
-(`project_rag.mcp_server`), registered in a project's `.mcp.json` and loaded by Claude Code /
+(entry module `project_rag.mcp_server`), registered in a project's `.mcp.json` and loaded by Claude Code /
 AI-Team at session start — no harness/backend code is modified. This module is the thin,
 transport-agnostic contract the MCP server (and any other adapter) consumes.
 
@@ -12,10 +12,11 @@ never taken from the LLM (v1 §4.6/§5.1 step 1). Tools are read-only; no filesy
 
 from __future__ import annotations
 
+import json
 from collections.abc import Callable
 from dataclasses import dataclass
 
-from .api import ProjectRAG
+from ..api_protocol import AssistantAPI
 
 # MCP identity. Tool names are what the agent calls; the server name is the `.mcp.json` key.
 RAG_SERVER_NAME = "project-rag"
@@ -39,10 +40,10 @@ class ToolDescriptor:
     description: str
     read_only: bool
     handler: Callable[..., object]
-    json_schema: dict
+    json_schema: dict[str, object]
 
 
-def build_tool_descriptors(rag: ProjectRAG, project_id: str) -> list[ToolDescriptor]:
+def build_tool_descriptors(rag: AssistantAPI, project_id: str) -> list[ToolDescriptor]:
     """Return descriptors bound to a server-resolved project scope.
 
     project_id is resolved from verified application/session context BEFORE this call — it is
@@ -109,3 +110,57 @@ def tool_result_is_error(payload: object) -> bool:
     return bool(warnings) and any(
         "not registered" in str(w) or "no active generation" in str(w) for w in warnings
     )
+
+
+def build_server(rag: AssistantAPI, project_id: str):  # returns mcp MCPServer
+    """Construct the MCPServer bound to a warm ProjectRAG + server-resolved project_id.
+
+    `project_id` is captured in the closures below — the LLM never supplies it (v1 §4.6). Calls run
+    synchronously in the handler: a stdio MCP server serves ONE client serially, so there is no
+    concurrency to gain by offloading, and ProjectRAG holds thread-affine SQLite connections
+    (manifest + lexical store) that must be used on the thread that created them — so we must NOT
+    hop threads (asyncio.to_thread would raise SQLite's cross-thread error). A fatal payload
+    (project not registered, no active generation) is raised so the agent sees an MCP tool error,
+    not a silent empty result.
+    """
+    from mcp.server import MCPServer
+
+    try:  # a deliberately-raised ToolError keeps its text for the agent; a bare crash does not
+        from mcp.server.mcpserver.exceptions import ToolError
+    except ImportError:  # pragma: no cover - fallback if the import path differs
+        ToolError = RuntimeError  # type: ignore[assignment,misc]
+
+    server = MCPServer(name=RAG_SERVER_NAME, version="1.0.0")
+
+    def _dump(payload) -> str:
+        text = json.dumps(payload, ensure_ascii=False, default=str)
+        if tool_result_is_error(payload):
+            raise ToolError(text)
+        return text
+
+    @server.tool(
+        name="search_project",
+        description="Retrieve source-backed passages for the active project. " + GROUNDING_GUIDANCE,
+    )
+    async def search_project(query: str, top_k: int = 5) -> str:
+        res = rag.search_project(project_id, query, top_k=top_k)
+        return _dump(res.model_dump())
+
+    @server.tool(
+        name="open_source",
+        description="Return the exact original excerpt for a retrieved document/location "
+        "to verify a span before citing a numeric or named fact.",
+    )
+    async def open_source(document_id: str, source_path: str, max_chars: int = 6000) -> str:
+        res = rag.open_source(project_id, document_id, source_path=source_path, max_chars=max_chars)
+        return _dump(res.model_dump())
+
+    @server.tool(
+        name="get_ingestion_status",
+        description="Report corpus ingestion health/coverage for the active project.",
+    )
+    async def get_ingestion_status() -> str:
+        res = rag.get_ingestion_status(project_id)
+        return _dump(res.model_dump())
+
+    return server

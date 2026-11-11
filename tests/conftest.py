@@ -10,7 +10,7 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from project_rag.api import ProjectRAG
-from project_rag.config import Config, with_overrides
+from project_rag.domain.config import Config, with_overrides
 
 FIXTURE_CORPUS = Path(__file__).resolve().parent / "fixtures" / "synthetic" / "ngo_project_demo"
 

@@ -7,11 +7,26 @@ scored as a separate abstention signal (expected empty / weak retrieval), not as
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from pathlib import Path
+from typing import Protocol
 
 from pydantic import BaseModel
 
-from .api import ProjectRAG
+from ..domain.models import SearchResponse
+
+
+class SearchesProject(Protocol):
+    """Anything that answers search_project (the SearchService or the ProjectRAG facade)."""
+
+    def search_project(
+        self,
+        project_id: str,
+        query: str,
+        *,
+        top_k: int | None = None,
+        filters: Mapping[str, object] | None = None,
+    ) -> SearchResponse: ...
 
 
 class EvalQuestion(BaseModel):
@@ -21,7 +36,7 @@ class EvalQuestion(BaseModel):
     query: str
     expect_source_paths: list[str]
     expect_substrings: list[str]
-    filters: dict = {}  # forwarded to search_project (doc_class, ...)
+    filters: dict[str, object] = {}  # forwarded to search_project (doc_class, ...)
 
 
 class QuestionResult(BaseModel):
@@ -65,7 +80,7 @@ def load_questions(path: str | Path) -> list[EvalQuestion]:
 
 
 def evaluate(
-    rag: ProjectRAG,
+    rag: SearchesProject,
     project_id: str,
     questions: list[EvalQuestion],
     top_k: int = 5,

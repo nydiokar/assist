@@ -13,7 +13,7 @@ import json
 from pathlib import Path
 
 from project_rag.api import ProjectRAG
-from project_rag.evaluation import load_questions
+from project_rag.services.eval import load_questions
 
 
 def _score(r, key: str) -> float | None:

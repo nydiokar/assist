@@ -8,7 +8,7 @@ correct and reversible.
 
 from __future__ import annotations
 
-from project_rag.query_expansion import expand_query
+from project_rag.core.query_expansion import expand_query
 
 
 def test_same_script_query_unchanged():
