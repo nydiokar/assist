@@ -9,7 +9,7 @@ from __future__ import annotations
 import sqlite3
 from pathlib import Path
 
-from .schema import EmbeddingProfile
+from ...domain.models import DocumentRecord, EmbeddingProfile
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS projects (
@@ -43,7 +43,7 @@ CREATE INDEX IF NOT EXISTS idx_docs_gen ON documents(project_id, generation);
 """
 
 
-class Manifest:
+class SqliteCatalog:
     def __init__(self, path: str | Path) -> None:
         self._path = Path(path)
         self._path.parent.mkdir(parents=True, exist_ok=True)
@@ -87,32 +87,20 @@ class Manifest:
         self._conn.commit()
 
     # ---- generation + document records ----
-    def upsert_document(
-        self,
-        *,
-        project_id: str,
-        source_id: str,
-        source_path: str,
-        content_hash: str,
-        version_id: str,
-        state: str,
-        generation: str,
-        n_chunks: int,
-        diagnostics: str = "",
-    ) -> None:
+    def upsert_document(self, record: DocumentRecord) -> None:
         self._conn.execute(
             "INSERT OR REPLACE INTO documents(project_id, source_id, source_path, content_hash, "
             "version_id, state, generation, n_chunks, diagnostics) VALUES(?,?,?,?,?,?,?,?,?)",
             (
-                project_id,
-                source_id,
-                source_path,
-                content_hash,
-                version_id,
-                state,
-                generation,
-                n_chunks,
-                diagnostics,
+                record.project_id,
+                record.source_id,
+                record.source_path,
+                record.content_hash,
+                record.version_id,
+                record.state,
+                record.generation,
+                record.n_chunks,
+                record.diagnostics,
             ),
         )
         self._conn.commit()
@@ -157,11 +145,25 @@ class Manifest:
         ).fetchall()
         return [r["chunk_id"] for r in rows]
 
-    def document_states(self, project_id: str, generation: str) -> list[sqlite3.Row]:
-        return self._conn.execute(
+    def document_states(self, project_id: str, generation: str) -> list[DocumentRecord]:
+        rows = self._conn.execute(
             "SELECT * FROM documents WHERE project_id=? AND generation=?",
             (project_id, generation),
         ).fetchall()
+        return [
+            DocumentRecord(
+                project_id=r["project_id"],
+                source_id=r["source_id"],
+                source_path=r["source_path"],
+                content_hash=r["content_hash"],
+                version_id=r["version_id"],
+                state=r["state"],
+                generation=r["generation"],
+                n_chunks=r["n_chunks"] or 0,
+                diagnostics=r["diagnostics"] or "",
+            )
+            for r in rows
+        ]
 
     def delete_generation(self, project_id: str, generation: str) -> None:
         self._conn.execute(

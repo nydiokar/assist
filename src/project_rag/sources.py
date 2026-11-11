@@ -8,22 +8,10 @@ inside the root (blocks traversal / symlink escape).
 
 from __future__ import annotations
 
-from pathlib import Path
-
-from .parsers import ParserRegistry
+from .adapters.corpus_local_fs import resolve_within_root
+from .domain.errors import PathOutsideRoot
+from .ports.parser import DocumentParser as ParserRegistry
 from .schema import SourceLocation, SourceResponse
-
-
-class PathTraversalError(Exception):
-    pass
-
-
-def _resolve_within_root(root: Path, source_path: str) -> Path:
-    root_resolved = root.resolve()
-    candidate = (root_resolved / source_path).resolve()
-    if root_resolved != candidate and root_resolved not in candidate.parents:
-        raise PathTraversalError(f"path escapes project root: {source_path}")
-    return candidate
 
 
 def open_source(
@@ -36,10 +24,9 @@ def open_source(
     location: SourceLocation | None = None,
     max_chars: int = 6000,
 ) -> SourceResponse:
-    root = Path(root_path)
     try:
-        abs_path = _resolve_within_root(root, source_path)
-    except PathTraversalError as e:
+        abs_path = resolve_within_root(root_path, source_path)
+    except PathOutsideRoot as e:
         return SourceResponse(
             project_id=project_id,
             document_id=document_id,

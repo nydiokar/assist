@@ -10,14 +10,13 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from .adapters.parse_registry import ParserRegistry
+from .adapters.sqlite.catalog import SqliteCatalog as Manifest
+from .adapters.sqlite.fts5 import Fts5LexicalIndex as LexicalStore
 from .config import Config, load_config
 from .core.abstention import assess_evidence
-from .embeddings import build_embedder
 from .expand import attach_expanded_context
 from .indexing import IndexingService
-from .lexical_store import LexicalStore
-from .manifest import Manifest
-from .parsers import ParserRegistry
 from .retrieval import Retriever
 from .schema import (
     IngestReport,
@@ -28,15 +27,13 @@ from .schema import (
 )
 from .sources import open_source as _open_source
 from .trace import QueryTrace, new_query_id, query_hash, timer
+from .wiring import build_embedder, build_vector_store
 
 
 class ProjectRAG:
     def __init__(self, config: Config | None = None, config_path: str | None = None) -> None:
         self._cfg = config or load_config(config_path)
         self._embedder = build_embedder(self._cfg.embedding)
-        # Vector store built lazily/eagerly here; memory/chroma both via protocol.
-        from .vector_store import build_vector_store
-
         self._vs = build_vector_store(self._cfg.vector_store)
         self._lx = LexicalStore(self._cfg.lexical_store.path)
         self._manifest = Manifest(self._cfg.lexical_store.path)

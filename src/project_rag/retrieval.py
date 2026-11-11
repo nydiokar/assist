@@ -12,9 +12,10 @@ from .core.fusion import rrf as _rrf  # noqa: F401  (re-export for scripts, S1 s
 from .core.query_expansion import expand_query
 from .core.ranking import apply_rerank_scores, fuse_and_rank, truncate_excerpts
 from .domain.models import ChannelHit, RetrievedResult
-from .embeddings import EmbedderProtocol
-from .lexical_store import LexicalStore
-from .vector_store import VectorStoreProtocol
+from .ports.embedder import Embedder as EmbedderProtocol
+from .ports.lexical import LexicalIndex as LexicalStore
+from .ports.vector import VectorIndex as VectorStoreProtocol
+from .wiring import build_reranker
 
 
 class Retriever:
@@ -29,11 +30,7 @@ class Retriever:
         self._vs = vector_store
         self._lx = lexical_store
         self._cfg = cfg
-        self._reranker = None
-        if cfg.rerank.enabled:
-            from .rerank import CrossEncoderReranker
-
-            self._reranker = CrossEncoderReranker(cfg.rerank)
+        self._reranker = build_reranker(cfg.rerank)
 
     def retrieve(
         self,

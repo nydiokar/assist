@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-from project_rag import gpu_env
+from project_rag.adapters import gpu_env
 
 
 def test_prepare_sets_var_on_wsl_with_dxg(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:

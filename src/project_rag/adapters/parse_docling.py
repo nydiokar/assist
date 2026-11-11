@@ -8,7 +8,7 @@ per-format fidelity on the real corpus before relying on it (v1 §4.2 parsing ga
 
 from __future__ import annotations
 
-from .schema import Block, BlockType, DocState, ParsedDocument, SourceLocation
+from ..domain.models import Block, BlockType, DocState, ParsedDocument, SourceLocation
 
 _DOCLING_EXTS = {".pdf", ".docx", ".xlsx"}
 

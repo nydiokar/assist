@@ -11,7 +11,7 @@ from __future__ import annotations
 import sqlite3
 from pathlib import Path
 
-from .domain.models import ChannelHit, Chunk, HitPayload, SourceLocation
+from ...domain.models import ChannelHit, Chunk, HitPayload, SourceLocation
 
 _SCHEMA = """
 CREATE VIRTUAL TABLE IF NOT EXISTS chunk_fts USING fts5(
@@ -38,7 +38,7 @@ def _escape_fts_query(query: str) -> str:
     return " OR ".join(f'"{t}"' for t in terms)
 
 
-class LexicalStore:
+class Fts5LexicalIndex:
     def __init__(self, path: str | Path) -> None:
         self._path = Path(path)
         self._path.parent.mkdir(parents=True, exist_ok=True)

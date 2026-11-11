@@ -14,21 +14,23 @@ from __future__ import annotations
 
 import numpy as np
 
+from .adapters.corpus_local_fs import discover
+from .adapters.sqlite.embedding_cache import SqliteEmbeddingCache as EmbeddingCache
+from .adapters.stage_cache_fs import FsArtifactStore
 from .config import Config
 from .core.corpus_diff import diff_corpus
 from .core.filesystem_evidence import build_filesystem_chunks
 from .core.fingerprint import classify_doc, generation_id, pipeline_fingerprint, text_hash
 from .core.fingerprint import source_id as _source_id
 from .core.fingerprint import version_id as _version_id
-from .discovery import discover
-from .embedding_cache import EmbeddingCache
-from .embeddings import EmbedderProtocol
-from .lexical_store import LexicalStore
-from .manifest import Manifest
-from .parsers import ParserRegistry
+from .domain.models import DocumentRecord
+from .ports.catalog import Catalog as Manifest
+from .ports.embedder import Embedder as EmbedderProtocol
+from .ports.lexical import LexicalIndex as LexicalStore
+from .ports.parser import DocumentParser as ParserRegistry
+from .ports.vector import VectorIndex as VectorStoreProtocol
 from .schema import Chunk, DocState, FileReport, IngestReport, ParsedDocument
 from .stages import StageCache
-from .vector_store import VectorStoreProtocol
 
 
 class IndexingService:
@@ -116,7 +118,7 @@ class IndexingService:
                 )
             return report()
 
-        cache = StageCache(self._cache_root, project_id)
+        cache = StageCache(FsArtifactStore(self._cache_root), project_id)
         token_counter = self._embedder.token_count
         staged_chunks: list[Chunk] = []
         for d in discovered:
@@ -216,15 +218,17 @@ class IndexingService:
                 (d.content_hash for d in discovered if d.source_path == fr.source_path), ""
             )
             self._manifest.upsert_document(
-                project_id=project_id,
-                source_id=fr.source_id,
-                source_path=fr.source_path,
-                content_hash=content_hash,
-                version_id=fr.version_id or "",
-                state=fr.state,
-                generation=new_gen,
-                n_chunks=fr.n_chunks,
-                diagnostics="; ".join(fr.diagnostics),
+                DocumentRecord(
+                    project_id=project_id,
+                    source_id=fr.source_id,
+                    source_path=fr.source_path,
+                    content_hash=content_hash,
+                    version_id=fr.version_id or "",
+                    state=fr.state,
+                    generation=new_gen,
+                    n_chunks=fr.n_chunks,
+                    diagnostics="; ".join(fr.diagnostics),
+                )
             )
 
         # Publish new active generation, then remove superseded derivatives.
@@ -281,8 +285,8 @@ class IndexingService:
         states: dict[str, int] = {}
         n_chunks = 0
         for r in docs:
-            states[r["state"]] = states.get(r["state"], 0) + 1
-            n_chunks += r["n_chunks"] or 0
+            states[r.state] = states.get(r.state, 0) + 1
+            n_chunks += r.n_chunks
         return StatusReport(
             project_id=project_id,
             index_generation=gen,

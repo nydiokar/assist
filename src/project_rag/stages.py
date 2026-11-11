@@ -13,13 +13,14 @@ stages.py owns [1] PARSE and [2] CHUNK, the two stages that are expensive to rec
 
 from __future__ import annotations
 
-from pathlib import Path
+from collections.abc import Callable
 
 from .config import ChunkingConfig, ParsingConfig
 from .core.chunking import chunk_document
-from .core.fingerprint import PARSER_VERSION, chunk_key, chunk_lineage_key, parse_key  # noqa: F401
+from .core.fingerprint import chunk_key, chunk_lineage_key, parse_key
 from .domain.models import ChunkArtifact, ParseArtifact
-from .parsers import ParserRegistry
+from .ports.cache import ArtifactStore
+from .ports.parser import DocumentParser
 
 
 class StageCache:
@@ -30,22 +31,13 @@ class StageCache:
     and addresses must stay separate.
     """
 
-    def __init__(self, root: str | Path, project_id: str) -> None:
-        self._root = Path(root)
-        self._parse_dir = self._root / "_parse_shared"  # cross-project
-        self._chunk_dir = self._root / project_id / "chunk"
-        self._parse_dir.mkdir(parents=True, exist_ok=True)
-        self._chunk_dir.mkdir(parents=True, exist_ok=True)
+    def __init__(self, store: ArtifactStore, project_id: str) -> None:
+        self._store = store
+        self._project_id = project_id
         self.parse_hits = 0
         self.parse_misses = 0
         self.chunk_hits = 0
         self.chunk_misses = 0
-
-    def _parse_path(self, key: str) -> Path:
-        return self._parse_dir / f"{key}.json"
-
-    def _chunk_path(self, key: str) -> Path:
-        return self._chunk_dir / f"{key}.json"
 
     # ---- [1] PARSE ----
     def get_or_parse(
@@ -55,20 +47,20 @@ class StageCache:
         source_path: str,
         ext: str,
         content_hash: str,
-        registry: ParserRegistry,
+        registry: DocumentParser,
         parser_cfg: ParsingConfig,
     ) -> ParseArtifact:
         key = parse_key(content_hash, parser_cfg)
-        p = self._parse_path(key)
-        if p.is_file():
+        cached = self._store.get_parse(key)
+        if cached is not None:
             self.parse_hits += 1
-            return ParseArtifact.model_validate_json(p.read_text(encoding="utf-8"))
+            return cached
         self.parse_misses += 1
         doc = registry.parse(abs_path, source_path, ext)
         art = ParseArtifact(
             artifact_id=key, source_path=source_path, source_content_hash=content_hash, doc=doc
         )
-        p.write_text(art.model_dump_json(), encoding="utf-8")
+        self._store.put_parse(art)
         return art
 
     # ---- [2] CHUNK ----
@@ -81,15 +73,14 @@ class StageCache:
         version_id: str,
         source_type: str,
         chunk_cfg: ChunkingConfig,
-        token_counter=None,
+        token_counter: Callable[[str], int] | None = None,
     ) -> ChunkArtifact:
         key = chunk_key(parse_art.artifact_id, chunk_cfg)
-        # Chunk identity also depends on project/source/version lineage; fold into filename.
         lineage = chunk_lineage_key(key, project_id, source_id, version_id)
-        p = self._chunk_path(lineage)
-        if p.is_file():
+        cached = self._store.get_chunk(self._project_id, lineage)
+        if cached is not None:
             self.chunk_hits += 1
-            return ChunkArtifact.model_validate_json(p.read_text(encoding="utf-8"))
+            return cached
         self.chunk_misses += 1
         chunks = chunk_document(
             parse_art.doc,
@@ -103,10 +94,10 @@ class StageCache:
         art = ChunkArtifact(
             artifact_id=lineage, parsed_artifact_id=parse_art.artifact_id, chunks=chunks
         )
-        p.write_text(art.model_dump_json(), encoding="utf-8")
+        self._store.put_chunk(self._project_id, art)
         return art
 
-    def stats(self) -> dict:
+    def stats(self) -> dict[str, int]:
         return {
             "parse_hits": self.parse_hits,
             "parse_misses": self.parse_misses,

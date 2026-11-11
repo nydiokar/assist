@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from project_rag.adapters.stage_cache_fs import FsArtifactStore
 from project_rag.chunking import chunk_document
 from project_rag.config import (
     ChunkingConfig,
@@ -62,7 +63,7 @@ def _md(tmp_path: Path) -> Path:
 def test_changing_chunk_config_reuses_parse(tmp_path):
     root = _md(tmp_path)
     reg = ParserRegistry(ParsingConfig())
-    cache = StageCache(tmp_path / "cache", "p")
+    cache = StageCache(FsArtifactStore(tmp_path / "cache"), "p")
     content_hash = "h1"
     pa = cache.get_or_parse(
         abs_path=str(root / "a.md"),
@@ -83,7 +84,7 @@ def test_changing_chunk_config_reuses_parse(tmp_path):
     assert cache.parse_misses == 1 and cache.chunk_misses == 1
 
     # New cache instance (simulates a later run) with a DIFFERENT chunk config.
-    cache2 = StageCache(tmp_path / "cache", "p")
+    cache2 = StageCache(FsArtifactStore(tmp_path / "cache"), "p")
     pa2 = cache2.get_or_parse(
         abs_path=str(root / "a.md"),
         source_path="a.md",
@@ -108,7 +109,7 @@ def test_unchanged_source_full_cache_hit(tmp_path):
     root = _md(tmp_path)
     reg = ParserRegistry(ParsingConfig())
     cfg = ChunkingConfig()
-    c1 = StageCache(tmp_path / "cache", "p")
+    c1 = StageCache(FsArtifactStore(tmp_path / "cache"), "p")
     pa = c1.get_or_parse(
         abs_path=str(root / "a.md"),
         source_path="a.md",
@@ -120,7 +121,7 @@ def test_unchanged_source_full_cache_hit(tmp_path):
     c1.get_or_chunk(
         parse_art=pa, project_id="p", source_id="s", version_id="v", source_type="md", chunk_cfg=cfg
     )
-    c2 = StageCache(tmp_path / "cache", "p")
+    c2 = StageCache(FsArtifactStore(tmp_path / "cache"), "p")
     pa2 = c2.get_or_parse(
         abs_path=str(root / "a.md"),
         source_path="a.md",

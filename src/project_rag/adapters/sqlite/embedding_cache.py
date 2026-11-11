@@ -12,8 +12,6 @@ from pathlib import Path
 
 import numpy as np
 
-from .core.fingerprint import text_hash  # noqa: F401  (re-export, S1 shim)
-
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS emb (
     profile TEXT NOT NULL,
@@ -25,7 +23,7 @@ CREATE TABLE IF NOT EXISTS emb (
 """
 
 
-class EmbeddingCache:
+class SqliteEmbeddingCache:
     def __init__(self, path: str | Path) -> None:
         p = Path(path)
         p.parent.mkdir(parents=True, exist_ok=True)
