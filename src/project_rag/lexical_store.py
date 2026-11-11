@@ -11,7 +11,7 @@ from __future__ import annotations
 import sqlite3
 from pathlib import Path
 
-from .schema import Chunk, SourceLocation
+from .domain.models import ChannelHit, Chunk, HitPayload, SourceLocation
 
 _SCHEMA = """
 CREATE VIRTUAL TABLE IF NOT EXISTS chunk_fts USING fts5(
@@ -89,8 +89,8 @@ class LexicalStore:
 
     def search(
         self, project_id: str, generation: str, query: str, limit: int, doc_class: str | None = None
-    ) -> list[tuple[str, float, dict]]:
-        """Return [(chunk_id, bm25_score_ascending, payload)]. Lower bm25 == better."""
+    ) -> list[ChannelHit]:
+        """Return hits ordered by bm25 ascending (lower == better)."""
         fts_query = _escape_fts_query(query)
         rows = self._conn.execute(
             "SELECT chunk_id, document_id, source_path, heading, location_json, citation_text, "
@@ -100,14 +100,17 @@ class LexicalStore:
             "ORDER BY score LIMIT ?",
             (fts_query, project_id, generation, doc_class, doc_class, limit),
         ).fetchall()
-        out: list[tuple[str, float, dict]] = []
-        for r in rows:
-            payload = {
-                "document_id": r["document_id"],
-                "source_path": r["source_path"],
-                "heading": r["heading"],
-                "location": SourceLocation.model_validate_json(r["location_json"]),
-                "citation_text": r["citation_text"],
-            }
-            out.append((r["chunk_id"], float(r["score"]), payload))
-        return out
+        return [
+            ChannelHit(
+                chunk_id=r["chunk_id"],
+                score=float(r["score"]),
+                payload=HitPayload(
+                    document_id=r["document_id"],
+                    source_path=r["source_path"],
+                    heading=r["heading"],
+                    location=SourceLocation.model_validate_json(r["location_json"]),
+                    citation_text=r["citation_text"],
+                ),
+            )
+            for r in rows
+        ]

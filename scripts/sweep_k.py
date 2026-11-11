@@ -20,8 +20,9 @@ from pathlib import Path
 import numpy as np
 
 from project_rag.api import ProjectRAG
+from project_rag.core.fusion import rrf_fuse
+from project_rag.domain.models import ChannelHit
 from project_rag.evaluation import load_questions
-from project_rag.retrieval import _rrf
 
 CONFIG = "configs/yp_qwen4b_gpu.yaml"
 PROJECT = "ypq"
@@ -31,20 +32,12 @@ POOL = 50  # candidates per channel for the sweep (production uses 16)
 KS = (5, 10, 20)
 
 
-def fuse_raw(
-    dense: list[tuple[str, float, dict]], lexical: list[tuple[str, float, dict]], k: int
-) -> list[tuple[str, dict]]:
-    ranks: dict[str, dict[str, int]] = {}
-    payloads: dict[str, dict] = {}
-    for r, (cid, _s, p) in enumerate(dense, start=1):
-        ranks.setdefault(cid, {})["dense"] = r
-        payloads[cid] = p
-    for r, (cid, _s, p) in enumerate(lexical, start=1):
-        ranks.setdefault(cid, {})["lexical"] = r
-        payloads.setdefault(cid, p)
-    scored = [(sum(_rrf(rr, k) for rr in d.values()), cid) for cid, d in ranks.items()]
-    scored.sort(key=lambda t: (-t[0], t[1]))
-    return [(cid, payloads[cid]) for _f, cid in scored]
+def fuse_raw(dense: list[ChannelHit], lexical: list[ChannelHit], k: int) -> list[tuple[str, dict]]:
+    """Uncapped RRF order as (chunk_id, payload dict) — the sweep inspects the raw pool."""
+    return [
+        (c.chunk_id, c.payload.model_dump())
+        for c in rrf_fuse({"dense": dense, "lexical": lexical}, k)
+    ]
 
 
 def main() -> None:

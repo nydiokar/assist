@@ -10,17 +10,17 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from .config import AbstentionConfig, Config, load_config
+from .config import Config, load_config
+from .core.abstention import assess_evidence
 from .embeddings import build_embedder
+from .expand import attach_expanded_context
 from .indexing import IndexingService
 from .lexical_store import LexicalStore
 from .manifest import Manifest
 from .parsers import ParserRegistry
 from .retrieval import Retriever
 from .schema import (
-    EvidenceVerdict,
     IngestReport,
-    RetrievedResult,
     SearchResponse,
     SourceLocation,
     SourceResponse,
@@ -28,36 +28,6 @@ from .schema import (
 )
 from .sources import open_source as _open_source
 from .trace import QueryTrace, new_query_id, query_hash, timer
-
-
-def assess_evidence(
-    results: list[RetrievedResult], cfg: AbstentionConfig
-) -> tuple[EvidenceVerdict, list[str]]:
-    """Decide evidence sufficiency from the top-1 relevance score (v1 §6.2 abstention, F16).
-
-    Pure function, no LLM. Reads the configured `signal` from the top result's `score_details`;
-    `sufficient = top_score >= min_top_score`. Returns the verdict plus any warnings (e.g. the
-    reranker is off so only the uncalibrated fusion score is available — v1 §4.6). The caller
-    decides whether to suppress passages; this function never mutates `results`.
-    """
-    warnings: list[str] = []
-    if not cfg.enabled:
-        return EvidenceVerdict(enabled=False, sufficient=True), warnings
-    top_score = results[0].score_details.get(cfg.signal) if results else None
-    if cfg.signal == "rerank_score" and top_score is None and results:
-        warnings.append("abstention: rerank_score absent (reranker off); evidence gate inactive")
-        return EvidenceVerdict(enabled=False, sufficient=True, signal=cfg.signal), warnings
-    sufficient = top_score is not None and top_score >= cfg.min_top_score
-    return (
-        EvidenceVerdict(
-            enabled=True,
-            sufficient=sufficient,
-            signal=cfg.signal,
-            top_score=top_score,
-            threshold=cfg.min_top_score,
-        ),
-        warnings,
-    )
 
 
 class ProjectRAG:
@@ -150,7 +120,7 @@ class ProjectRAG:
 
         t = timer()
         with t.span("retrieve"):
-            results, channels = self._retriever.retrieve(
+            results, channel_counts = self._retriever.retrieve(
                 project_id,
                 gen,
                 query,
@@ -184,8 +154,6 @@ class ProjectRAG:
         # recover answers the top chunk alone did not carry (measured span@5 0.718 vs 0.667).
         # Only on served (non-suppressed) passages; the verbatim excerpt is kept.
         if served and self._cfg.retrieval.context_expansion.enabled:
-            from .expand import attach_expanded_context
-
             served = attach_expanded_context(
                 self, project_id, served, max_chars=self._cfg.retrieval.context_expansion.max_chars
             )
@@ -197,7 +165,7 @@ class ProjectRAG:
             query_hash=query_hash(query),
             index_generation=gen,
             retrieved_chunk_ids=[r.chunk_id for r in served],
-            channels=channels,
+            channels=channel_counts,
             result_count=len(served),
             timings_ms=t.timings_ms,
             warnings=warnings,

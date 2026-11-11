@@ -13,27 +13,13 @@ stages.py owns [1] PARSE and [2] CHUNK, the two stages that are expensive to rec
 
 from __future__ import annotations
 
-import hashlib
 from pathlib import Path
 
-from .chunking import CHUNKER_VERSION, chunk_document
 from .config import ChunkingConfig, ParsingConfig
+from .core.chunking import chunk_document
+from .core.fingerprint import PARSER_VERSION, chunk_key, chunk_lineage_key, parse_key  # noqa: F401
 from .domain.models import ChunkArtifact, ParseArtifact
 from .parsers import ParserRegistry
-
-PARSER_VERSION = "native_v1"
-
-
-def _fp(*parts: str) -> str:
-    return hashlib.sha256("|".join(parts).encode("utf-8")).hexdigest()[:32]
-
-
-def parse_key(source_content_hash: str, parser_cfg: ParsingConfig) -> str:
-    return _fp("parse", source_content_hash, PARSER_VERSION, parser_cfg.model_dump_json())
-
-
-def chunk_key(parsed_artifact_id: str, chunk_cfg: ChunkingConfig) -> str:
-    return _fp("chunk", parsed_artifact_id, CHUNKER_VERSION, chunk_cfg.model_dump_json())
 
 
 class StageCache:
@@ -99,7 +85,7 @@ class StageCache:
     ) -> ChunkArtifact:
         key = chunk_key(parse_art.artifact_id, chunk_cfg)
         # Chunk identity also depends on project/source/version lineage; fold into filename.
-        lineage = _fp(key, project_id, source_id, version_id)
+        lineage = chunk_lineage_key(key, project_id, source_id, version_id)
         p = self._chunk_path(lineage)
         if p.is_file():
             self.chunk_hits += 1

@@ -7,20 +7,11 @@ matching retrieval trace fails (v1 §5.2).
 
 from __future__ import annotations
 
-import hashlib
 import time
 from contextlib import contextmanager
 
+from .core.fingerprint import new_query_id, query_hash  # noqa: F401  (re-export, S1 shim)
 from .domain.models import QueryTrace  # noqa: F401  (re-export, S1 shim)
-
-
-def query_hash(query: str) -> str:
-    return hashlib.sha256(query.encode("utf-8")).hexdigest()[:16]
-
-
-def new_query_id(project_id: str, query: str, nonce: str) -> str:
-    raw = f"{project_id}|{query}|{nonce}"
-    return "q_" + hashlib.sha256(raw.encode("utf-8")).hexdigest()[:16]
 
 
 class _Timer:

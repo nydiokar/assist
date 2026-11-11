@@ -13,7 +13,6 @@ Lazy, offline, fail-closed on a missing model. No network beyond the local HF ca
 from __future__ import annotations
 
 from .config import RerankConfig
-from .schema import RetrievedResult
 
 
 class CrossEncoderReranker:
@@ -34,32 +33,11 @@ class CrossEncoderReranker:
             trust_remote_code=False,
         )
 
-    def rerank(self, query: str, results: list[RetrievedResult]) -> list[RetrievedResult]:
-        """Score the top_n fused candidates by (query, excerpt) and sort descending.
-
-        Deterministic: stable sort on (-score, chunk_id). Candidates beyond top_n keep their
-        fused order after the reranked head, so recall of the pool is never reduced.
-        """
-        if not results:
-            return results
+    def score(self, query: str, passages: list[str]) -> list[float]:
+        """Relevance score per (query, passage); higher is more relevant."""
+        if not passages:
+            return []
         self._ensure()
-        head = results[: self._cfg.top_n]
-        tail = results[self._cfg.top_n :]
-        pairs = [(query, r.excerpt or "") for r in head]
+        pairs = [(query, p) for p in passages]
         scores = self._model.predict(pairs, batch_size=self._cfg.batch_size)  # type: ignore[union-attr]
-        order = sorted(range(len(head)), key=lambda i: (-float(scores[i]), head[i].chunk_id))
-        reranked: list[RetrievedResult] = []
-        for src_idx in order:
-            r = head[src_idx]
-            reranked.append(
-                r.model_copy(
-                    update={
-                        "score_details": {
-                            **r.score_details,
-                            "rerank_score": round(float(scores[src_idx]), 6),
-                        }
-                    }
-                )
-            )
-        out = reranked + tail
-        return [r.model_copy(update={"rank": i}) for i, r in enumerate(out, start=1)]
+        return [float(x) for x in scores]

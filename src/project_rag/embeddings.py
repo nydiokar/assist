@@ -17,6 +17,8 @@ from typing import Protocol, runtime_checkable
 import numpy as np
 
 from .config import EmbeddingConfig
+from .core.vectors import l2_normalize as _l2_normalize
+from .core.vectors import validate_matrix as _validate_matrix
 from .gpu_env import describe_gpu_env, prepare_gpu_env
 from .schema import EmbeddingProfile
 
@@ -37,25 +39,6 @@ class EmbedderProtocol(Protocol):
     def embed_passages(self, texts: list[str]) -> np.ndarray: ...
 
     def embed_queries(self, texts: list[str]) -> np.ndarray: ...
-
-
-def _l2_normalize(mat: np.ndarray) -> np.ndarray:
-    norms = np.linalg.norm(mat, axis=1, keepdims=True)
-    norms[norms == 0] = 1.0
-    return mat / norms
-
-
-def _validate_matrix(mat: np.ndarray, dim: int, normalize: bool) -> None:
-    """A01 §D output checks: finite, correct dim, consistent normalization."""
-    if mat.ndim != 2 or mat.shape[1] != dim:
-        raise ValueError(f"embedding shape {mat.shape} != (*, {dim})")
-    if not np.isfinite(mat).all():
-        raise ValueError("embedding contains non-finite values")
-    if normalize and mat.shape[0]:
-        norms = np.linalg.norm(mat, axis=1)
-        nonzero = norms[norms > 1e-8]
-        if nonzero.size and not np.allclose(nonzero, 1.0, atol=1e-3):
-            raise ValueError("normalized embeddings are not unit-norm")
 
 
 class HashEmbedder:

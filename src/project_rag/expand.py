@@ -20,26 +20,11 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from .schema import RetrievedResult, SourceLocation
+from .core.expand import merge_expansion, parent_location
+from .schema import RetrievedResult
 
 if TYPE_CHECKING:
     from .api import ProjectRAG
-
-
-def _parent_location(loc: SourceLocation) -> SourceLocation | None:
-    """The coarsest provenance key that defines a chunk's "parent section".
-
-    Priority matches how chunking groups blocks (chunking.py): free text is grouped under a
-    heading; tables under a sheet; PDF prose falls back to the page. Returns None when the chunk
-    has no coarser anchor than itself (then expansion is a no-op and we keep the chunk excerpt).
-    """
-    if loc.heading:
-        return SourceLocation(heading=loc.heading)
-    if loc.sheet:
-        return SourceLocation(sheet=loc.sheet)
-    if loc.page is not None:
-        return SourceLocation(page=loc.page)
-    return None
 
 
 def expand_result_context(
@@ -51,7 +36,7 @@ def expand_result_context(
     excerpt when the chunk has no coarser location anchor or the re-read yields nothing — so the
     result is never *less* than what the caller already had.
     """
-    parent = _parent_location(result.source_location)
+    parent = parent_location(result.source_location)
     if parent is None:
         return result.excerpt
     resp = rag.open_source(
@@ -61,14 +46,7 @@ def expand_result_context(
         location=parent,
         max_chars=max_chars,
     )
-    text = resp.excerpt.strip()
-    if not text:
-        return result.excerpt
-    # Guarantee the chunk's own text is present even if location filtering dropped it (e.g. a
-    # heading match that excludes a trailing block the chunk spanned).
-    if result.excerpt and result.excerpt.strip() not in text:
-        text = (text + "\n" + result.excerpt.strip())[:max_chars]
-    return text
+    return merge_expansion(resp.excerpt, result.excerpt, max_chars)
 
 
 def attach_expanded_context(

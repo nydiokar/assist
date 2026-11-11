@@ -7,11 +7,12 @@ interrupted multi-hour run resumes instead of restarting. Vectors are stored FP3
 
 from __future__ import annotations
 
-import hashlib
 import sqlite3
 from pathlib import Path
 
 import numpy as np
+
+from .core.fingerprint import text_hash  # noqa: F401  (re-export, S1 shim)
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS emb (
@@ -22,10 +23,6 @@ CREATE TABLE IF NOT EXISTS emb (
     PRIMARY KEY (profile, text_hash)
 ) WITHOUT ROWID;
 """
-
-
-def text_hash(text: str) -> str:
-    return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
 class EmbeddingCache:

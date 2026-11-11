@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from project_rag.config import RetrievalConfig
 from project_rag.retrieval import fuse_and_rank
-from project_rag.schema import SourceLocation
+from project_rag.schema import ChannelHit, HitPayload, SourceLocation
 
 
 def _ingest(rag, root):
@@ -107,14 +107,15 @@ def test_query_length_bounded(make_rag, corpus_root):
 
 def test_fusion_is_deterministic():
     cfg = RetrievalConfig()
-    payload = {
-        "source_path": "a.md",
-        "document_id": "d",
-        "citation_text": "t",
-        "location": SourceLocation(),
-    }
-    dense = [("ck_1", 0.1, payload), ("ck_2", 0.2, payload)]
-    lexical = [("ck_2", 1.0, payload), ("ck_3", 2.0, payload)]
+    payload = HitPayload(
+        source_path="a.md", document_id="d", citation_text="t", location=SourceLocation()
+    )
+
+    def hit(cid: str, score: float) -> ChannelHit:
+        return ChannelHit(chunk_id=cid, score=score, payload=payload)
+
+    dense = [hit("ck_1", 0.1), hit("ck_2", 0.2)]
+    lexical = [hit("ck_2", 1.0), hit("ck_3", 2.0)]
     a = [r.chunk_id for r in fuse_and_rank(dense, lexical, cfg)]
     b = [r.chunk_id for r in fuse_and_rank(dense, lexical, cfg)]
     assert a == b

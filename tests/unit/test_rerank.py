@@ -1,5 +1,6 @@
 """Cross-encoder reranker reorder logic (F19). No model download: a fake scorer is injected
-into the lazy `_model` slot so `_ensure` is never called. Verifies the three guarantees the
+into the adapter's lazy `_model` slot so `_ensure` is never called; the reorder itself is the
+pure `apply_rerank_scores`. Verifies the three guarantees the
 pipeline relies on: (1) the top_n head is reordered by descending score, (2) candidates beyond
 top_n keep their fused order after the reranked head (pool recall never shrinks), (3) ranks are
 renumbered 1..n and rerank_score is recorded for audit.
@@ -8,6 +9,7 @@ renumbered 1..n and rerank_score is recorded for audit.
 from __future__ import annotations
 
 from project_rag.config import RerankConfig
+from project_rag.core.ranking import apply_rerank_scores
 from project_rag.rerank import CrossEncoderReranker
 from project_rag.schema import RetrievedResult, SourceLocation
 
@@ -35,10 +37,24 @@ def _result(chunk_id: str, excerpt: str, rank: int) -> RetrievedResult:
     )
 
 
-def _reranker(scores: dict[str, float], top_n: int) -> CrossEncoderReranker:
-    rr = CrossEncoderReranker(RerankConfig(enabled=True, top_n=top_n))
-    rr._model = _FakeCrossEncoder(scores)  # inject fake, skip _ensure/download
-    return rr
+class _Rerank:
+    """Adapter score() + pure reorder, as the retriever composes them."""
+
+    def __init__(self, scores: dict[str, float], top_n: int) -> None:
+        self._rr = CrossEncoderReranker(RerankConfig(enabled=True, top_n=top_n))
+        self._rr._model = _FakeCrossEncoder(scores)  # inject fake, skip _ensure/download
+        self._top_n = top_n
+
+    def rerank(self, query: str, results: list[RetrievedResult]) -> list[RetrievedResult]:
+        if not results:
+            return results
+        head = results[: self._top_n]
+        scores = self._rr.score(query, [r.excerpt or "" for r in head])
+        return apply_rerank_scores(results, scores, self._top_n)
+
+
+def _reranker(scores: dict[str, float], top_n: int) -> _Rerank:
+    return _Rerank(scores, top_n)
 
 
 def test_rerank_reorders_head_by_score() -> None:

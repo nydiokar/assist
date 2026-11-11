@@ -12,13 +12,14 @@ heading, source_type, location_json (v1 §4.6 collection model).
 from __future__ import annotations
 
 import json
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Protocol
 
 import numpy as np
 
 from .config import VectorStoreConfig
-from .schema import Chunk, SourceLocation
+from .domain.models import ChannelHit, Chunk, HitPayload, SourceLocation
 
 
 class VectorStoreProtocol(Protocol):
@@ -35,7 +36,7 @@ class VectorStoreProtocol(Protocol):
         query_embedding: np.ndarray,
         limit: int,
         doc_class: str | None = None,
-    ) -> list[tuple[str, float, dict]]: ...
+    ) -> list[ChannelHit]: ...
 
     def count(self, project_id: str, generation: str) -> int: ...
 
@@ -55,14 +56,14 @@ def _payload(c: Chunk, generation: str) -> dict:
     }
 
 
-def _result_payload(meta: dict) -> dict:
-    return {
-        "document_id": meta["document_id"],
-        "source_path": meta["source_path"],
-        "heading": meta.get("heading", ""),
-        "location": SourceLocation.model_validate_json(meta["location_json"]),
-        "citation_text": meta["citation_text"],
-    }
+def _result_payload(meta: Mapping[str, object]) -> HitPayload:
+    return HitPayload(
+        document_id=str(meta["document_id"]),
+        source_path=str(meta["source_path"]),
+        heading=str(meta.get("heading", "")),
+        location=SourceLocation.model_validate_json(str(meta["location_json"])),
+        citation_text=str(meta["citation_text"]),
+    )
 
 
 class InMemoryVectorStore:
@@ -133,10 +134,10 @@ class InMemoryVectorStore:
         query_embedding: np.ndarray,
         limit: int,
         doc_class: str | None = None,
-    ) -> list[tuple[str, float, dict]]:
+    ) -> list[ChannelHit]:
         q = np.asarray(query_embedding, dtype=np.float32).ravel()
         qn = np.linalg.norm(q) or 1.0
-        scored: list[tuple[str, float, dict]] = []
+        scored: list[ChannelHit] = []
         for cid, v, m in zip(self._ids, self._vecs, self._meta, strict=True):
             if m["project_id"] != project_id or m["generation"] != generation:
                 continue  # project filter enforced BEFORE ranking (v1 §4.6)
@@ -144,8 +145,9 @@ class InMemoryVectorStore:
                 continue
             vn = np.linalg.norm(v) or 1.0
             cos = float(np.dot(q, v) / (qn * vn))
-            scored.append((cid, 1.0 - cos, _result_payload(m)))  # cosine distance
-        scored.sort(key=lambda t: t[1])
+            # cosine distance
+            scored.append(ChannelHit(chunk_id=cid, score=1.0 - cos, payload=_result_payload(m)))
+        scored.sort(key=lambda t: t.score)
         return scored[:limit]
 
     def count(self, project_id: str, generation: str) -> int:
@@ -205,7 +207,7 @@ class ChromaVectorStore:
         query_embedding: np.ndarray,
         limit: int,
         doc_class: str | None = None,
-    ) -> list[tuple[str, float, dict]]:
+    ) -> list[ChannelHit]:
         clauses: list[dict] = [{"project_id": project_id}, {"generation": generation}]
         if doc_class is not None:
             clauses.append({"doc_class": doc_class})
@@ -219,7 +221,8 @@ class ChromaVectorStore:
         dists = res["distances"][0]
         metas = res["metadatas"][0]
         return [
-            (cid, float(d), _result_payload(m)) for cid, d, m in zip(ids, dists, metas, strict=True)
+            ChannelHit(chunk_id=cid, score=float(d), payload=_result_payload(m))
+            for cid, d, m in zip(ids, dists, metas, strict=True)
         ]
 
     def count(self, project_id: str, generation: str) -> int:

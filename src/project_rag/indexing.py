@@ -12,14 +12,16 @@ Guarantees:
 
 from __future__ import annotations
 
-import hashlib
-
 import numpy as np
 
-from .chunking import CHUNKER_VERSION
 from .config import Config
+from .core.corpus_diff import diff_corpus
+from .core.filesystem_evidence import build_filesystem_chunks
+from .core.fingerprint import classify_doc, generation_id, pipeline_fingerprint, text_hash
+from .core.fingerprint import source_id as _source_id
+from .core.fingerprint import version_id as _version_id
 from .discovery import discover
-from .embedding_cache import EmbeddingCache, text_hash
+from .embedding_cache import EmbeddingCache
 from .embeddings import EmbedderProtocol
 from .lexical_store import LexicalStore
 from .manifest import Manifest
@@ -27,22 +29,6 @@ from .parsers import ParserRegistry
 from .schema import Chunk, DocState, FileReport, IngestReport, ParsedDocument
 from .stages import StageCache
 from .vector_store import VectorStoreProtocol
-
-
-def _source_id(source_path: str) -> str:
-    return "src_" + hashlib.sha256(source_path.encode("utf-8")).hexdigest()[:20]
-
-
-def _version_id(content_hash: str, parser_backend: str) -> str:
-    raw = f"{content_hash}|{parser_backend}|{CHUNKER_VERSION}"
-    return "v_" + hashlib.sha256(raw.encode("utf-8")).hexdigest()[:20]
-
-
-def _generation_id(project_id: str, hashes: list[str], pipeline: str) -> str:
-    """Identity of the whole derived index: sources AND the pipeline that produced it.
-    A chunker/parser/config change must yield a new generation (ADR-009), not 'no changes'."""
-    raw = project_id + "|" + pipeline + "|" + "|".join(sorted(hashes))
-    return "g_" + hashlib.sha256(raw.encode("utf-8")).hexdigest()[:16]
 
 
 class IndexingService:
@@ -85,15 +71,10 @@ class IndexingService:
             )
 
         discovered = discover(root_path)
-        pipeline = "|".join(
-            [
-                CHUNKER_VERSION,
-                self._cfg.parsing.backend,
-                self._cfg.chunking.model_dump_json(),
-                self._cfg.classification.model_dump_json(),
-            ]
+        pipeline = pipeline_fingerprint(
+            self._cfg.parsing, self._cfg.chunking, self._cfg.classification
         )
-        new_gen = _generation_id(
+        new_gen = generation_id(
             project_id, [d.content_hash + d.source_path for d in discovered], pipeline
         )
         prior_gen = self._manifest.active_generation(project_id)
@@ -101,7 +82,13 @@ class IndexingService:
 
         files: list[FileReport] = []
         warnings: list[str] = []
-        counts = {"added": 0, "modified": 0, "unchanged": 0, "deleted": 0}
+        changes = diff_corpus(prior_hashes, discovered)
+        counts = {
+            "added": len(changes.added),
+            "modified": len(changes.modified),
+            "unchanged": len(changes.unchanged),
+            "deleted": len(changes.deleted),
+        }
 
         def report() -> IngestReport:
             return IngestReport(
@@ -116,7 +103,7 @@ class IndexingService:
 
         # Short-circuit true idempotency: identical corpus AND same generation already active.
         if prior_gen == new_gen and not dry_run:
-            counts["unchanged"] = len(discovered)
+            counts = {"added": 0, "modified": 0, "unchanged": len(discovered), "deleted": 0}
             warnings.append("no changes: active generation unchanged")
             for d in discovered:
                 files.append(
@@ -135,15 +122,6 @@ class IndexingService:
         for d in discovered:
             sid = _source_id(d.source_path)
             vid = _version_id(d.content_hash, self._cfg.parsing.backend)
-            prior = prior_hashes.get(d.source_path)
-            changed = prior is None or prior[0] != d.content_hash
-            if prior is None:
-                counts["added"] += 1
-            elif changed:
-                counts["modified"] += 1
-            else:
-                counts["unchanged"] += 1
-
             if not d.supported:
                 files.append(
                     FileReport(
@@ -186,9 +164,8 @@ class IndexingService:
                 chunk_cfg=self._cfg.chunking,
                 token_counter=token_counter,
             )
-            prefixes = tuple(self._cfg.classification.reference_prefixes)
-            doc_class = (
-                "reference" if prefixes and d.source_path.startswith(prefixes) else "project_record"
+            doc_class = classify_doc(
+                d.source_path, tuple(self._cfg.classification.reference_prefixes)
             )
             chunks = [c.model_copy(update={"doc_class": doc_class}) for c in chunk_art.chunks]
             staged_chunks.extend(chunks)
@@ -214,15 +191,10 @@ class IndexingService:
         # from the discovery walk (no parse/chunk cache — it is cheap and derived purely from the
         # file inventory). doc_class=filesystem keeps it filterable and unmistakable for content.
         if self._cfg.classification.filesystem_evidence:
-            from .filesystem import build_filesystem_chunks
-
             fs_chunks = build_filesystem_chunks(project_id, discovered)
             staged_chunks.extend(fs_chunks)
             if fs_chunks:
                 warnings.append(f"filesystem_evidence: {len(fs_chunks)} presence chunk(s)")
-
-        deleted = set(prior_hashes) - {d.source_path for d in discovered}
-        counts["deleted"] = len(deleted)
 
         if dry_run:
             warnings.append("dry run: no writes performed")
