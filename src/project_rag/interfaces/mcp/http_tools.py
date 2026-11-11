@@ -42,7 +42,13 @@ AGENT_GUIDANCE = (
 class ServiceApi(Protocol):
     """The read-side operations the tools call (implemented by `wiring.ServiceApi`)."""
 
-    def projects(self) -> list[ProjectIdentity]: ...
+    def projects(self) -> list[ProjectIdentity]:
+        """Registered projects (store read; also refreshes the cached id set)."""
+        ...
+
+    def cached_project_ids(self) -> frozenset[str]:
+        """Last known project ids, readable from any thread without a store call."""
+        ...
 
     def search(
         self, project_id: str, query: str, top_k: int, doc_class: str | None
@@ -86,12 +92,18 @@ def build_http_server(api: ServiceApi, executor: StoreExecutor, cfg: ServiceConf
         except StoreError as e:
             raise ToolError(f"the document store is unavailable: {e}") from e
 
-    async def known_ids() -> set[str]:
+    async def known_ids(refresh: bool = False) -> set[str]:
+        if not refresh:
+            cached = api.cached_project_ids()
+            if cached:
+                return set(cached)
         projects = await call(api.projects, cfg.status_deadline_s)
         return {p.project_id for p in projects}  # type: ignore[attr-defined]
 
     async def require_project(project_id: str) -> None:
         ids = await known_ids()
+        if project_id not in ids:  # a project added since the last refresh
+            ids = await known_ids(refresh=True)
         if project_id not in ids:
             raise ToolError(
                 f"unknown project_id {project_id!r}; call list_projects (known: {sorted(ids)})"

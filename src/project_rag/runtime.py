@@ -42,6 +42,7 @@ class ServiceApiImpl:
         self._cfg = config
         self._links: dict[str, str] = {}
         self._folders: dict[str, str] = {}
+        self._ids: frozenset[str] = frozenset()
 
     # -- registry / roots --
     def sync_registry(self) -> None:
@@ -49,11 +50,17 @@ class ServiceApiImpl:
         for rec in self._s.registry.sync(root):
             self._s.search.register_project_root(rec.identity.project_id, rec.root_path)
             self._folders[rec.identity.project_id] = rec.folder
+        self.projects()
         manifest = self._s.registry.read_manifest(root)
         self._links = {f.path: f.web_link for f in manifest.files} if manifest else {}
 
     def projects(self) -> list[ProjectIdentity]:
-        return self._s.catalog.list_projects()
+        projects = self._s.catalog.list_projects()
+        self._ids = frozenset(p.project_id for p in projects)
+        return projects
+
+    def cached_project_ids(self) -> frozenset[str]:
+        return self._ids
 
     def _ensure_root(self, project_id: str) -> None:
         if project_id in self._folders:
