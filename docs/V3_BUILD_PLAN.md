@@ -108,7 +108,7 @@ flowchart TD
 | S1 | done | S0 | — | `5ad1e55` | 2026-11-11 |
 | S2 | done | S1 | — | `54d7ece` | 2026-11-11 |
 | S3 | done | S1 | — | `7219631` | 2026-11-11 |
-| S4 | todo | S2, S3 | — | | |
+| S4 | active | S2, S3 | — | (YP full ingest running) | |
 | S5 | todo | S4 | missing files added (O1) | | |
 | S6 | todo | S4 | — | | |
 | S7 | todo | S5, S6 | D-1 + labels + floor (O2); D-7 key (O3) for the live part only | | |
@@ -443,6 +443,7 @@ Format: `YYYY-MM-DD · Stage · event · evidence (commands + one-line results, 
   - Faults: respx `uv run pytest tests/unit/test_openai_compat_adapters.py` → 17 passed (timeout→`ProviderTimeout` after 3 tries, refused→`ProviderUnavailable`, 5xx retried then recovered, 400 not retried, wrong dim / NaN / missing items → `ProviderContractViolation`). Live `tests/integration/test_provider_faults_live.py` → 2 passed (`docker compose stop embed|rerank` → `ProviderUnavailable`; restart → served again).
   - End-to-end: `python -m project_rag.cli --config configs/dev_llama_server.yaml ingest|search` on the fixture corpus → BG query "Какъв е номерът на гранта?" ranks the EN grant-number passage first (rerank 0.152, next 0.0004).
   - Regression floor: unit+contracts+integration 239 passed (18 live deselected), evaluation 2 passed, lint-imports 11 kept, pyright 0. CI `7219631` → success (225 passed, 16 chroma skips).
+- 2026-11-11 · S4 · progress (not closed) · branch `v3/s4-ingestion-v2` (`c43df52` isolation/OCR/antiword/run report, `7936562` registry, `b849f54` dev image + OCR tool tests, `1331e8d`/`b995685`/`9135704` thresholds, golden, CI). Done so far: fault-injection tests (corrupt PDF, OCR crash, embed timeout each isolated; run publishes; systemic embed outage aborts and keeps the previous generation), rename/delete/idempotency tests on fixtures, OCR thresholds tuned on YP (15 chars / 65 conf), CI green incl. a Debian `ocr-tools` job with the real binaries. **YP full ingest started 17:47 in `assist:dev`** (`ingest-corpus`, Q8_0 CPU llama-server, 12 threads): pilot 104 tok/s → ~5.9 h extrapolated for 2.21 M tokens (X6 procedure; within the plan's "hours"). GPU build blocked by permission (owner queue). Parallel prep while it runs (branches, not merged, close only after S4): S6 `v3/s6-service`, S8 `v3/s8-packaging`, S7 `v3/s7-eval`.
 
 ## 6. Owner queue and open issues
 
