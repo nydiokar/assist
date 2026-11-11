@@ -1,0 +1,49 @@
+# S6 network test: assist on two networks; the admin API is bound to the knowledge-network
+# address only. Probes:
+#   docker compose -f deploy/dev/compose.service.yaml up -d assist
+#   docker compose -f deploy/dev/compose.service.yaml run --rm probe-agent      # admin: refused
+#   docker compose -f deploy/dev/compose.service.yaml run --rm probe-knowledge  # admin: 200
+name: assist-svc-test
+
+networks:
+  knowledge:
+    internal: true
+    ipam:
+      config:
+        - subnet: 172.31.10.0/24
+  agent:
+    internal: true
+
+services:
+  assist:
+    image: assist:dev
+    entrypoint: ["python", "-m", "project_rag.serve", "--config", "/app/configs/service_fixture.yaml"]
+    environment:
+      ASSIST_MCP_TOKEN: compose-test-token
+      ASSIST_ALLOW_DEV_PROFILE: "1"
+    volumes:
+      - ../../tests/fixtures/synthetic/ngo_project_demo:/corpus/Demo:ro
+    networks:
+      knowledge:
+        ipv4_address: 172.31.10.10
+      agent: {}
+
+  probe-agent:
+    image: curlimages/curl:8.11.1
+    profiles: [probe]
+    networks: [agent]
+    entrypoint: ["sh", "-c"]
+    command:
+      - >-
+        echo -n 'agent  /healthz: ' && curl -s -o /dev/null -w '%{http_code}\n' --max-time 5 http://assist:8000/healthz;
+        echo -n 'agent  admin(dns): ' && (curl -s -o /dev/null -w '%{http_code}\n' --max-time 5 http://assist:8001/admin/status || echo unreachable);
+        echo -n 'agent  admin(ip): ' && (curl -s -o /dev/null -w '%{http_code}\n' --max-time 5 http://172.31.10.10:8001/admin/status || echo unreachable)
+
+  probe-knowledge:
+    image: curlimages/curl:8.11.1
+    profiles: [probe]
+    networks: [knowledge]
+    entrypoint: ["sh", "-c"]
+    command:
+      - >-
+        echo -n 'knowledge admin: ' && curl -s -o /dev/null -w '%{http_code}\n' --max-time 5 http://assist:8001/admin/status
