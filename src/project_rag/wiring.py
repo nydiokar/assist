@@ -15,6 +15,7 @@ from .ports.lexical import LexicalIndex
 from .ports.reranker import Reranker
 from .ports.vector import VectorIndex
 from .services.ingest import IngestService
+from .services.registry import ProjectRegistryService
 from .services.search import SearchService
 
 
@@ -84,6 +85,7 @@ class Services:
     config: Config
     ingest: IngestService
     search: SearchService
+    registry: ProjectRegistryService
     embedder: Embedder
     vector: VectorIndex
     lexical: LexicalIndex
@@ -162,6 +164,7 @@ def build(config: Config, *, collect_garbage: bool = True) -> Services:
         config=config,
         ingest=ingest,
         search=search,
+        registry=ProjectRegistryService(catalog, corpus),
         embedder=embedder,
         vector=vector,
         lexical=lexical,

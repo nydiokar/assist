@@ -354,3 +354,40 @@ class FeedbackSignal(Frozen):
     at: datetime
     query_hash: str = ""
     detail: str = ""
+
+
+# ---- project registry + sync sidecar (S4, spec §6.4 / §8.5) ----
+
+
+class SyncFolder(Frozen):
+    path: str  # top-level folder name under the corpus root
+    drive_id: str
+
+
+class SyncFile(Frozen):
+    path: str  # corpus-root-relative, forward slashes
+    drive_id: str
+    web_link: str = ""
+
+
+class SyncManifest(Frozen):
+    """`.sync/manifest.json`, written by the sync job (S8) next to the synced tree."""
+
+    version: int = 1
+    generated_at: str = ""
+    folders: list[SyncFolder] = Field(default_factory=list)
+    files: list[SyncFile] = Field(default_factory=list)
+
+
+class ProjectIdentity(Frozen):
+    project_id: str  # slug, assigned once, never changes
+    drive_id: str  # Drive folder id (or the dev fallback key)
+    display_name: str  # follows the folder name
+
+
+class ProjectRecord(Frozen):
+    identity: ProjectIdentity
+    folder: str  # current top-level folder name
+    root_path: str  # absolute path of the folder
+    key_source: str  # "drive" | "path-fallback"
+    renamed_from: str | None = None

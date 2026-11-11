@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from ...domain.models import DocumentRecord, EmbeddingProfile, RunReport
+from ...domain.models import DocumentRecord, EmbeddingProfile, ProjectIdentity, RunReport
 from .db import SqliteDb
 
 
@@ -153,6 +153,47 @@ class SqliteCatalog:
                     f"DELETE FROM {table} WHERE project_id=? AND generation=?",
                     (project_id, generation),
                 )
+
+    # ---- project registry (S4, migration 003) ----
+    def project_by_drive_id(self, drive_id: str) -> ProjectIdentity | None:
+        row = self._conn.execute(
+            "SELECT project_id, drive_id, display_name FROM projects WHERE drive_id=?",
+            (drive_id,),
+        ).fetchone()
+        if row is None:
+            return None
+        return ProjectIdentity(
+            project_id=row["project_id"], drive_id=row["drive_id"], display_name=row["display_name"]
+        )
+
+    def list_projects(self) -> list[ProjectIdentity]:
+        rows = self._conn.execute(
+            "SELECT project_id, drive_id, display_name FROM projects "
+            "WHERE drive_id IS NOT NULL ORDER BY project_id"
+        ).fetchall()
+        return [
+            ProjectIdentity(
+                project_id=r["project_id"], drive_id=r["drive_id"], display_name=r["display_name"]
+            )
+            for r in rows
+        ]
+
+    def upsert_project_identity(self, identity: ProjectIdentity) -> None:
+        with self._db.transaction():
+            self._conn.execute(
+                "INSERT INTO projects(project_id, drive_id, slug, display_name) VALUES(?,?,?,?) "
+                "ON CONFLICT(project_id) DO UPDATE SET drive_id=excluded.drive_id, "
+                "slug=excluded.slug, display_name=excluded.display_name",
+                (
+                    identity.project_id,
+                    identity.drive_id,
+                    identity.project_id,
+                    identity.display_name,
+                ),
+            )
+
+    def all_project_ids(self) -> set[str]:
+        return {r[0] for r in self._conn.execute("SELECT project_id FROM projects").fetchall()}
 
     # ---- run reports (S4) ----
     def record_run(self, report: RunReport) -> None:

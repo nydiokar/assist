@@ -100,3 +100,11 @@ class LocalFsCorpus:
 
     def is_file(self, path: str) -> bool:
         return Path(path).is_file()
+
+    def list_dirs(self, root: str) -> list[str]:
+        base = Path(_long_path(str(Path(root).resolve())))
+        return sorted(p.name for p in base.iterdir() if p.is_dir() and not p.name.startswith("."))
+
+    def read_text(self, root: str, source_path: str) -> str | None:
+        p = resolve_within_root(root, source_path)
+        return p.read_text(encoding="utf-8") if p.is_file() else None

@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Protocol
 
-from ..domain.models import DocumentRecord, EmbeddingProfile, RunReport
+from ..domain.models import DocumentRecord, EmbeddingProfile, ProjectIdentity, RunReport
 
 
 class Catalog(Protocol):
@@ -53,6 +53,18 @@ class Catalog(Protocol):
 
     def stale_generations(self) -> list[tuple[str, str]]:
         """Non-active (project_id, generation) pairs: crashed stagings and unfinished deletes."""
+        ...
+
+    def project_by_drive_id(self, drive_id: str) -> ProjectIdentity | None: ...
+
+    def list_projects(self) -> list[ProjectIdentity]:
+        """Registered projects (rows with a drive_id), by project_id."""
+        ...
+
+    def upsert_project_identity(self, identity: ProjectIdentity) -> None: ...
+
+    def all_project_ids(self) -> set[str]:
+        """Every project_id in the catalog (registered or ingested directly)."""
         ...
 
     def record_run(self, report: RunReport) -> None:
