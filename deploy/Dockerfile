@@ -27,6 +27,7 @@ COPY pyproject.toml uv.lock README.md ./
 RUN uv sync --frozen --extra serve --no-install-project --no-editable
 COPY src ./src
 COPY configs ./configs
+COPY scripts/state_backup.py ./scripts/state_backup.py
 RUN uv sync --frozen --extra serve --no-editable \
     && useradd --uid 10001 --create-home --home-dir /home/assist --shell /usr/sbin/nologin assist \
     && mkdir -p /state /corpus /models \

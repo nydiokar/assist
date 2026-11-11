@@ -98,7 +98,7 @@ services:
       timeout: 5s
       retries: 3
     cpus: 0.5
-    mem_limit: 256m
+    mem_limit: 768m  # squid 6 peaks ~0.7 GB RSS at start
 
   kuma:
     <<: *limits
