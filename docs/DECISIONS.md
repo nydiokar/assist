@@ -598,3 +598,25 @@ All behaviour-neutral (golden snapshot byte-identical to S0, `git diff 36b1ec9 -
   its own transaction. 001 is the prototype schema with `IF NOT EXISTS`, so pre-migration
   databases open (their data is not migrated; L6 re-indexes). 002 staging journal, 003 registry
   columns (`drive_id` unique, `slug`, `display_name`), 004 `run_reports`, 005 `feedback`.
+
+## 2026-11-11 — S3 HTTP providers: design choices
+
+- **Embedder port keeps `token_count(text)`** (S1 decision); `/tokenize` takes one text per call,
+  so the adapter caches per text hash instead of batching. Behaviour matches spec §6.1 (served
+  model's own counts, cached).
+- **No client-side EOS.** llama-server appends `<|endoftext|>` for the Qwen3-Embedding GGUF
+  (`/tokenize` counts equal the HF tokenizer's, which appends it). `append_text` stays as a
+  config knob, empty by default.
+- **Reranker `score_transform: sigmoid` by default**: llama-server returns logits; the torch
+  CrossEncoder returned sigmoid probabilities and the abstention threshold (0.26) is on that scale.
+- **Rerank parity pair set** = the production reranker input (top-5 fused candidates per query),
+  not arbitrary query × passage products, whose pooled ranking is dominated by ties among
+  unrelated pairs. Both results recorded (0.947 arbitrary, 0.9835 pipeline; within-query 1.0).
+- **Profile key in the generation id** (ADR-009 made literal): a different served model, quant
+  or GGUF file is a new generation even on an empty store. Prototype profile keys are unchanged
+  (new fields add nothing when unset).
+- **Torch reranker truncated pairs at 512 tokens; llama-server scores full length** (per-slot
+  context 2048). Fixture passages are short, so parity is unaffected; real passages are capped by
+  `max_result_excerpt_chars` (1200 chars). Revisit if E1 shows a rerank shift on long passages.
+- **FP16 reranker GGUF pinned** (`bge-reranker-v2-m3-f16`) only as the round-1 diagnostic; the
+  served default stays Q8_0.
