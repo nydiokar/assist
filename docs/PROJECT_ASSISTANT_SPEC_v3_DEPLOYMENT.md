@@ -2,7 +2,8 @@
 
 | | |
 |---|---|
-| Status | **DRAFT 1** — design stage, 2026-11-11. Expect revisions after the owner decisions in §3. |
+| Status | **v3.0 — build baseline**, 2026-11-11. This document is **Amendment A03** under the AGENTS.md pivot rule. Changes after this point go into `docs/AMENDMENT_A04+.md`, not silent edits. The owner decisions in §3 are recorded in the build plan as they are made. |
+| Companion | `docs/V3_BUILD_PLAN.md`: the staged, dependency-ordered build with checkpoints and live status. |
 | Scope | Turn the validated `assist` RAG prototype into a self-hosted, single-tenant **project assistant**: AI-Team (gateway + worker + Claude Code) on a dedicated host, assist as the knowledge service, Google Drive as the source, local CPU models for embedding/rerank. |
 | Precedence | Retrieval **methodology** (spec v1 §5–§6, v2, A01, A02, EVAL_LOG, DECISIONS) stands. This document **supersedes** every runtime/deployment assumption of the prototype: WSL/ROCm launch, stdio-per-session MCP, single bound project, torch in the serving path, "nothing leaves the machine" (testing-only context in AGENTS.md). |
 | Audience | An autonomous agent implementing it **and** the owner. Every task is tagged with who does it and where the agent must stop. |
@@ -678,7 +679,7 @@ flowchart TD
 
 | # | Item | Who | Acceptance |
 |---|---|---|---|
-| A0 | Restructure into the §15.3 layout as a **pure refactor** (`api.py` → `rag.py` facade + `wiring.py` composition root; migration runner; `uv` lock; pyright in CI) | AGENT | all existing tests green, zero behaviour change, one commit per move |
+| A0 | Restructure into the §15.3 ports/core/adapters/services/interfaces architecture as a **pure refactor** | AGENT | fixture golden snapshot byte-identical; all tests green; import-linter + pyright strict pass on the new packages; one layer per commit |
 | A1 | `openai_compat` embedder (query prompt client-side, last-token pooling, L2, batching, timeout, retry) | AGENT | unit tests against a stub server; a live test against llama-server matches the bf16 vectors on fixtures (cosine ≥ 0.99 for the same model at Q8) |
 | A2 | `RerankerProtocol` + `openai_compat_rerank` | AGENT | the same scores ordering as the torch reranker on 20 fixture pairs (Spearman ≥ 0.95) |
 | A3 | Token counting via `/tokenize`, cached | AGENT | chunk boundaries identical to the HF tokenizer on fixtures |
@@ -730,9 +731,11 @@ T1–T10 in §7. T1, T2 (final) and T9 are yours. The rest are agent tasks, veri
 
 ## 11. Phases and agent stop points
 
+> **Sequencing authority:** `docs/V3_BUILD_PLAN.md` owns the stage order, dependencies, checkpoints and live status. This table is a summary. If they disagree, the build plan wins and this table gets fixed.
+
 | Phase | Content | Runs on | **Agent stops for** |
 |---|---|---|---|
-| P0 | A0 first (refactor, behaviour-neutral), then A1–A4, A5 (E1) on your PC; containers CPU/RAM-limited to emulate the host | your PC | **D-1 quant choice; A6 label confirmation** |
+| P0 | A0 first (refactor, behaviour-neutral), then A1–A4, A5 (E1) — **E1 runs after OCR (A11), so the big re-index and re-label happen once; see the build plan** — on your PC; containers CPU/RAM-limited to emulate the host | your PC | **D-1 quant choice; A6 label confirmation** |
 | P1 | A7–A10, A12–A15, A19 | your PC | D-3 if the spike is inconclusive |
 | P2 | A11 (OCR), A16–A18 | your PC | D-7 API key provisioning; OCR spot-check |
 | P3 | A20, I4, I5 on a **staging VM** (a cheap 1-month box, which doubles as B1) | staging VM | **D-2 host choice; I3 allowlist approval** |
@@ -840,31 +843,127 @@ The real weaknesses:
 | Type checking | **`pyright` (or `mypy --strict`)** in CI, plus `ruff` (already configured). | The project rules ask for strict types; the codebase is already close. |
 | CLI | Keep `argparse`. | Works. Changing it would add nothing. |
 
-### 15.3 Target layout
+### 15.3 Architecture: ports and adapters, with a functional core
+
+The folders aren't the point; each one is a **role with a rule**. The pattern is *hexagonal architecture* (ports and adapters) with a *functional core, imperative shell*:
+
+- **Ports** are typed contracts (`typing.Protocol`) for everything the system needs from the outside world.
+- **Adapters** implement a port for one concrete technology. They are the **only** code that touches a third party.
+- **The core** is pure functions over immutable values. It holds all the RAG logic that makes the system valuable.
+- **Services** are the thin imperative shell: they take ports as arguments, call the core, and handle effects.
+- **Interfaces** (HTTP, MCP, CLI) translate the outside world into service calls.
+- **One composition root** (`wiring.py`) is the only place that knows which adapter implements which port.
+
+```mermaid
+flowchart TB
+  subgraph interfaces["interfaces/ — HTTP (FastAPI), MCP, CLI"]
+  end
+  subgraph services["services/ — imperative shell (orchestrates, owns effects)"]
+  end
+  subgraph core["core/ — pure functions (no I/O, no clock, no globals)"]
+  end
+  subgraph ports["ports/ — Protocols + port errors"]
+  end
+  subgraph domain["domain/ — frozen pydantic models, config models"]
+  end
+  subgraph adapters["adapters/ — the ONLY place third parties are imported"]
+  end
+  W["wiring.py — composition root"]
+  interfaces --> services
+  services --> core
+  services --> ports
+  core --> domain
+  ports --> domain
+  adapters -. implements .-> ports
+  adapters --> domain
+  W --> adapters
+  W --> services
+  W --> interfaces
+```
+
+**Ports — the abstraction the rest of the system is built on:**
+
+| Port | Contract (abridged) | Adapters (v3) | Port errors |
+|---|---|---|---|
+| `Embedder` | `profile() -> EmbeddingProfile`; `embed_passages(texts) -> Matrix`; `embed_queries(texts) -> Matrix`; `count_tokens(texts) -> list[int]` | `openai_compat` (llama-server, DeepInfra), `hash` (tests), `torch` (dev-gpu reference) | `ProviderUnavailable`, `ProviderTimeout`, `ProviderContractViolation` (wrong dim, NaN, not normalised) |
+| `Reranker` | `profile()`; `score(query, passages) -> list[float]` | `openai_compat` (`/v1/rerank`), `torch` (dev), `identity` (tests) | same three |
+| `Parser` | `supports(ext) -> bool`; `parse(path, meta) -> ParsedDocument` (states, never raises for content problems) | `native` (pypdf/docx/openpyxl/csv), `docling`, `antiword` | `ParserCrashed` (caught per document) |
+| `OcrEngine` | `ocr_pdf(path) -> path`; `ocr_image(path) -> OcrText(text, mean_conf)` | `tesseract` (ocrmypdf + tesseract), `null` | `OcrFailed` |
+| `CorpusReader` | `list_files(root) -> Iterable[FileMeta]`; `read(path) -> bytes`; path-safe by construction | `local_fs` (with a long-path shim), `fixture` | `PathOutsideRoot` |
+| `LexicalIndex` | `stage(gen, chunks)`, `search(gen, query, k)` | `sqlite_fts5` | `StoreError` |
+| `VectorIndex` | `stage(gen, chunks, vecs)`, `query(gen, vec, k, filters)` | `sqlite_vec` or `chroma` (D-3), `memory` (tests) | `StoreError` |
+| `Catalog` | projects, documents, generations, `publish(project, gen)` **atomically with the indexes it shares a transaction with** | `sqlite` | `StoreError`, `ProfileMismatch` |
+| `FeedbackSink` | `record(signal)`; `query(window)` | `sqlite`, `memory` | `StoreError` |
+| `Telemetry` | `observe(stage, seconds)`, `count(name, labels)` | `prometheus`, `null` | none (must never raise) |
+| `Clock`, `IdGen` | `now()`, `new_id()` | `system`, `fixed` (tests) | — |
+
+**Core — pure functions that carry the RAG value** (each one unit-tested and property-tested, with no mocks needed):
+
+`chunk(doc, cfg, token_counts) -> tuple[Chunk, ...]` · `fingerprint(profile, pipeline_cfg) -> str` · `generation_id(...)` · `rrf_fuse(rankings, k) -> Ranking` · `apply_per_file_cap(ranking, cap)` · `assess_evidence(results, cfg) -> Verdict` (exists, already pure) · `expand_context(...)` · `diff_corpus(prior, discovered) -> ChangeSet` · `ocr_keep(text, conf, policy) -> bool` · `gate(metrics, baseline, policy) -> GateDecision` · `wrap_untrusted(passage) -> Envelope` · `retry_schedule(policy) -> list[float]`.
+
+**Services — the shell:** `IngestService(corpus, parsers, ocr, embedder, lexical, vector, catalog, telemetry, clock)`, `SearchService(embedder, reranker, lexical, vector, catalog, feedback, telemetry)` (this is where degraded mode lives: catch port errors → fall back → flag), `EvalService`, `FeedbackService`, `ProjectRegistryService`.
+
+**Rules (enforced mechanically where possible):**
+
+| # | Rule | Enforced by |
+|---|---|---|
+| R1 | `domain` imports nothing from the package. `core` imports only `domain`. `ports` imports only `domain`. `services` never import `adapters`. Only `wiring.py` imports adapters. | **`import-linter`** contracts in CI |
+| R2 | A third-party library is imported only inside `adapters/` (exceptions: pydantic, numpy, the standard library). | `import-linter` forbidden-modules contract |
+| R3 | **Every port has one shared contract test suite**, and every adapter must pass it (`tests/contracts/test_<port>.py`, parametrised over adapters). A new adapter is "done" when it passes the suite. This is what makes the port the real base for the rest, not just a folder. | pytest; CI runs fakes, the integration tier runs real adapters (pinned llama-server container, the pinned sqlite-vec/Chroma) |
+| R4 | Domain models are **immutable** (`model_config = ConfigDict(frozen=True)`). Core functions return new values and never mutate their arguments. | pyright + a review rule |
+| R5 | **No hidden I/O or global state in the core**: no clock, environment, filesystem, network or logging. Time and IDs come in through `Clock`/`IdGen`. | `import-linter` (core may not import `os`, `time`, `logging`, `pathlib` I/O) + review |
+| R6 | Errors: **adapters translate** third-party exceptions into port errors; **services decide** (degrade, isolate, fail). There is no `except Exception` outside adapters and service boundaries, and every catch is logged with a reason. | ruff `BLE001` + review |
+| R7 | Configuration is a validated immutable object built once in `wiring.py` and passed down. Nothing below `wiring.py` reads the environment. | `import-linter` (os.environ only in config loading) |
+| R8 | Classes exist only where something holds a resource (an adapter's client or connection, a service's dependencies). There are no inheritance hierarchies: Protocols are structural. No `@staticmethod`. | review; matches the owner's global rules |
+| R9 | Every function has typed parameters and a typed return; `Any` only at the adapter edge, with a comment. | **pyright `strict`** on all new packages. Legacy modules are listed in a shrinking exclude list until A0 is done. |
+
+**Tooling and libraries (final):**
+
+| Concern | Choice |
+|---|---|
+| Packaging / lockfile | `uv` (`uv.lock`); extras: `serve`, `dev`, `dev-gpu` |
+| Lint + format | `ruff` (lint + format; already configured) |
+| Types | `pyright` strict |
+| Layer rules | `import-linter` |
+| Tests | `pytest`, **`hypothesis`** (property tests for fusion, cap, chunking, diff_corpus, gate), `respx` (httpx mocking for the adapter unit tests; contract tests use the real server) |
+| HTTP client | `httpx` (explicit timeouts on every call) |
+| Retries | `tenacity`, used only inside adapters, with a policy object from config |
+| Config | `pydantic-settings` |
+| Service | `fastapi` + `uvicorn`; the MCP SDK's Streamable HTTP app mounted as an ASGI sub-app |
+| Metrics | `prometheus-client` |
+| Storage | `sqlite3` (stdlib) + `sqlite-vec` (or `chromadb`, D-3); migrations by a numbered runner on `PRAGMA user_version` |
+| Pre-commit | ruff + pyright + import-linter + pytest unit tier |
+
+**Target tree:**
 
 ```
 src/project_rag/
-  domain/        schema.py, config.py (pydantic-settings), errors.py
-  providers/     embed_base.py, embed_openai_compat.py, embed_hash.py, embed_torch.py (dev-gpu only)
-                 rerank_base.py, rerank_openai_compat.py, rerank_torch.py (dev-gpu only), gpu_env.py
-  ingest/        discovery.py, filesystem.py, parsers.py, parsers_docling.py, ocr.py, chunking.py,
-                 stages.py, indexing.py, registry.py
-  store/         db.py (connection + transactions), migrations/ (001_….sql …), manifest.py,
-                 lexical.py, vector.py (protocol + sqlite-vec / chroma), embedding_cache.py, feedback.py
-  retrieval/     retriever.py, abstention.py (assess_evidence), expand.py, query_expansion.py
-  eval/          metrics.py, gold.py, smoke.py (tier S), gate.py, digest.py
-  service/       app.py (FastAPI composition), mcp_tools.py (+ trust envelope), admin.py, telemetry.py
-  rag.py         ProjectRAG facade (renamed from api.py); takes its dependencies as arguments
-  wiring.py      composition root: build(config) → providers, stores, ProjectRAG
-  cli.py
+  domain/      models.py (frozen), config.py (pydantic-settings models), errors.py (port error types)
+  core/        chunking.py, fusion.py, cap.py, abstention.py, expand.py, query_expansion.py,
+               fingerprint.py, corpus_diff.py, ocr_policy.py, gate.py, envelope.py, retry_policy.py
+  ports/       embedder.py, reranker.py, parser.py, ocr.py, corpus.py, lexical.py, vector.py,
+               catalog.py, feedback.py, telemetry.py, clock.py
+  adapters/    embed_openai_compat.py, embed_hash.py, embed_torch.py, rerank_openai_compat.py,
+               rerank_torch.py, rerank_identity.py, parse_native.py, parse_docling.py,
+               parse_antiword.py, ocr_tesseract.py, corpus_local_fs.py, sqlite/ (db.py, migrations/,
+               catalog.py, fts5.py, vec.py, feedback.py), vector_chroma.py, vector_memory.py,
+               telemetry_prometheus.py, clock_system.py, gpu_env.py
+  services/    ingest.py, search.py, eval.py, feedback.py, registry.py
+  interfaces/  http/ (app.py, admin.py, health.py), mcp/ (tools.py), cli.py
+  wiring.py    the composition root: build(settings) -> Services
+tests/
+  unit/        core, pure, hypothesis
+  contracts/   one suite per port, parametrised over adapters
+  integration/ services + real adapters (pinned containers)
+  evaluation/  fixture-corpus golden snapshots
 ```
 
-**Rules for the move:**
+**Rules for the move (A0):**
 
-- **Each third-party library is imported in exactly one adapter module**, and gets a contract test: chromadb or sqlite-vec in `store/vector.py`, `mcp` in `service/mcp_tools.py`, llama-server HTTP in `providers/*_openai_compat.py`, torch only in `*_torch.py`.
-- **Contract tests run against the real dependency** in the integration tier (a pinned llama-server container, the pinned Chroma/sqlite-vec version). An upstream breaking change then fails one named test, not production.
-- `ai_team_adapter.py` + `mcp_server.py` merge into `service/mcp_tools.py`. `answerer.py` (only used by `scripts/eval_agent.py`) moves to `eval/`.
-- **Do the move as a pure refactor first:** the existing 102 tests stay green, and there are no behaviour changes in the same commit. Only after that do the v3 features land.
+- **Snapshot first.** Before moving anything, record golden outputs of `search_project` and `ingest_project` on the synthetic fixture corpus (hash embedder): result ids, order, scores, verdicts, and the ingest report. The refactor is "behaviour-neutral" only when that snapshot is byte-identical afterwards.
+- Move one layer per commit, in this order: domain → core (extract the pure functions) → ports → adapters → services → interfaces → wiring. Tests and the snapshot stay green after every commit.
+- `ai_team_adapter.py` + `mcp_server.py` → `interfaces/mcp/tools.py`. `api.py` (`ProjectRAG`) → kept as a thin compatibility facade over the services until the scripts are migrated, then removed. `answerer.py` → `services/eval.py` support (it is only used by `scripts/eval_agent.py`).
+- No behaviour change and no new feature in A0. Features start at the next stage.
 
 ## 16. Sources (external facts used, checked 2026-11-11)
 

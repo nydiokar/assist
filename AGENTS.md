@@ -60,6 +60,10 @@ shards. **Never ingest them, never commit them.** Source of truth for ingestion 
 
 ## Read before working (in this order)
 
+0. **v3 build (active from 2026-11-11):** `docs/V3_BUILD_PLAN.md` (what to do next, stage
+   checkpoints, live status; it contains the autonomous continuation protocol), then
+   `docs/PROJECT_ASSISTANT_SPEC_v3_DEPLOYMENT.md` (= Amendment A03: the target system). A03
+   supersedes the prototype's runtime/deployment assumptions; the retrieval methodology below stands.
 1. `docs/AMENDMENT_A01.md` — **authoritative** where it differs from v1/v2. Qwen3-Embedding-4B
    profile, CUDA feasibility gate, fingerprinted reusable stages, and the *measured environment
    deviation* (no NVIDIA GPU on this machine).
@@ -71,7 +75,7 @@ shards. **Never ingest them, never commit them.** Source of truth for ingestion 
 4. `README.md` — setup, runbook, config switches.
 5. `configs/retrieval.yaml` — single source of provider selection and tuning.
 
-**Precedence: A01 > v2 > v1.** Anything not changed by a higher document stands.
+**Precedence: A03 (SPEC_v3) > A02 > A01 > v2 > v1.** Anything not changed by a higher document stands.
 
 ## GPU / WSL rules (mandatory — a false "GPU down" cost a day)
 
