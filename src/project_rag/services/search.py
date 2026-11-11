@@ -25,21 +25,33 @@ from ..core.fingerprint import new_query_id, query_hash
 from ..core.query_expansion import expand_query
 from ..core.ranking import apply_rerank_scores, fuse_and_rank, truncate_excerpts
 from ..domain.config import Config
-from ..domain.errors import PathOutsideRoot
+from ..domain.errors import (
+    PathOutsideRoot,
+    ProviderContractViolation,
+    ProviderTimeout,
+    ProviderUnavailable,
+)
 from ..domain.models import (
     ChannelHit,
+    EvidenceVerdict,
+    FeedbackSignal,
+    ProjectHit,
     QueryTrace,
     RetrievedResult,
+    SearchAllResponse,
     SearchResponse,
     SourceLocation,
     SourceResponse,
 )
 from ..ports.catalog import Catalog
+from ..ports.clock import Clock
 from ..ports.corpus import CorpusReader
 from ..ports.embedder import Embedder
+from ..ports.feedback import FeedbackSink
 from ..ports.lexical import LexicalIndex
 from ..ports.parser import DocumentParser
 from ..ports.reranker import Reranker
+from ..ports.telemetry import Telemetry
 from ..ports.vector import VectorIndex
 
 _DOC_CLASSES = frozenset({"project_record", "reference", "filesystem"})
@@ -79,8 +91,14 @@ class SearchService:
         catalog: Catalog,
         corpus: CorpusReader,
         parser: DocumentParser,
+        telemetry: Telemetry | None = None,
+        feedback: FeedbackSink | None = None,
+        clock: Clock | None = None,
     ) -> None:
         self._cfg = cfg
+        self._telemetry = telemetry
+        self._feedback = feedback
+        self._clock = clock
         self._embedder = embedder
         self._reranker = reranker
         self._vector = vector
@@ -112,36 +130,56 @@ class SearchService:
         *,
         doc_class: str | None = None,
         channels: Sequence[str] = ("dense", "lexical"),
-    ) -> tuple[list[RetrievedResult], dict[str, int]]:
+    ) -> tuple[list[RetrievedResult], dict[str, int], list[str]]:
+        """Results, per-channel candidate counts, and degraded components (spec §6.6): a model
+        server fault drops that stage and flags it; it never turns into an empty result."""
         rcfg = self._cfg.retrieval
         dense: list[ChannelHit] = []
         lexical: list[ChannelHit] = []
+        degraded: list[str] = []
         # Cross-language query expansion (F11/F14): additive anchors for both channels; the trace
         # still hashes the original query.
         search_query = query
         if rcfg.query_expansion.enabled:
             search_query = expand_query(query, corpus_script=rcfg.query_expansion.corpus_script)
         if "dense" in channels:
-            qvec = np.asarray(self._embedder.embed_queries([search_query])[0], dtype=np.float32)
-            dense = self._vector.query(
-                project_id, generation, qvec, rcfg.candidates_per_channel, doc_class
-            )
+            try:
+                with self._stage("embed"):
+                    qmat = self._embedder.embed_queries([search_query])
+                qvec = np.asarray(qmat[0], dtype=np.float32)
+            except _PROVIDER_ERRORS:  # degrade, do not fail (spec §6.6)
+                degraded.append("dense")
+            else:
+                with self._stage("dense"):
+                    dense = self._vector.query(
+                        project_id, generation, qvec, rcfg.candidates_per_channel, doc_class
+                    )
         if "lexical" in channels:
-            lexical = self._lexical.search(
-                project_id, generation, search_query, rcfg.candidates_per_channel, doc_class
-            )
+            with self._stage("lexical"):
+                lexical = self._lexical.search(
+                    project_id, generation, search_query, rcfg.candidates_per_channel, doc_class
+                )
         if self._reranker is not None:
             # Fuse a wider window, rerank it by content, then cut to top_k.
-            pool = fuse_and_rank(dense, lexical, rcfg, limit=rcfg.rerank.top_n)
+            with self._stage("fuse"):
+                pool = fuse_and_rank(dense, lexical, rcfg, limit=rcfg.rerank.top_n)
             if pool:
                 head = pool[: rcfg.rerank.top_n]
-                scores = self._reranker.score(query, [r.excerpt or "" for r in head])
-                pool = apply_rerank_scores(pool, scores, rcfg.rerank.top_n)
-            results = pool[: rcfg.top_k]
+                try:
+                    with self._stage("rerank"):
+                        scores = self._reranker.score(query, [r.excerpt or "" for r in head])
+                except _PROVIDER_ERRORS:  # keep the RRF order, flag it (spec §6.6)
+                    degraded.append("rerank")
+                else:
+                    pool = apply_rerank_scores(pool, scores, rcfg.rerank.top_n)
+            results = (
+                fuse_and_rank(dense, lexical, rcfg) if "rerank" in degraded else pool[: rcfg.top_k]
+            )
         else:
-            results = fuse_and_rank(dense, lexical, rcfg)
+            with self._stage("fuse"):
+                results = fuse_and_rank(dense, lexical, rcfg)
         results = truncate_excerpts(results, excerpt_limit)
-        return results, {"dense": len(dense), "lexical": len(lexical)}
+        return results, {"dense": len(dense), "lexical": len(lexical)}, degraded
 
     def search_project(
         self,
@@ -198,7 +236,7 @@ class SearchService:
 
         t = _Timer()
         with t.span("retrieve"):
-            results, channel_counts = self.retrieve(
+            results, channel_counts, degraded = self.retrieve(
                 project_id,
                 gen,
                 query,
@@ -213,7 +251,12 @@ class SearchService:
         # configured, insufficient evidence suppresses the passages (explicit no-evidence signal).
         acfg = self._cfg.retrieval.abstention
         verdict, ev_warnings = assess_evidence(results, acfg)
+        if "rerank" in degraded:
+            # The calibrated signal is gone; the gate result (if any) is RRF-based (spec §6.6).
+            verdict = verdict.model_copy(update={"calibrated": False})
         warnings.extend(ev_warnings)
+        if degraded:
+            warnings.append(f"degraded: {', '.join(degraded)} unavailable; reduced-mode search")
         served = results
         if verdict.enabled and not verdict.sufficient and acfg.suppress_on_insufficient:
             served = []
@@ -225,6 +268,7 @@ class SearchService:
         # Parent-section context expansion (v1 §7, F12/F9): additive, served passages only.
         xcfg = self._cfg.retrieval.context_expansion
         if served and xcfg.enabled:
+            t_expand = time.perf_counter()
             served = [
                 r.model_copy(
                     update={
@@ -235,7 +279,11 @@ class SearchService:
                 )
                 for r in served
             ]
+            self._observe("expand", time.perf_counter() - t_expand)
 
+        self._record_outcome(
+            project_id, query, served, verdict.enabled and not verdict.sufficient, degraded
+        )
         self._traces.append(
             QueryTrace(
                 query_id=qid,
@@ -257,7 +305,85 @@ class SearchService:
             results=served,
             evidence=verdict,
             warnings=warnings,
+            degraded=degraded,
         )
+
+    def search_all(
+        self,
+        query: str,
+        project_ids: Sequence[str],
+        *,
+        top_k: int | None = None,
+        filters: Mapping[str, object] | None = None,
+    ) -> SearchAllResponse:
+        """D-12: search each project, then merge by reranker score (fusion score when there is
+        no reranker or it was down), keeping `project_id` on every result."""
+        hits: list[ProjectHit] = []
+        verdicts: dict[str, EvidenceVerdict] = {}
+        warnings: list[str] = []
+        degraded: set[str] = set()
+        for pid in project_ids:
+            resp = self.search_project(pid, query, top_k=top_k, filters=filters)
+            verdicts[pid] = resp.evidence
+            degraded |= set(resp.degraded)
+            warnings.extend(f"{pid}: {w}" for w in resp.warnings)
+            hits.extend(ProjectHit(project_id=pid, result=r) for r in resp.results)
+        hits.sort(key=_merge_key)
+        limit = top_k or self._cfg.retrieval.top_k
+        return SearchAllResponse(
+            results=[
+                h.model_copy(update={"result": h.result.model_copy(update={"rank": i})})
+                for i, h in enumerate(hits[:limit], start=1)
+            ],
+            evidence=verdicts,
+            warnings=warnings,
+            degraded=sorted(degraded),
+        )
+
+    # ---- telemetry + automatic feedback (spec §6.9/§6.10) ----
+
+    @contextmanager
+    def _stage(self, name: str) -> Iterator[None]:
+        t0 = time.perf_counter()
+        try:
+            yield
+        finally:
+            self._observe(name, time.perf_counter() - t0)
+
+    def _observe(self, stage: str, seconds: float) -> None:
+        if self._telemetry is not None:
+            self._telemetry.observe(stage, seconds)
+
+    def _record_outcome(
+        self,
+        project_id: str,
+        query: str,
+        served: Sequence[RetrievedResult],
+        abstained: bool,
+        degraded: Sequence[str],
+    ) -> None:
+        outcome = "abstain" if abstained else ("empty" if not served else "answered")
+        if self._telemetry is not None:
+            self._telemetry.count("assist_search_total", {"outcome": outcome})
+            for component in degraded:
+                self._telemetry.count("assist_degraded_total", {"component": component})
+        if self._feedback is None or self._clock is None:
+            return
+        kinds = [outcome] if outcome != "answered" else []
+        kinds += ["degraded"] if degraded else []
+        for kind in kinds:
+            self._feedback.record(
+                FeedbackSignal(
+                    kind=kind,
+                    project_id=project_id,
+                    at=self._clock.now(),
+                    query_hash=query_hash(query),
+                    detail=",".join(degraded) if kind == "degraded" else "",
+                    query=query,
+                )
+            )
+            if self._telemetry is not None:
+                self._telemetry.count("assist_feedback_total", {"kind": kind})
 
     def expand_result_context(
         self, project_id: str, result: RetrievedResult, *, max_chars: int = 4000
@@ -343,3 +469,12 @@ class SearchService:
             truncated=len(text) > limit,
             warnings=list(doc.diagnostics),
         )
+
+
+_PROVIDER_ERRORS = (ProviderUnavailable, ProviderTimeout, ProviderContractViolation)
+
+
+def _merge_key(hit: ProjectHit) -> tuple[float, str, str]:
+    scores = hit.result.score_details
+    primary = scores.get("rerank_score", scores.get("fusion_score", 0.0))
+    return (-primary, hit.project_id, hit.result.chunk_id)

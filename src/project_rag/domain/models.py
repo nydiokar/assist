@@ -172,6 +172,7 @@ class EvidenceVerdict(Frozen):
     signal: str = ""  # score_details key used (rerank_score | fusion_score)
     top_score: float | None = None  # top-1 relevance score observed
     threshold: float | None = None  # min_top_score the signal was compared against
+    calibrated: bool = True  # False when the reranker was down and the gate fell back (§6.6)
 
 
 class SearchResponse(Frozen):
@@ -182,6 +183,21 @@ class SearchResponse(Frozen):
     results: list[RetrievedResult] = Field(default_factory=list)
     evidence: EvidenceVerdict = Field(default_factory=EvidenceVerdict)
     warnings: list[str] = Field(default_factory=list)
+    degraded: list[str] = Field(default_factory=list)  # "dense" | "rerank" (spec §6.6)
+
+
+class ProjectHit(Frozen):
+    project_id: str
+    result: RetrievedResult
+
+
+class SearchAllResponse(Frozen):
+    """Cross-project search (D-12): results merged by reranker score, tagged by project."""
+
+    results: list[ProjectHit] = Field(default_factory=list)
+    evidence: dict[str, EvidenceVerdict] = Field(default_factory=dict)
+    warnings: list[str] = Field(default_factory=list)
+    degraded: list[str] = Field(default_factory=list)
 
 
 class SourceResponse(Frozen):
@@ -354,6 +370,7 @@ class FeedbackSignal(Frozen):
     at: datetime
     query_hash: str = ""
     detail: str = ""
+    query: str = ""  # raw query text; stays on the host (spec §6.9 privacy)
 
 
 # ---- project registry + sync sidecar (S4, spec §6.4 / §8.5) ----

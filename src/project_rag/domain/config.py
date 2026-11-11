@@ -378,6 +378,23 @@ class SecurityConfig(_Cfg):
     max_result_excerpt_chars: int = 1200
 
 
+class ServiceConfig(_Cfg):
+    """The shared assist service (spec §6.3, S6)."""
+
+    corpus_root: str = "/corpus"  # one project per top-level folder (registry)
+    mcp_host: str = "0.0.0.0"
+    mcp_port: int = 8000  # agent network: /mcp (bearer token), /healthz, /metrics
+    admin_host: str = "0.0.0.0"
+    admin_port: int = 8001  # knowledge network only: /admin/ingest, /admin/status
+    max_waiting: int = 16  # requests queued for the store thread; more -> 503 + Retry-After
+    retry_after_s: int = 2
+    search_deadline_s: float = 20.0
+    open_source_deadline_s: float = 5.0
+    status_deadline_s: float = 10.0
+    max_body_bytes: int = 65536
+    allowed_hosts: list[str] = Field(default_factory=lambda: ["*"])  # MCP Host-header allowlist
+
+
 class Config(_Cfg):
     schema_version: int = 1
     embedding: EmbeddingConfig = Field(default_factory=EmbeddingConfig)
@@ -389,6 +406,7 @@ class Config(_Cfg):
     security: SecurityConfig = Field(default_factory=SecurityConfig)
     classification: ClassificationConfig = Field(default_factory=ClassificationConfig)
     ingest: IngestConfig = Field(default_factory=IngestConfig)
+    service: ServiceConfig = Field(default_factory=ServiceConfig)
 
     def assert_release_safe(self) -> list[str]:
         """Release guard (v2 §D1/D3, A01): fakes are not valid production backends.
