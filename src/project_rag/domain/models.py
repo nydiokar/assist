@@ -6,6 +6,7 @@ needs a changed value builds a new one with `model_copy(update=...)`.
 
 from __future__ import annotations
 
+from datetime import datetime
 from enum import StrEnum
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -279,3 +280,34 @@ class QueryTrace(Frozen):
     result_count: int = 0
     timings_ms: dict[str, float] = Field(default_factory=dict)
     warnings: list[str] = Field(default_factory=list)
+
+
+class DocumentRecord(Frozen):
+    """One catalog row: a source document's state within a generation."""
+
+    project_id: str
+    source_id: str
+    source_path: str
+    content_hash: str
+    version_id: str
+    state: str
+    generation: str
+    n_chunks: int = 0
+    diagnostics: str = ""
+
+
+class OcrText(Frozen):
+    """OCR output for one image: the text and the engine's mean word confidence (0-100)."""
+
+    text: str
+    mean_conf: float
+
+
+class FeedbackSignal(Frozen):
+    """A quality signal recorded by the service or the agent (spec §6.9). No raw query text."""
+
+    kind: str  # abstain | empty | degraded | user_dissatisfied | rescue
+    project_id: str
+    at: datetime
+    query_hash: str = ""
+    detail: str = ""
