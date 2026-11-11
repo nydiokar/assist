@@ -96,8 +96,10 @@ def test_prompt_uses_expanded_context_and_cites_sources():
 
 
 def test_prompt_falls_back_to_excerpt_without_expanded_context():
-    res = _sufficient_response()
-    res.results[0].expanded_context = ""  # no parent section attached
+    base = _sufficient_response()
+    res = base.model_copy(  # no parent section attached
+        update={"results": [base.results[0].model_copy(update={"expanded_context": ""})]}
+    )
     prompt = build_grounding_prompt("q", res)
     assert "общ бюджет 49 697,00 EUR" in prompt
 
@@ -105,10 +107,23 @@ def test_prompt_falls_back_to_excerpt_without_expanded_context():
 def test_prompt_warns_when_passages_shown_below_threshold():
     """Report-drafting profile (suppress off): passages present but gate said insufficient —
     the prompt must tell the model the signal is weak and to abstain unless a passage states it."""
-    res = _sufficient_response()
-    res.results[0].score_details["rerank_score"] = 0.05
-    res.evidence = EvidenceVerdict(
-        enabled=True, sufficient=False, signal="rerank_score", top_score=0.05, threshold=0.26
+    base = _sufficient_response()
+    top = base.results[0]
+    res = base.model_copy(
+        update={
+            "results": [
+                top.model_copy(
+                    update={"score_details": {**top.score_details, "rerank_score": 0.05}}
+                )
+            ],
+            "evidence": EvidenceVerdict(
+                enabled=True,
+                sufficient=False,
+                signal="rerank_score",
+                top_score=0.05,
+                threshold=0.26,
+            ),
+        }
     )
     prompt = build_grounding_prompt("q", res)
     assert "BELOW" in prompt

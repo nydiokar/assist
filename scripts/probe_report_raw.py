@@ -10,6 +10,7 @@ import argparse
 from pathlib import Path
 
 from project_rag.api import ProjectRAG
+from project_rag.config import load_config, with_overrides
 from project_rag.evaluation import load_questions
 
 
@@ -22,9 +23,12 @@ def main() -> None:
     ap.add_argument("--only", nargs="*", default=None, help="only these ids")
     args = ap.parse_args()
 
-    rag = ProjectRAG(config_path=args.config)
     # turn OFF suppression so we always see the raw ranked passages + the substring presence
-    rag.config.retrieval.abstention.suppress_on_insufficient = False
+    rag = ProjectRAG(
+        config=with_overrides(
+            load_config(args.config), {"retrieval.abstention.suppress_on_insufficient": False}
+        )
+    )
     rag.register_project_root(args.project, args.root)
     questions = load_questions(args.questions)
     if args.only:

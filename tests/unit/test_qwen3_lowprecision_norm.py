@@ -6,7 +6,7 @@ from typing import ClassVar
 
 import numpy as np
 
-from project_rag.config import EmbeddingConfig
+from project_rag.config import EmbeddingConfig, Qwen3Config
 from project_rag.embeddings import Qwen3Embedder
 
 
@@ -20,8 +20,7 @@ class _FakeBf16Model:
 
 
 def test_low_precision_vectors_are_renormalized_in_fp32() -> None:
-    cfg = EmbeddingConfig(provider="qwen3")
-    cfg.qwen3.dim = 1024
+    cfg = EmbeddingConfig(provider="qwen3", qwen3=Qwen3Config(dim=1024))
     emb = Qwen3Embedder(cfg)
     emb._model = _FakeBf16Model()
     out = emb.embed_passages(["a", "b", "c"])

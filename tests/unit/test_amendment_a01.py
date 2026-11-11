@@ -5,7 +5,13 @@ from __future__ import annotations
 from pathlib import Path
 
 from project_rag.chunking import chunk_document
-from project_rag.config import ChunkingConfig, Config, EmbeddingConfig, ParsingConfig
+from project_rag.config import (
+    ChunkingConfig,
+    Config,
+    EmbeddingConfig,
+    ParsingConfig,
+    with_overrides,
+)
 from project_rag.parsers import ParserRegistry
 from project_rag.schema import Block, BlockType, DocState, ParsedDocument
 from project_rag.stages import StageCache
@@ -32,12 +38,12 @@ def test_profile_key_distinguishes_providers_and_dims():
 
 
 def test_release_guard_rejects_unpinned_qwen3_revision():
-    cfg = Config()
-    cfg.embedding.provider = "qwen3"
-    cfg.vector_store.provider = "chroma"
+    cfg = with_overrides(
+        Config(), {"embedding.provider": "qwen3", "vector_store.provider": "chroma"}
+    )
     problems = cfg.assert_release_safe()
     assert any("revision not pinned" in p for p in problems)
-    cfg.embedding.qwen3.revision = "abc123deadbeef"
+    cfg = with_overrides(cfg, {"embedding.qwen3.revision": "abc123deadbeef"})
     assert cfg.assert_release_safe() == []
 
 

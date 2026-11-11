@@ -83,9 +83,7 @@ def fuse_and_rank(
             break
         _append(results, c, fused)
 
-    for i, r in enumerate(results, start=1):
-        r.rank = i
-    return results[:cap]
+    return [r.model_copy(update={"rank": i}) for i, r in enumerate(results[:cap], start=1)]
 
 
 def _append(results: list[RetrievedResult], c: _Candidate, fused: float) -> None:
@@ -167,8 +165,11 @@ class Retriever:
             results = pool[: self._cfg.top_k]
         else:
             results = fuse_and_rank(dense, lexical, self._cfg)
-        for r in results:
-            if len(r.excerpt) > excerpt_limit:
-                r.excerpt = r.excerpt[:excerpt_limit] + "…"
+        results = [
+            r.model_copy(update={"excerpt": r.excerpt[:excerpt_limit] + "…"})
+            if len(r.excerpt) > excerpt_limit
+            else r
+            for r in results
+        ]
         channels = {"dense": len(dense), "lexical": len(lexical)}
         return results, channels

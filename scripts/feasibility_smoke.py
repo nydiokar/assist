@@ -66,11 +66,10 @@ def main() -> int:
     report["cuda_runtime"] = torch.version.cuda
 
     # 2) load model + encode
-    from project_rag.config import load_config
+    from project_rag.config import load_config, with_overrides
     from project_rag.embeddings import build_embedder
 
-    cfg = load_config()
-    cfg.embedding.provider = "qwen3"
+    cfg = with_overrides(load_config(), {"embedding.provider": "qwen3"})
     report["model_id"] = cfg.embedding.qwen3.model
     report["revision"] = cfg.embedding.qwen3.revision
     report["inference_dtype"] = cfg.embedding.qwen3.inference_dtype

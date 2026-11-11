@@ -99,19 +99,27 @@ class IndexingService:
         prior_gen = self._manifest.active_generation(project_id)
         prior_hashes = self._manifest.prior_hashes(project_id, prior_gen) if prior_gen else {}
 
-        report = IngestReport(
-            project_id=project_id,
-            index_generation=new_gen,
-            dry_run=dry_run,
-            embedding_profile_key=profile.key(),
-        )
+        files: list[FileReport] = []
+        warnings: list[str] = []
+        counts = {"added": 0, "modified": 0, "unchanged": 0, "deleted": 0}
+
+        def report() -> IngestReport:
+            return IngestReport(
+                project_id=project_id,
+                index_generation=new_gen,
+                dry_run=dry_run,
+                embedding_profile_key=profile.key(),
+                files=files,
+                warnings=warnings,
+                **counts,
+            )
 
         # Short-circuit true idempotency: identical corpus AND same generation already active.
         if prior_gen == new_gen and not dry_run:
-            report.unchanged = len(discovered)
-            report.warnings.append("no changes: active generation unchanged")
+            counts["unchanged"] = len(discovered)
+            warnings.append("no changes: active generation unchanged")
             for d in discovered:
-                report.files.append(
+                files.append(
                     FileReport(
                         source_path=d.source_path,
                         state=DocState.READY if d.supported else DocState.UNSUPPORTED,
@@ -119,7 +127,7 @@ class IndexingService:
                         version_id=_version_id(d.content_hash, self._cfg.parsing.backend),
                     )
                 )
-            return report
+            return report()
 
         cache = StageCache(self._cache_root, project_id)
         token_counter = self._embedder.token_count
@@ -130,14 +138,14 @@ class IndexingService:
             prior = prior_hashes.get(d.source_path)
             changed = prior is None or prior[0] != d.content_hash
             if prior is None:
-                report.added += 1
+                counts["added"] += 1
             elif changed:
-                report.modified += 1
+                counts["modified"] += 1
             else:
-                report.unchanged += 1
+                counts["unchanged"] += 1
 
             if not d.supported:
-                report.files.append(
+                files.append(
                     FileReport(
                         source_path=d.source_path,
                         state=DocState.UNSUPPORTED,
@@ -158,7 +166,7 @@ class IndexingService:
             )
             doc: ParsedDocument = parse_art.doc
             if doc.state not in {DocState.PARSED}:
-                report.files.append(
+                files.append(
                     FileReport(
                         source_path=d.source_path,
                         state=doc.state,
@@ -190,7 +198,7 @@ class IndexingService:
                     f"TRUNCATION: {sum(c.truncated for c in chunks)} chunk(s) exceeded "
                     f"max_tokens={self._cfg.chunking.max_tokens}"
                 )
-            report.files.append(
+            files.append(
                 FileReport(
                     source_path=d.source_path,
                     state=DocState.READY,
@@ -211,14 +219,14 @@ class IndexingService:
             fs_chunks = build_filesystem_chunks(project_id, discovered)
             staged_chunks.extend(fs_chunks)
             if fs_chunks:
-                report.warnings.append(f"filesystem_evidence: {len(fs_chunks)} presence chunk(s)")
+                warnings.append(f"filesystem_evidence: {len(fs_chunks)} presence chunk(s)")
 
         deleted = set(prior_hashes) - {d.source_path for d in discovered}
-        report.deleted = len(deleted)
+        counts["deleted"] = len(deleted)
 
         if dry_run:
-            report.warnings.append("dry run: no writes performed")
-            return report
+            warnings.append("dry run: no writes performed")
+            return report()
 
         # Stage: embed + write new generation.
         if staged_chunks:
@@ -231,7 +239,7 @@ class IndexingService:
                 [(c.chunk_id, c.source_id, c.version_id) for c in staged_chunks],
             )
 
-        for fr in report.files:
+        for fr in files:
             content_hash = next(
                 (d.content_hash for d in discovered if d.source_path == fr.source_path), ""
             )
@@ -256,8 +264,8 @@ class IndexingService:
             self._lx.delete_generation(project_id, prior_gen)
             self._manifest.delete_generation(project_id, prior_gen)
 
-        report.warnings.append(f"stage_cache={cache.stats()}")
-        return report
+        warnings.append(f"stage_cache={cache.stats()}")
+        return report()
 
     def _embed_cached(self, chunks: list[Chunk], *, cache_root: str, batch: int = 64) -> np.ndarray:
         """Embed only chunks whose (text, profile) is not cached; commit each batch (resumable)."""

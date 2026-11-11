@@ -16,12 +16,10 @@ from __future__ import annotations
 import hashlib
 from pathlib import Path
 
-from pydantic import BaseModel
-
 from .chunking import CHUNKER_VERSION, chunk_document
 from .config import ChunkingConfig, ParsingConfig
+from .domain.models import ChunkArtifact, ParseArtifact
 from .parsers import ParserRegistry
-from .schema import Chunk, ParsedDocument
 
 PARSER_VERSION = "native_v1"
 
@@ -36,19 +34,6 @@ def parse_key(source_content_hash: str, parser_cfg: ParsingConfig) -> str:
 
 def chunk_key(parsed_artifact_id: str, chunk_cfg: ChunkingConfig) -> str:
     return _fp("chunk", parsed_artifact_id, CHUNKER_VERSION, chunk_cfg.model_dump_json())
-
-
-class ParseArtifact(BaseModel):
-    artifact_id: str  # == parse_key (identity for downstream chunk key)
-    source_path: str
-    source_content_hash: str
-    doc: ParsedDocument
-
-
-class ChunkArtifact(BaseModel):
-    artifact_id: str  # == chunk_key
-    parsed_artifact_id: str
-    chunks: list[Chunk]
 
 
 class StageCache:

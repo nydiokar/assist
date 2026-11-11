@@ -6,7 +6,7 @@ import hashlib
 import os
 from pathlib import Path
 
-from pydantic import BaseModel
+from .domain.models import DiscoveredFile
 
 SUPPORTED_EXTENSIONS: frozenset[str] = frozenset({".pdf", ".docx", ".xlsx", ".csv", ".txt", ".md"})
 
@@ -16,16 +16,6 @@ IGNORE_DIR_NAMES: frozenset[str] = frozenset(
     {".git", "local_data", "__pycache__", ".venv", "node_modules", "chroma"}
 )
 IGNORE_FILE_PREFIXES: tuple[str, ...] = ("~$", ".~")
-
-
-class DiscoveredFile(BaseModel):
-    source_path: str  # relative to root, forward-slash normalized
-    abs_path: str
-    ext: str
-    size: int
-    mtime: float  # diagnostic only (v1 §4.1)
-    content_hash: str  # SHA-256
-    supported: bool
 
 
 def _sha256(path: Path) -> str:

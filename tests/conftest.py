@@ -10,22 +10,21 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from project_rag.api import ProjectRAG
-from project_rag.config import Config
+from project_rag.config import Config, with_overrides
 
 FIXTURE_CORPUS = Path(__file__).resolve().parent / "fixtures" / "synthetic" / "ngo_project_demo"
 
 
 def _config(tmp_path: Path, **overrides) -> Config:
-    cfg = Config()
-    cfg.lexical_store.path = str(tmp_path / "manifest.sqlite3")
-    cfg.vector_store.persist_path = str(tmp_path / "store")
-    for k, v in overrides.items():
-        *parents, field = k.split(".")  # supports nested e.g. retrieval.abstention.enabled
-        obj = cfg
-        for p in parents:
-            obj = getattr(obj, p)
-        setattr(obj, field, v)
-    return cfg
+    # Dotted keys address nested sections, e.g. retrieval.abstention.enabled (config is frozen).
+    return with_overrides(
+        Config(),
+        {
+            "lexical_store.path": str(tmp_path / "manifest.sqlite3"),
+            "vector_store.persist_path": str(tmp_path / "store"),
+            **overrides,
+        },
+    )
 
 
 @pytest.fixture

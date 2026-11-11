@@ -186,7 +186,7 @@ class ProjectRAG:
         if served and self._cfg.retrieval.context_expansion.enabled:
             from .expand import attach_expanded_context
 
-            attach_expanded_context(
+            served = attach_expanded_context(
                 self, project_id, served, max_chars=self._cfg.retrieval.context_expansion.max_chars
             )
 

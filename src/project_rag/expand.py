@@ -73,11 +73,17 @@ def expand_result_context(
 
 def attach_expanded_context(
     rag: ProjectRAG, project_id: str, results: list[RetrievedResult], *, max_chars: int = 4000
-) -> None:
-    """Populate `RetrievedResult.expanded_context` in place for each served result.
+) -> list[RetrievedResult]:
+    """Return copies of the served results with `expanded_context` populated.
 
     Re-reads are cached per source_path inside `open_source`'s parser registry call; we cap the
     count by operating only on the already-served (top_k) window, so cost is bounded.
     """
-    for r in results:
-        r.expanded_context = expand_result_context(rag, project_id, r, max_chars=max_chars)
+    return [
+        r.model_copy(
+            update={
+                "expanded_context": expand_result_context(rag, project_id, r, max_chars=max_chars)
+            }
+        )
+        for r in results
+    ]

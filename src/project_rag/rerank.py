@@ -51,9 +51,15 @@ class CrossEncoderReranker:
         reranked: list[RetrievedResult] = []
         for src_idx in order:
             r = head[src_idx]
-            r.score_details = {**r.score_details, "rerank_score": round(float(scores[src_idx]), 6)}
-            reranked.append(r)
+            reranked.append(
+                r.model_copy(
+                    update={
+                        "score_details": {
+                            **r.score_details,
+                            "rerank_score": round(float(scores[src_idx]), 6),
+                        }
+                    }
+                )
+            )
         out = reranked + tail
-        for i, r in enumerate(out, start=1):
-            r.rank = i
-        return out
+        return [r.model_copy(update={"rank": i}) for i, r in enumerate(out, start=1)]

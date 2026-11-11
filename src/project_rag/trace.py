@@ -11,20 +11,7 @@ import hashlib
 import time
 from contextlib import contextmanager
 
-from pydantic import BaseModel, Field
-
-
-class QueryTrace(BaseModel):
-    query_id: str
-    tool: str
-    project_id: str
-    query_hash: str
-    index_generation: str
-    retrieved_chunk_ids: list[str] = Field(default_factory=list)
-    channels: dict[str, int] = Field(default_factory=dict)  # channel -> candidate count
-    result_count: int = 0
-    timings_ms: dict[str, float] = Field(default_factory=dict)
-    warnings: list[str] = Field(default_factory=list)
+from .domain.models import QueryTrace  # noqa: F401  (re-export, S1 shim)
 
 
 def query_hash(query: str) -> str:

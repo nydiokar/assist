@@ -87,7 +87,6 @@ def test_dry_run_writes_nothing(make_rag, corpus_root, tmp_path):
 def test_chunking_config_change_forces_new_generation(make_rag, corpus_root, tmp_path):
     rag = make_rag()
     g1 = rag.ingest_project("demo", corpus_root).index_generation
-    rag._cfg.chunking.target_tokens = 120
-    rag._indexer._cfg.chunking.target_tokens = 120
-    r2 = rag.ingest_project("demo", corpus_root)
+    rag2 = make_rag(**{"chunking.target_tokens": 120})  # same store, changed chunker config
+    r2 = rag2.ingest_project("demo", corpus_root)
     assert r2.index_generation != g1 and "no changes" not in " ".join(r2.warnings)
