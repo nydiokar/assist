@@ -48,6 +48,22 @@ def _corpus(tmp: Path) -> Path:
         f"# Partner note\n\n{INJECTION}\n", encoding="utf-8"
     )
     shutil.copytree(FIXTURE_CORPUS, root / "Second Project")
+    (root / ".sync").mkdir()
+    (root / ".sync" / "manifest.json").write_text(
+        json.dumps(
+            {
+                "folders": [{"path": "Green Villages", "drive_id": "drv-gv"}],
+                "files": [
+                    {
+                        "path": "Green Villages/proposal.md",
+                        "drive_id": "f1",
+                        "web_link": "https://drive.google.com/file/d/f1/view",
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
     return root
 
 
@@ -172,6 +188,9 @@ def test_tools_search_envelope_and_invalid_project(running: tuple[Runtime, str, 
     first = body["passages"][0]
     assert first["type"] == "retrieved_document_excerpt" and first["trust"] == "untrusted_data"
     assert any("GV-2025-017" in p["content"] for p in body["passages"])
+    links = {p["source_path"]: p["web_link"] for p in body["passages"]}
+    assert links.get("proposal.md") == "https://drive.google.com/file/d/f1/view"  # A10
+    assert all(v is None for k, v in links.items() if k != "proposal.md")  # dev: no sidecar entry
     assert body["degraded"] == []
 
     err, text = asyncio.run(
