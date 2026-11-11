@@ -21,9 +21,12 @@ jobs:
           version: "0.9.5"
           python-version: "3.12"
       - name: OCR and legacy-doc tools (S4 adapter tests)
+        timeout-minutes: 8
+        env:
+          DEBIAN_FRONTEND: noninteractive
         run: |
-          sudo apt-get update -q
-          sudo apt-get install -y -q --no-install-recommends tesseract-ocr tesseract-ocr-bul tesseract-ocr-eng ocrmypdf antiword
+          sudo apt-get -o Acquire::Retries=5 update -q
+          sudo apt-get -o Acquire::Retries=5 install -y -q --no-install-recommends tesseract-ocr tesseract-ocr-bul tesseract-ocr-eng ocrmypdf antiword
       - name: Sync (frozen lock, dev extra)
         run: uv sync --frozen --extra dev
       - name: Ruff lint
