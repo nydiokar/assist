@@ -1,0 +1,2849 @@
+{
+ "abstain_expand": {
+  "ingest": {
+   "added": 6,
+   "deleted": 0,
+   "embedding_profile_key": "hash:hash-deterministic:v1:2560:hash:1:hash_query_v1",
+   "files": [
+    {
+     "n_blocks": 3,
+     "n_chunks": 1,
+     "source_id": "src_6ffd3c288c4781b22fb0",
+     "source_path": "indicators.xlsx",
+     "state": "READY",
+     "version_id": "v_efd280aa3a7d41f559be"
+    },
+    {
+     "n_blocks": 3,
+     "n_chunks": 1,
+     "source_id": "src_a711e743b10bf0319c4d",
+     "source_path": "memo_bg.md",
+     "state": "READY",
+     "version_id": "v_8171296ec87b2fbd3322"
+    },
+    {
+     "n_blocks": 7,
+     "n_chunks": 3,
+     "source_id": "src_dec9eb68a39868228da5",
+     "source_path": "progress_report.md",
+     "state": "READY",
+     "version_id": "v_5dbd57ee51c312285536"
+    },
+    {
+     "n_blocks": 8,
+     "n_chunks": 3,
+     "source_id": "src_c05f8eb8e8cb1c92cedd",
+     "source_path": "proposal.md",
+     "state": "READY",
+     "version_id": "v_4401cead9068ca71880e"
+    },
+    {
+     "n_blocks": 6,
+     "n_chunks": 1,
+     "source_id": "src_8bd86b578500f3062b04",
+     "source_path": "registrations.csv",
+     "state": "READY",
+     "version_id": "v_e7a5dca4e8a0307c3edd"
+    },
+    {
+     "n_blocks": 0,
+     "n_chunks": 0,
+     "source_id": "src_fb2eb00686284bd27146",
+     "source_path": "scanned_placeholder.pdf",
+     "state": "OCR_REQUIRED",
+     "version_id": "v_cf6ea8d5174a1bcd5dd0"
+    }
+   ],
+   "index_generation": "g_7f0b15d76fcac5c5",
+   "modified": 0,
+   "unchanged": 0,
+   "warnings": [
+    "stage_cache={'parse_hits': 0, 'parse_misses': 6, 'chunk_hits': 0, 'chunk_misses': 5}"
+   ]
+  },
+  "queries": {
+   "q01": {
+    "index_generation": "g_7f0b15d76fcac5c5",
+    "query_id": "q_469e38316460f332",
+    "results": [
+     {
+      "channels": [
+       "dense",
+       "lexical"
+      ],
+      "chunk_id": "ck_18869a5586f0fde9ffb58756",
+      "excerpt_sha": "26170d136d828463",
+      "expanded_sha": "26170d136d828463",
+      "rank": 1,
+      "scores": {
+       "fusion_score": 0.032787,
+       "rank_dense": 1.0,
+       "rank_lexical": 1.0
+      },
+      "source_path": "proposal.md"
+     },
+     {
+      "channels": [
+       "dense",
+       "lexical"
+      ],
+      "chunk_id": "ck_550ae4febedd9d7e2f9b0010",
+      "excerpt_sha": "e458579c001e48f3",
+      "expanded_sha": "e458579c001e48f3",
+      "rank": 2,
+      "scores": {
+       "fusion_score": 0.032258,
+       "rank_dense": 2.0,
+       "rank_lexical": 2.0
+      },
+      "source_path": "proposal.md"
+     },
+     {
+      "channels": [
+       "dense",
+       "lexical"
+      ],
+      "chunk_id": "ck_7e2469605b94344b853971a4",
+      "excerpt_sha": "ad8269dc5e69162b",
+      "expanded_sha": "ad8269dc5e69162b",
+      "rank": 3,
+      "scores": {
+       "fusion_score": 0.031498,
+       "rank_dense": 4.0,
+       "rank_lexical": 3.0
+      },
+      "source_path": "progress_report.md"
+     },
+     {
+      "channels": [
+       "dense",
+       "lexical"
+      ],
+      "chunk_id": "ck_df38c5a0b4bcc935b701e5b7",
+      "excerpt_sha": "069838c289b57172",
+      "expanded_sha": "069838c289b57172",
+      "rank": 4,
+      "scores": {
+       "fusion_score": 0.03101,
+       "rank_dense": 5.0,
+       "rank_lexical": 4.0
+      },
+      "source_path": "proposal.md"
+     },
+     {
+      "channels": [
+       "dense"
+      ],
+      "chunk_id": "ck_49456d6af8b43865f42896f7",
+      "excerpt_sha": "af1863b0cf9a0632",
+      "expanded_sha": "af1863b0cf9a0632",
+      "rank": 5,
+      "scores": {
+       "fusion_score": 0.015873,
+       "rank_dense": 3.0
+      },
+      "source_path": "registrations.csv"
+     }
+    ],
+    "verdict": {
+     "enabled": true,
+     "signal": "fusion_score",
+     "sufficient": true,
+     "threshold": 0.03,
+     "top_score": 0.032787
+    },
+    "warnings": []
+   },
+   "q02": {
+    "index_generation": "g_7f0b15d76fcac5c5",
+    "query_id": "q_38664ee96514bace",
+    "results": [
+     {
+      "channels": [
+       "dense",
+       "lexical"
+      ],
+      "chunk_id": "ck_550ae4febedd9d7e2f9b0010",
+      "excerpt_sha": "e458579c001e48f3",
+      "expanded_sha": "e458579c001e48f3",
+      "rank": 1,
+      "scores": {
+       "fusion_score": 0.032787,
+       "rank_dense": 1.0,
+       "rank_lexical": 1.0
+      },
+      "source_path": "proposal.md"
+     },
+     {
+      "channels": [
+       "dense",
+       "lexical"
+      ],
+      "chunk_id": "ck_6123907e05fc0b9b6f19292d",
+      "excerpt_sha": "c8458ac2ac9a25b8",
+      "expanded_sha": "c8458ac2ac9a25b8",
+      "rank": 2,
+      "scores": {
+       "fusion_score": 0.032258,
+       "rank_dense": 2.0,
+       "rank_lexical": 2.0
+      },
+      "source_path": "indicators.xlsx"
+     },
+     {
+      "channels": [
+       "dense",
+       "lexical"
+      ],
+      "chunk_id": "ck_18869a5586f0fde9ffb58756",
+      "excerpt_sha": "26170d136d828463",
+      "expanded_sha": "26170d136d828463",
+      "rank": 3,
+      "scores": {
+       "fusion_score": 0.031498,
+       "rank_dense": 4.0,
+       "rank_lexical": 3.0
+      },
+      "source_path": "proposal.md"
+     },
+     {
+      "channels": [
+       "dense",
+       "lexical"
+      ],
+      "chunk_id": "ck_7e2469605b94344b853971a4",
+      "excerpt_sha": "ad8269dc5e69162b",
+      "expanded_sha": "ad8269dc5e69162b",
+      "rank": 4,
+      "scores": {
+       "fusion_score": 0.030777,
+       "rank_dense": 6.0,
+       "rank_lexical": 4.0
+      },
+      "source_path": "progress_report.md"
+     },
+     {
+      "channels": [
+       "dense",
+       "lexical"
+      ],
+      "chunk_id": "ck_df38c5a0b4bcc935b701e5b7",
+      "excerpt_sha": "069838c289b57172",
+      "expanded_sha": "069838c289b57172",
+      "rank": 5,
+      "scores": {
+       "fusion_score": 0.030769,
+       "rank_dense": 5.0,
+       "rank_lexical": 5.0
+      },
+      "source_path": "proposal.md"
+     }
+    ],
+    "verdict": {
+     "enabled": true,
+     "signal": "fusion_score",
+     "sufficient": true,
+     "threshold": 0.03,
+     "top_score": 0.032787
+    },
+    "warnings": []
+   },
+   "q03": {
+    "index_generation": "g_7f0b15d76fcac5c5",
+    "query_id": "q_26b1f9a47624fb54",
+    "results": [
+     {
+      "channels": [
+       "dense",
+       "lexical"
+      ],
+      "chunk_id": "ck_df38c5a0b4bcc935b701e5b7",
+      "excerpt_sha": "069838c289b57172",
+      "expanded_sha": "069838c289b57172",
+      "rank": 1,
+      "scores": {
+       "fusion_score": 0.032787,
+       "rank_dense": 1.0,
+       "rank_lexical": 1.0
+      },
+      "source_path": "proposal.md"
+     },
+     {
+      "channels": [
+       "dense",
+       "lexical"
+      ],
+      "chunk_id": "ck_8cb9df92ed666b19ed3a5547",
+      "excerpt_sha": "a80713bffbb8fcf6",
+      "expanded_sha": "a80713bffbb8fcf6",
+      "rank": 2,
+      "scores": {
+       "fusion_score": 0.032258,
+       "rank_dense": 2.0,
+       "rank_lexical": 2.0
+      },
+      "source_path": "progress_report.md"
+     },
+     {
+      "channels": [
+       "dense",
+       "lexical"
+      ],
+      "chunk_id": "ck_18869a5586f0fde9ffb58756",
+      "excerpt_sha": "26170d136d828463",
+      "expanded_sha": "26170d136d828463",
+      "rank": 3,
+      "scores": {
+       "fusion_score": 0.031498,
+       "rank_dense": 3.0,
+       "rank_lexical": 4.0
+      },
+      "source_path": "proposal.md"
+     },
+     {
+      "channels": [
+       "dense",
+       "lexical"
+      ],
+      "chunk_id": "ck_7e2469605b94344b853971a4",
+      "excerpt_sha": "ad8269dc5e69162b",
+      "expanded_sha": "ad8269dc5e69162b",
+      "rank": 4,
+      "scores": {
+       "fusion_score": 0.031025,
+       "rank_dense": 6.0,
+       "rank_lexical": 3.0
+      },
+      "source_path": "progress_report.md"
+     },
+     {
+      "channels": [
+       "dense",
+       "lexical"
+      ],
+      "chunk_id": "ck_550ae4febedd9d7e2f9b0010",
+      "excerpt_sha": "e458579c001e48f3",
+      "expanded_sha": "e458579c001e48f3",
+      "rank": 5,
+      "scores": {
+       "fusion_score": 0.03031,
+       "rank_dense": 7.0,
+       "rank_lexical": 5.0
+      },
+      "source_path": "proposal.md"
+     }
+    ],
+    "verdict": {
+     "enabled": true,
+     "signal": "fusion_score",
+     "sufficient": true,
+     "threshold": 0.03,
+     "top_score": 0.032787
+    },
+    "warnings": []
+   },
+   "q04": {
+    "index_generation": "g_7f0b15d76fcac5c5",
+    "query_id": "q_6f4967a05969feac",
+    "results": [
+     {
+      "channels": [
+       "dense",
+       "lexical"
+      ],
+      "chunk_id": "ck_7e2469605b94344b853971a4",
+      "excerpt_sha": "ad8269dc5e69162b",
+      "expanded_sha": "ad8269dc5e69162b",
+      "rank": 1,
+      "scores": {
+       "fusion_score": 0.032787,
+       "rank_dense": 1.0,
+       "rank_lexical": 1.0
+      },
+      "source_path": "progress_report.md"
+     },
+     {
+      "channels": [
+       "dense",
+       "lexical"
+      ],
+      "chunk_id": "ck_550ae4febedd9d7e2f9b0010",
+      "excerpt_sha": "e458579c001e48f3",
+      "expanded_sha": "e458579c001e48f3",
+      "rank": 2,
+      "scores": {
+       "fusion_score": 0.032002,
+       "rank_dense": 2.0,
+       "rank_lexical": 3.0
+      },
+      "source_path": "proposal.md"
+     },
+     {
+      "channels": [
+       "dense",
+       "lexical"
+      ],
+      "chunk_id": "ck_49456d6af8b43865f42896f7",
+      "excerpt_sha": "af1863b0cf9a0632",
+      "expanded_sha": "af1863b0cf9a0632",
+      "rank": 3,
+      "scores": {
+       "fusion_score": 0.031514,
+       "rank_dense": 5.0,
+       "rank_lexical": 2.0
+      },
+      "source_path": "registrations.csv"
+     },
+     {
+      "channels": [
+       "dense",
+       "lexical"
+      ],
+      "chunk_id": "ck_18869a5586f0fde9ffb58756",
+      "excerpt_sha": "26170d136d828463",
+      "expanded_sha": "26170d136d828463",
+      "rank": 4,
+      "scores": {
+       "fusion_score": 0.03125,
+       "rank_dense": 4.0,
+       "rank_lexical": 4.0
+      },
+      "source_path": "proposal.md"
+     },
+     {
+      "channels": [
+       "dense",
+       "lexical"
+      ],
+      "chunk_id": "ck_a59e4a9c7a969506ba9d264d",
+      "excerpt_sha": "e7f196aa1d0123b6",
+      "expanded_sha": "e7f196aa1d0123b6",
+      "rank": 5,
+      "scores": {
+       "fusion_score": 0.030798,
+       "rank_dense": 3.0,
+       "rank_lexical": 7.0
+      },
+      "source_path": "progress_report.md"
+     }
+    ],
+    "verdict": {
+     "enabled": true,
+     "signal": "fusion_score",
+     "sufficient": true,
+     "threshold": 0.03,
+     "top_score": 0.032787
+    },
+    "warnings": []
+   },
+   "q05": {
+    "index_generation": "g_7f0b15d76fcac5c5",
+    "query_id": "q_b49de51e83207f02",
+    "results": [
+     {
+      "channels": [
+       "dense",
+       "lexical"
+      ],
+      "chunk_id": "ck_6123907e05fc0b9b6f19292d",
+      "excerpt_sha": "c8458ac2ac9a25b8",
+      "expanded_sha": "c8458ac2ac9a25b8",
+      "rank": 1,
+      "scores": {
+       "fusion_score": 0.032522,
+       "rank_dense": 2.0,
+       "rank_lexical": 1.0
+      },
+      "source_path": "indicators.xlsx"
+     },
+     {
+      "channels": [
+       "dense",
+       "lexical"
+      ],
+      "chunk_id": "ck_a59e4a9c7a969506ba9d264d",
+      "excerpt_sha": "e7f196aa1d0123b6",
+      "expanded_sha": "e7f196aa1d0123b6",
+      "rank": 2,
+      "scores": {
+       "fusion_score": 0.032522,
+       "rank_dense": 1.0,
+       "rank_lexical": 2.0
+      },
+      "source_path": "progress_report.md"
+     },
+     {
+      "channels": [
+       "dense",
+       "lexical"
+      ],
+      "chunk_id": "ck_550ae4febedd9d7e2f9b0010",
+      "excerpt_sha": "e458579c001e48f3",
+      "expanded_sha": "e458579c001e48f3",
+      "rank": 3,
+      "scores": {
+       "fusion_score": 0.031746,
+       "rank_dense": 3.0,
+       "rank_lexical": 3.0
+      },
+      "source_path": "proposal.md"
+     },
+     {
+      "channels": [
+       "dense",
+       "lexical"
+      ],
+      "chunk_id": "ck_df38c5a0b4bcc935b701e5b7",
+      "excerpt_sha": "069838c289b57172",
+      "expanded_sha": "069838c289b57172",
+      "rank": 4,
+      "scores": {
+       "fusion_score": 0.030777,
+       "rank_dense": 6.0,
+       "rank_lexical": 4.0
+      },
+      "source_path": "proposal.md"
+     },
+     {
+      "channels": [
+       "dense",
+       "lexical"
+      ],
+      "chunk_id": "ck_7e2469605b94344b853971a4",
+      "excerpt_sha": "ad8269dc5e69162b",
+      "expanded_sha": "ad8269dc5e69162b",
+      "rank": 5,
+      "scores": {
+       "fusion_score": 0.030769,
+       "rank_dense": 5.0,
+       "rank_lexical": 5.0
+      },
+      "source_path": "progress_report.md"
+     }
+    ],
+    "verdict": {
+     "enabled": true,
+     "signal": "fusion_score",
+     "sufficient": true,
+     "threshold": 0.03,
+     "top_score": 0.032522
+    },
+    "warnings": []
+   },
+   "q06": {
+    "index_generation": "g_7f0b15d76fcac5c5",
+    "query_id": "q_628c982a84fe28f3",
+    "results": [
+     {
+      "channels": [
+       "dense",
+       "lexical"
+      ],
+      "chunk_id": "ck_550ae4febedd9d7e2f9b0010",
+      "excerpt_sha": "e458579c001e48f3",
+      "expanded_sha": "e458579c001e48f3",
+      "rank": 1,
+      "scores": {
+       "fusion_score": 0.032787,
+       "rank_dense": 1.0,
+       "rank_lexical": 1.0
+      },
+      "source_path": "proposal.md"
+     },
+     {
+      "channels": [
+       "dense",
+       "lexical"
+      ],
+      "chunk_id": "ck_6123907e05fc0b9b6f19292d",
+      "excerpt_sha": "c8458ac2ac9a25b8",
+      "expanded_sha": "c8458ac2ac9a25b8",
+      "rank": 2,
+      "scores": {
+       "fusion_score": 0.031754,
+       "rank_dense": 4.0,
+       "rank_lexical": 2.0
+      },
+      "source_path": "indicators.xlsx"
+     },
+     {
+      "channels": [
+       "dense",
+       "lexical"
+      ],
+      "chunk_id": "ck_7e2469605b94344b853971a4",
+      "excerpt_sha": "ad8269dc5e69162b",
+      "expanded_sha": "ad8269dc5e69162b",
+      "rank": 3,
+      "scores": {
+       "fusion_score": 0.031754,
+       "rank_dense": 2.0,
+       "rank_lexical": 4.0
+      },
+      "source_path": "progress_report.md"
+     },
+     {
+      "channels": [
+       "dense",
+       "lexical"
+      ],
+      "chunk_id": "ck_a59e4a9c7a969506ba9d264d",
+      "excerpt_sha": "e7f196aa1d0123b6",
+      "expanded_sha": "e7f196aa1d0123b6",
+      "rank": 4,
+      "scores": {
+       "fusion_score": 0.031746,
+       "rank_dense": 3.0,
+       "rank_lexical": 3.0
+      },
+      "source_path": "progress_report.md"
+     },
+     {
+      "channels": [
+       "dense",
+       "lexical"
+      ],
+      "chunk_id": "ck_18869a5586f0fde9ffb58756",
+      "excerpt_sha": "26170d136d828463",
+      "expanded_sha": "26170d136d828463",
+      "rank": 5,
+      "scores": {
+       "fusion_score": 0.030536,
+       "rank_dense": 6.0,
+       "rank_lexical": 5.0
+      },
+      "source_path": "proposal.md"
+     }
+    ],
+    "verdict": {
+     "enabled": true,
+     "signal": "fusion_score",
+     "sufficient": true,
+     "threshold": 0.03,
+     "top_score": 0.032787
+    },
+    "warnings": []
+   },
+   "q07": {
+    "index_generation": "g_7f0b15d76fcac5c5",
+    "query_id": "q_ee2ffcd221d1ea82",
+    "results": [
+     {
+      "channels": [
+       "dense",
+       "lexical"
+      ],
+      "chunk_id": "ck_a11c632474ffa3356194ab5d",
+      "excerpt_sha": "e1e170dc8951d7ad",
+      "expanded_sha": "e1e170dc8951d7ad",
+      "rank": 1,
+      "scores": {
+       "fusion_score": 0.032787,
+       "rank_dense": 1.0,
+       "rank_lexical": 1.0
+      },
+      "source_path": "memo_bg.md"
+     },
+     {
+      "channels": [
+       "dense"
+      ],
+      "chunk_id": "ck_df38c5a0b4bcc935b701e5b7",
+      "excerpt_sha": "069838c289b57172",
+      "expanded_sha": "069838c289b57172",
+      "rank": 2,
+      "scores": {
+       "fusion_score": 0.016129,
+       "rank_dense": 2.0
+      },
+      "source_path": "proposal.md"
+     },
+     {
+      "channels": [
+       "dense"
+      ],
+      "chunk_id": "ck_a59e4a9c7a969506ba9d264d",
+      "excerpt_sha": "e7f196aa1d0123b6",
+      "expanded_sha": "e7f196aa1d0123b6",
+      "rank": 3,
+      "scores": {
+       "fusion_score": 0.015873,
+       "rank_dense": 3.0
+      },
+      "source_path": "progress_report.md"
+     },
+     {
+      "channels": [
+       "dense"
+      ],
+      "chunk_id": "ck_550ae4febedd9d7e2f9b0010",
+      "excerpt_sha": "e458579c001e48f3",
+      "expanded_sha": "e458579c001e48f3",
+      "rank": 4,
+      "scores": {
+       "fusion_score": 0.015625,
+       "rank_dense": 4.0
+      },
+      "source_path": "proposal.md"
+     },
+     {
+      "channels": [
+       "dense"
+      ],
+      "chunk_id": "ck_6123907e05fc0b9b6f19292d",
+      "excerpt_sha": "c8458ac2ac9a25b8",
+      "expanded_sha": "c8458ac2ac9a25b8",
+      "rank": 5,
+      "scores": {
+       "fusion_score": 0.015385,
+       "rank_dense": 5.0
+      },
+      "source_path": "indicators.xlsx"
+     }
+    ],
+    "verdict": {
+     "enabled": true,
+     "signal": "fusion_score",
+     "sufficient": true,
+     "threshold": 0.03,
+     "top_score": 0.032787
+    },
+    "warnings": []
+   },
+   "q08": {
+    "index_generation": "g_7f0b15d76fcac5c5",
+    "query_id": "q_ffe478da7352a77d",
+    "results": [
+     {
+      "channels": [
+       "dense",
+       "lexical"
+      ],
+      "chunk_id": "ck_a11c632474ffa3356194ab5d",
+      "excerpt_sha": "e1e170dc8951d7ad",
+      "expanded_sha": "e1e170dc8951d7ad",
+      "rank": 1,
+      "scores": {
+       "fusion_score": 0.032787,
+       "rank_dense": 1.0,
+       "rank_lexical": 1.0
+      },
+      "source_path": "memo_bg.md"
+     },
+     {
+      "channels": [
+       "dense"
+      ],
+      "chunk_id": "ck_df38c5a0b4bcc935b701e5b7",
+      "excerpt_sha": "069838c289b57172",
+      "expanded_sha": "069838c289b57172",
+      "rank": 2,
+      "scores": {
+       "fusion_score": 0.016129,
+       "rank_dense": 2.0
+      },
+      "source_path": "proposal.md"
+     },
+     {
+      "channels": [
+       "dense"
+      ],
+      "chunk_id": "ck_a59e4a9c7a969506ba9d264d",
+      "excerpt_sha": "e7f196aa1d0123b6",
+      "expanded_sha": "e7f196aa1d0123b6",
+      "rank": 3,
+      "scores": {
+       "fusion_score": 0.015873,
+       "rank_dense": 3.0
+      },
+      "source_path": "progress_report.md"
+     },
+     {
+      "channels": [
+       "dense"
+      ],
+      "chunk_id": "ck_8cb9df92ed666b19ed3a5547",
+      "excerpt_sha": "a80713bffbb8fcf6",
+      "expanded_sha": "a80713bffbb8fcf6",
+      "rank": 4,
+      "scores": {
+       "fusion_score": 0.015625,
+       "rank_dense": 4.0
+      },
+      "source_path": "progress_report.md"
+     },
+     {
+      "channels": [
+       "dense"
+      ],
+      "chunk_id": "ck_6123907e05fc0b9b6f19292d",
+      "excerpt_sha": "c8458ac2ac9a25b8",
+      "expanded_sha": "c8458ac2ac9a25b8",
+      "rank": 5,
+      "scores": {
+       "fusion_score": 0.015385,
+       "rank_dense": 5.0
+      },
+      "source_path": "indicators.xlsx"
+     }
+    ],
+    "verdict": {
+     "enabled": true,
+     "signal": "fusion_score",
+     "sufficient": true,
+     "threshold": 0.03,
+     "top_score": 0.032787
+    },
+    "warnings": []
+   },
+   "q09": {
+    "index_generation": "g_7f0b15d76fcac5c5",
+    "query_id": "q_42e0473c2b1c773d",
+    "results": [
+     {
+      "channels": [
+       "dense",
+       "lexical"
+      ],
+      "chunk_id": "ck_550ae4febedd9d7e2f9b0010",
+      "excerpt_sha": "e458579c001e48f3",
+      "expanded_sha": "e458579c001e48f3",
+      "rank": 1,
+      "scores": {
+       "fusion_score": 0.032787,
+       "rank_dense": 1.0,
+       "rank_lexical": 1.0
+      },
+      "source_path": "proposal.md"
+     },
+     {
+      "channels": [
+       "dense",
+       "lexical"
+      ],
+      "chunk_id": "ck_6123907e05fc0b9b6f19292d",
+      "excerpt_sha": "c8458ac2ac9a25b8",
+      "expanded_sha": "c8458ac2ac9a25b8",
+      "rank": 2,
+      "scores": {
+       "fusion_score": 0.032002,
+       "rank_dense": 3.0,
+       "rank_lexical": 2.0
+      },
+      "source_path": "indicators.xlsx"
+     },
+     {
+      "channels": [
+       "dense",
+       "lexical"
+      ],
+      "chunk_id": "ck_a59e4a9c7a969506ba9d264d",
+      "excerpt_sha": "e7f196aa1d0123b6",
+      "expanded_sha": "e7f196aa1d0123b6",
+      "rank": 3,
+      "scores": {
+       "fusion_score": 0.032002,
+       "rank_dense": 2.0,
+       "rank_lexical": 3.0
+      },
+      "source_path": "progress_report.md"
+     },
+     {
+      "channels": [
+       "dense"
+      ],
+      "chunk_id": "ck_18869a5586f0fde9ffb58756",
+      "excerpt_sha": "26170d136d828463",
+      "expanded_sha": "26170d136d828463",
+      "rank": 4,
+      "scores": {
+       "fusion_score": 0.015625,
+       "rank_dense": 4.0
+      },
+      "source_path": "proposal.md"
+     },
+     {
+      "channels": [
+       "dense"
+      ],
+      "chunk_id": "ck_49456d6af8b43865f42896f7",
+      "excerpt_sha": "af1863b0cf9a0632",
+      "expanded_sha": "af1863b0cf9a0632",
+      "rank": 5,
+      "scores": {
+       "fusion_score": 0.015385,
+       "rank_dense": 5.0
+      },
+      "source_path": "registrations.csv"
+     }
+    ],
+    "verdict": {
+     "enabled": true,
+     "signal": "fusion_score",
+     "sufficient": true,
+     "threshold": 0.03,
+     "top_score": 0.032787
+    },
+    "warnings": []
+   },
+   "q10": {
+    "index_generation": "g_7f0b15d76fcac5c5",
+    "query_id": "q_8528f874508306bf",
+    "results": [
+     {
+      "channels": [
+       "dense",
+       "lexical"
+      ],
+      "chunk_id": "ck_550ae4febedd9d7e2f9b0010",
+      "excerpt_sha": "e458579c001e48f3",
+      "expanded_sha": "e458579c001e48f3",
+      "rank": 1,
+      "scores": {
+       "fusion_score": 0.032522,
+       "rank_dense": 1.0,
+       "rank_lexical": 2.0
+      },
+      "source_path": "proposal.md"
+     },
+     {
+      "channels": [
+       "dense",
+       "lexical"
+      ],
+      "chunk_id": "ck_18869a5586f0fde9ffb58756",
+      "excerpt_sha": "26170d136d828463",
+      "expanded_sha": "26170d136d828463",
+      "rank": 2,
+      "scores": {
+       "fusion_score": 0.032002,
+       "rank_dense": 2.0,
+       "rank_lexical": 3.0
+      },
+      "source_path": "proposal.md"
+     },
+     {
+      "channels": [
+       "dense",
+       "lexical"
+      ],
+      "chunk_id": "ck_7e2469605b94344b853971a4",
+      "excerpt_sha": "ad8269dc5e69162b",
+      "expanded_sha": "ad8269dc5e69162b",
+      "rank": 3,
+      "scores": {
+       "fusion_score": 0.031778,
+       "rank_dense": 5.0,
+       "rank_lexical": 1.0
+      },
+      "source_path": "progress_report.md"
+     },
+     {
+      "channels": [
+       "dense",
+       "lexical"
+      ],
+      "chunk_id": "ck_df38c5a0b4bcc935b701e5b7",
+      "excerpt_sha": "069838c289b57172",
+      "expanded_sha": "069838c289b57172",
+      "rank": 4,
+      "scores": {
+       "fusion_score": 0.030777,
+       "rank_dense": 6.0,
+       "rank_lexical": 4.0
+      },
+      "source_path": "proposal.md"
+     },
+     {
+      "channels": [
+       "dense"
+      ],
+      "chunk_id": "ck_a59e4a9c7a969506ba9d264d",
+      "excerpt_sha": "e7f196aa1d0123b6",
+      "expanded_sha": "e7f196aa1d0123b6",
+      "rank": 5,
+      "scores": {
+       "fusion_score": 0.015873,
+       "rank_dense": 3.0
+      },
+      "source_path": "progress_report.md"
+     }
+    ],
+    "verdict": {
+     "enabled": true,
+     "signal": "fusion_score",
+     "sufficient": true,
+     "threshold": 0.03,
+     "top_score": 0.032522
+    },
+    "warnings": []
+   },
+   "q11": {
+    "index_generation": "g_7f0b15d76fcac5c5",
+    "query_id": "q_35098bcd827ece12",
+    "results": [
+     {
+      "channels": [
+       "dense",
+       "lexical"
+      ],
+      "chunk_id": "ck_49456d6af8b43865f42896f7",
+      "excerpt_sha": "af1863b0cf9a0632",
+      "expanded_sha": "af1863b0cf9a0632",
+      "rank": 1,
+      "scores": {
+       "fusion_score": 0.032522,
+       "rank_dense": 2.0,
+       "rank_lexical": 1.0
+      },
+      "source_path": "registrations.csv"
+     },
+     {
+      "channels": [
+       "dense",
+       "lexical"
+      ],
+      "chunk_id": "ck_7e2469605b94344b853971a4",
+      "excerpt_sha": "ad8269dc5e69162b",
+      "expanded_sha": "ad8269dc5e69162b",
+      "rank": 2,
+      "scores": {
+       "fusion_score": 0.032522,
+       "rank_dense": 1.0,
+       "rank_lexical": 2.0
+      },
+      "source_path": "progress_report.md"
+     },
+     {
+      "channels": [
+       "dense",
+       "lexical"
+      ],
+      "chunk_id": "ck_18869a5586f0fde9ffb58756",
+      "excerpt_sha": "26170d136d828463",
+      "expanded_sha": "26170d136d828463",
+      "rank": 3,
+      "scores": {
+       "fusion_score": 0.031498,
+       "rank_dense": 3.0,
+       "rank_lexical": 4.0
+      },
+      "source_path": "proposal.md"
+     },
+     {
+      "channels": [
+       "dense",
+       "lexical"
+      ],
+      "chunk_id": "ck_550ae4febedd9d7e2f9b0010",
+      "excerpt_sha": "e458579c001e48f3",
+      "expanded_sha": "e458579c001e48f3",
+      "rank": 4,
+      "scores": {
+       "fusion_score": 0.031258,
+       "rank_dense": 5.0,
+       "rank_lexical": 3.0
+      },
+      "source_path": "proposal.md"
+     },
+     {
+      "channels": [
+       "dense",
+       "lexical"
+      ],
+      "chunk_id": "ck_a59e4a9c7a969506ba9d264d",
+      "excerpt_sha": "e7f196aa1d0123b6",
+      "expanded_sha": "e7f196aa1d0123b6",
+      "rank": 5,
+      "scores": {
+       "fusion_score": 0.03055,
+       "rank_dense": 4.0,
+       "rank_lexical": 7.0
+      },
+      "source_path": "progress_report.md"
+     }
+    ],
+    "verdict": {
+     "enabled": true,
+     "signal": "fusion_score",
+     "sufficient": true,
+     "threshold": 0.03,
+     "top_score": 0.032522
+    },
+    "warnings": []
+   },
+   "q12": {
+    "index_generation": "g_7f0b15d76fcac5c5",
+    "query_id": "q_bc2d9ccb7e40ccf7",
+    "results": [
+     {
+      "channels": [
+       "dense",
+       "lexical"
+      ],
+      "chunk_id": "ck_df38c5a0b4bcc935b701e5b7",
+      "excerpt_sha": "069838c289b57172",
+      "expanded_sha": "069838c289b57172",
+      "rank": 1,
+      "scores": {
+       "fusion_score": 0.032787,
+       "rank_dense": 1.0,
+       "rank_lexical": 1.0
+      },
+      "source_path": "proposal.md"
+     },
+     {
+      "channels": [
+       "dense",
+       "lexical"
+      ],
+      "chunk_id": "ck_8cb9df92ed666b19ed3a5547",
+      "excerpt_sha": "a80713bffbb8fcf6",
+      "expanded_sha": "a80713bffbb8fcf6",
+      "rank": 2,
+      "scores": {
+       "fusion_score": 0.032258,
+       "rank_dense": 2.0,
+       "rank_lexical": 2.0
+      },
+      "source_path": "progress_report.md"
+     },
+     {
+      "channels": [
+       "dense",
+       "lexical"
+      ],
+      "chunk_id": "ck_18869a5586f0fde9ffb58756",
+      "excerpt_sha": "26170d136d828463",
+      "expanded_sha": "26170d136d828463",
+      "rank": 3,
+      "scores": {
+       "fusion_score": 0.031258,
+       "rank_dense": 3.0,
+       "rank_lexical": 5.0
+      },
+      "source_path": "proposal.md"
+     },
+     {
+      "channels": [
+       "dense",
+       "lexical"
+      ],
+      "chunk_id": "ck_7e2469605b94344b853971a4",
+      "excerpt_sha": "ad8269dc5e69162b",
+      "expanded_sha": "ad8269dc5e69162b",
+      "rank": 4,
+      "scores": {
+       "fusion_score": 0.031025,
+       "rank_dense": 6.0,
+       "rank_lexical": 3.0
+      },
+      "source_path": "progress_report.md"
+     },
+     {
+      "channels": [
+       "dense",
+       "lexical"
+      ],
+      "chunk_id": "ck_550ae4febedd9d7e2f9b0010",
+      "excerpt_sha": "e458579c001e48f3",
+      "expanded_sha": "e458579c001e48f3",
+      "rank": 5,
+      "scores": {
+       "fusion_score": 0.03055,
+       "rank_dense": 7.0,
+       "rank_lexical": 4.0
+      },
+      "source_path": "proposal.md"
+     }
+    ],
+    "verdict": {
+     "enabled": true,
+     "signal": "fusion_score",
+     "sufficient": true,
+     "threshold": 0.03,
+     "top_score": 0.032787
+    },
+    "warnings": []
+   },
+   "q13": {
+    "index_generation": "g_7f0b15d76fcac5c5",
+    "query_id": "q_b26d8001604be26e",
+    "results": [
+     {
+      "channels": [
+       "dense",
+       "lexical"
+      ],
+      "chunk_id": "ck_7e2469605b94344b853971a4",
+      "excerpt_sha": "ad8269dc5e69162b",
+      "expanded_sha": "ad8269dc5e69162b",
+      "rank": 1,
+      "scores": {
+       "fusion_score": 0.032787,
+       "rank_dense": 1.0,
+       "rank_lexical": 1.0
+      },
+      "source_path": "progress_report.md"
+     },
+     {
+      "channels": [
+       "dense",
+       "lexical"
+      ],
+      "chunk_id": "ck_49456d6af8b43865f42896f7",
+      "excerpt_sha": "af1863b0cf9a0632",
+      "expanded_sha": "af1863b0cf9a0632",
+      "rank": 2,
+      "scores": {
+       "fusion_score": 0.032258,
+       "rank_dense": 2.0,
+       "rank_lexical": 2.0
+      },
+      "source_path": "registrations.csv"
+     },
+     {
+      "channels": [
+       "dense",
+       "lexical"
+      ],
+      "chunk_id": "ck_18869a5586f0fde9ffb58756",
+      "excerpt_sha": "26170d136d828463",
+      "expanded_sha": "26170d136d828463",
+      "rank": 3,
+      "scores": {
+       "fusion_score": 0.031498,
+       "rank_dense": 3.0,
+       "rank_lexical": 4.0
+      },
+      "source_path": "proposal.md"
+     },
+     {
+      "channels": [
+       "dense",
+       "lexical"
+      ],
+      "chunk_id": "ck_550ae4febedd9d7e2f9b0010",
+      "excerpt_sha": "e458579c001e48f3",
+      "expanded_sha": "e458579c001e48f3",
+      "rank": 4,
+      "scores": {
+       "fusion_score": 0.031498,
+       "rank_dense": 4.0,
+       "rank_lexical": 3.0
+      },
+      "source_path": "proposal.md"
+     },
+     {
+      "channels": [
+       "dense",
+       "lexical"
+      ],
+      "chunk_id": "ck_6123907e05fc0b9b6f19292d",
+      "excerpt_sha": "c8458ac2ac9a25b8",
+      "expanded_sha": "c8458ac2ac9a25b8",
+      "rank": 5,
+      "scores": {
+       "fusion_score": 0.030536,
+       "rank_dense": 6.0,
+       "rank_lexical": 5.0
+      },
+      "source_path": "indicators.xlsx"
+     }
+    ],
+    "verdict": {
+     "enabled": true,
+     "signal": "fusion_score",
+     "sufficient": true,
+     "threshold": 0.03,
+     "top_score": 0.032787
+    },
+    "warnings": []
+   },
+   "q14": {
+    "index_generation": "g_7f0b15d76fcac5c5",
+    "query_id": "q_b6fc2a980f4b8306",
+    "results": [],
+    "verdict": {
+     "enabled": true,
+     "signal": "fusion_score",
+     "sufficient": false,
+     "threshold": 0.03,
+     "top_score": 0.016393
+    },
+    "warnings": [
+     "insufficient evidence: top relevance 0.016 < 0.030; passages withheld"
+    ]
+   },
+   "q15": {
+    "index_generation": "g_7f0b15d76fcac5c5",
+    "query_id": "q_bd0443989ba9a11e",
+    "results": [
+     {
+      "channels": [
+       "dense",
+       "lexical"
+      ],
+      "chunk_id": "ck_6123907e05fc0b9b6f19292d",
+      "excerpt_sha": "c8458ac2ac9a25b8",
+      "expanded_sha": "c8458ac2ac9a25b8",
+      "rank": 1,
+      "scores": {
+       "fusion_score": 0.032522,
+       "rank_dense": 2.0,
+       "rank_lexical": 1.0
+      },
+      "source_path": "indicators.xlsx"
+     },
+     {
+      "channels": [
+       "dense",
+       "lexical"
+      ],
+      "chunk_id": "ck_a59e4a9c7a969506ba9d264d",
+      "excerpt_sha": "e7f196aa1d0123b6",
+      "expanded_sha": "e7f196aa1d0123b6",
+      "rank": 2,
+      "scores": {
+       "fusion_score": 0.032522,
+       "rank_dense": 1.0,
+       "rank_lexical": 2.0
+      },
+      "source_path": "progress_report.md"
+     },
+     {
+      "channels": [
+       "dense",
+       "lexical"
+      ],
+      "chunk_id": "ck_550ae4febedd9d7e2f9b0010",
+      "excerpt_sha": "e458579c001e48f3",
+      "expanded_sha": "e458579c001e48f3",
+      "rank": 3,
+      "scores": {
+       "fusion_score": 0.031258,
+       "rank_dense": 5.0,
+       "rank_lexical": 3.0
+      },
+      "source_path": "proposal.md"
+     },
+     {
+      "channels": [
+       "dense"
+      ],
+      "chunk_id": "ck_8cb9df92ed666b19ed3a5547",
+      "excerpt_sha": "a80713bffbb8fcf6",
+      "expanded_sha": "a80713bffbb8fcf6",
+      "rank": 4,
+      "scores": {
+       "fusion_score": 0.015873,
+       "rank_dense": 3.0
+      },
+      "source_path": "progress_report.md"
+     },
+     {
+      "channels": [
+       "dense"
+      ],
+      "chunk_id": "ck_df38c5a0b4bcc935b701e5b7",
+      "excerpt_sha": "069838c289b57172",
+      "expanded_sha": "069838c289b57172",
+      "rank": 5,
+      "scores": {
+       "fusion_score": 0.015625,
+       "rank_dense": 4.0
+      },
+      "source_path": "proposal.md"
+     }
+    ],
+    "verdict": {
+     "enabled": true,
+     "signal": "fusion_score",
+     "sufficient": true,
+     "threshold": 0.03,
+     "top_score": 0.032522
+    },
+    "warnings": []
+   }
+  },
+  "reingest": {
+   "added": 0,
+   "deleted": 0,
+   "index_generation": "g_7f0b15d76fcac5c5",
+   "modified": 0,
+   "unchanged": 6,
+   "warnings": [
+    "no changes: active generation unchanged"
+   ]
+  },
+  "status": {
+   "healthy": true,
+   "index_generation": "g_7f0b15d76fcac5c5",
+   "n_chunks": 9,
+   "n_documents": 6,
+   "states": {
+    "OCR_REQUIRED": 1,
+    "READY": 5
+   },
+   "warnings": []
+  }
+ },
+ "defaults": {
+  "ingest": {
+   "added": 6,
+   "deleted": 0,
+   "embedding_profile_key": "hash:hash-deterministic:v1:2560:hash:1:hash_query_v1",
+   "files": [
+    {
+     "n_blocks": 3,
+     "n_chunks": 1,
+     "source_id": "src_6ffd3c288c4781b22fb0",
+     "source_path": "indicators.xlsx",
+     "state": "READY",
+     "version_id": "v_efd280aa3a7d41f559be"
+    },
+    {
+     "n_blocks": 3,
+     "n_chunks": 1,
+     "source_id": "src_a711e743b10bf0319c4d",
+     "source_path": "memo_bg.md",
+     "state": "READY",
+     "version_id": "v_8171296ec87b2fbd3322"
+    },
+    {
+     "n_blocks": 7,
+     "n_chunks": 3,
+     "source_id": "src_dec9eb68a39868228da5",
+     "source_path": "progress_report.md",
+     "state": "READY",
+     "version_id": "v_5dbd57ee51c312285536"
+    },
+    {
+     "n_blocks": 8,
+     "n_chunks": 3,
+     "source_id": "src_c05f8eb8e8cb1c92cedd",
+     "source_path": "proposal.md",
+     "state": "READY",
+     "version_id": "v_4401cead9068ca71880e"
+    },
+    {
+     "n_blocks": 6,
+     "n_chunks": 1,
+     "source_id": "src_8bd86b578500f3062b04",
+     "source_path": "registrations.csv",
+     "state": "READY",
+     "version_id": "v_e7a5dca4e8a0307c3edd"
+    },
+    {
+     "n_blocks": 0,
+     "n_chunks": 0,
+     "source_id": "src_fb2eb00686284bd27146",
+     "source_path": "scanned_placeholder.pdf",
+     "state": "OCR_REQUIRED",
+     "version_id": "v_cf6ea8d5174a1bcd5dd0"
+    }
+   ],
+   "index_generation": "g_7f0b15d76fcac5c5",
+   "modified": 0,
+   "unchanged": 0,
+   "warnings": [
+    "stage_cache={'parse_hits': 0, 'parse_misses': 6, 'chunk_hits': 0, 'chunk_misses': 5}"
+   ]
+  },
+  "queries": {
+   "q01": {
+    "index_generation": "g_7f0b15d76fcac5c5",
+    "query_id": "q_469e38316460f332",
+    "results": [
+     {
+      "channels": [
+       "dense",
+       "lexical"
+      ],
+      "chunk_id": "ck_18869a5586f0fde9ffb58756",
+      "excerpt_sha": "26170d136d828463",
+      "expanded_sha": "",
+      "rank": 1,
+      "scores": {
+       "fusion_score": 0.032787,
+       "rank_dense": 1.0,
+       "rank_lexical": 1.0
+      },
+      "source_path": "proposal.md"
+     },
+     {
+      "channels": [
+       "dense",
+       "lexical"
+      ],
+      "chunk_id": "ck_550ae4febedd9d7e2f9b0010",
+      "excerpt_sha": "e458579c001e48f3",
+      "expanded_sha": "",
+      "rank": 2,
+      "scores": {
+       "fusion_score": 0.032258,
+       "rank_dense": 2.0,
+       "rank_lexical": 2.0
+      },
+      "source_path": "proposal.md"
+     },
+     {
+      "channels": [
+       "dense",
+       "lexical"
+      ],
+      "chunk_id": "ck_7e2469605b94344b853971a4",
+      "excerpt_sha": "ad8269dc5e69162b",
+      "expanded_sha": "",
+      "rank": 3,
+      "scores": {
+       "fusion_score": 0.031498,
+       "rank_dense": 4.0,
+       "rank_lexical": 3.0
+      },
+      "source_path": "progress_report.md"
+     },
+     {
+      "channels": [
+       "dense",
+       "lexical"
+      ],
+      "chunk_id": "ck_df38c5a0b4bcc935b701e5b7",
+      "excerpt_sha": "069838c289b57172",
+      "expanded_sha": "",
+      "rank": 4,
+      "scores": {
+       "fusion_score": 0.03101,
+       "rank_dense": 5.0,
+       "rank_lexical": 4.0
+      },
+      "source_path": "proposal.md"
+     },
+     {
+      "channels": [
+       "dense"
+      ],
+      "chunk_id": "ck_49456d6af8b43865f42896f7",
+      "excerpt_sha": "af1863b0cf9a0632",
+      "expanded_sha": "",
+      "rank": 5,
+      "scores": {
+       "fusion_score": 0.015873,
+       "rank_dense": 3.0
+      },
+      "source_path": "registrations.csv"
+     }
+    ],
+    "verdict": {
+     "enabled": false,
+     "signal": "",
+     "sufficient": true,
+     "threshold": null,
+     "top_score": null
+    },
+    "warnings": []
+   },
+   "q02": {
+    "index_generation": "g_7f0b15d76fcac5c5",
+    "query_id": "q_38664ee96514bace",
+    "results": [
+     {
+      "channels": [
+       "dense",
+       "lexical"
+      ],
+      "chunk_id": "ck_550ae4febedd9d7e2f9b0010",
+      "excerpt_sha": "e458579c001e48f3",
+      "expanded_sha": "",
+      "rank": 1,
+      "scores": {
+       "fusion_score": 0.032787,
+       "rank_dense": 1.0,
+       "rank_lexical": 1.0
+      },
+      "source_path": "proposal.md"
+     },
+     {
+      "channels": [
+       "dense",
+       "lexical"
+      ],
+      "chunk_id": "ck_6123907e05fc0b9b6f19292d",
+      "excerpt_sha": "c8458ac2ac9a25b8",
+      "expanded_sha": "",
+      "rank": 2,
+      "scores": {
+       "fusion_score": 0.032258,
+       "rank_dense": 2.0,
+       "rank_lexical": 2.0
+      },
+      "source_path": "indicators.xlsx"
+     },
+     {
+      "channels": [
+       "dense",
+       "lexical"
+      ],
+      "chunk_id": "ck_18869a5586f0fde9ffb58756",
+      "excerpt_sha": "26170d136d828463",
+      "expanded_sha": "",
+      "rank": 3,
+      "scores": {
+       "fusion_score": 0.031498,
+       "rank_dense": 4.0,
+       "rank_lexical": 3.0
+      },
+      "source_path": "proposal.md"
+     },
+     {
+      "channels": [
+       "dense",
+       "lexical"
+      ],
+      "chunk_id": "ck_7e2469605b94344b853971a4",
+      "excerpt_sha": "ad8269dc5e69162b",
+      "expanded_sha": "",
+      "rank": 4,
+      "scores": {
+       "fusion_score": 0.030777,
+       "rank_dense": 6.0,
+       "rank_lexical": 4.0
+      },
+      "source_path": "progress_report.md"
+     },
+     {
+      "channels": [
+       "dense",
+       "lexical"
+      ],
+      "chunk_id": "ck_df38c5a0b4bcc935b701e5b7",
+      "excerpt_sha": "069838c289b57172",
+      "expanded_sha": "",
+      "rank": 5,
+      "scores": {
+       "fusion_score": 0.030769,
+       "rank_dense": 5.0,
+       "rank_lexical": 5.0
+      },
+      "source_path": "proposal.md"
+     }
+    ],
+    "verdict": {
+     "enabled": false,
+     "signal": "",
+     "sufficient": true,
+     "threshold": null,
+     "top_score": null
+    },
+    "warnings": []
+   },
+   "q03": {
+    "index_generation": "g_7f0b15d76fcac5c5",
+    "query_id": "q_26b1f9a47624fb54",
+    "results": [
+     {
+      "channels": [
+       "dense",
+       "lexical"
+      ],
+      "chunk_id": "ck_df38c5a0b4bcc935b701e5b7",
+      "excerpt_sha": "069838c289b57172",
+      "expanded_sha": "",
+      "rank": 1,
+      "scores": {
+       "fusion_score": 0.032787,
+       "rank_dense": 1.0,
+       "rank_lexical": 1.0
+      },
+      "source_path": "proposal.md"
+     },
+     {
+      "channels": [
+       "dense",
+       "lexical"
+      ],
+      "chunk_id": "ck_8cb9df92ed666b19ed3a5547",
+      "excerpt_sha": "a80713bffbb8fcf6",
+      "expanded_sha": "",
+      "rank": 2,
+      "scores": {
+       "fusion_score": 0.032258,
+       "rank_dense": 2.0,
+       "rank_lexical": 2.0
+      },
+      "source_path": "progress_report.md"
+     },
+     {
+      "channels": [
+       "dense",
+       "lexical"
+      ],
+      "chunk_id": "ck_18869a5586f0fde9ffb58756",
+      "excerpt_sha": "26170d136d828463",
+      "expanded_sha": "",
+      "rank": 3,
+      "scores": {
+       "fusion_score": 0.031498,
+       "rank_dense": 3.0,
+       "rank_lexical": 4.0
+      },
+      "source_path": "proposal.md"
+     },
+     {
+      "channels": [
+       "dense",
+       "lexical"
+      ],
+      "chunk_id": "ck_7e2469605b94344b853971a4",
+      "excerpt_sha": "ad8269dc5e69162b",
+      "expanded_sha": "",
+      "rank": 4,
+      "scores": {
+       "fusion_score": 0.031025,
+       "rank_dense": 6.0,
+       "rank_lexical": 3.0
+      },
+      "source_path": "progress_report.md"
+     },
+     {
+      "channels": [
+       "dense",
+       "lexical"
+      ],
+      "chunk_id": "ck_550ae4febedd9d7e2f9b0010",
+      "excerpt_sha": "e458579c001e48f3",
+      "expanded_sha": "",
+      "rank": 5,
+      "scores": {
+       "fusion_score": 0.03031,
+       "rank_dense": 7.0,
+       "rank_lexical": 5.0
+      },
+      "source_path": "proposal.md"
+     }
+    ],
+    "verdict": {
+     "enabled": false,
+     "signal": "",
+     "sufficient": true,
+     "threshold": null,
+     "top_score": null
+    },
+    "warnings": []
+   },
+   "q04": {
+    "index_generation": "g_7f0b15d76fcac5c5",
+    "query_id": "q_6f4967a05969feac",
+    "results": [
+     {
+      "channels": [
+       "dense",
+       "lexical"
+      ],
+      "chunk_id": "ck_7e2469605b94344b853971a4",
+      "excerpt_sha": "ad8269dc5e69162b",
+      "expanded_sha": "",
+      "rank": 1,
+      "scores": {
+       "fusion_score": 0.032787,
+       "rank_dense": 1.0,
+       "rank_lexical": 1.0
+      },
+      "source_path": "progress_report.md"
+     },
+     {
+      "channels": [
+       "dense",
+       "lexical"
+      ],
+      "chunk_id": "ck_550ae4febedd9d7e2f9b0010",
+      "excerpt_sha": "e458579c001e48f3",
+      "expanded_sha": "",
+      "rank": 2,
+      "scores": {
+       "fusion_score": 0.032002,
+       "rank_dense": 2.0,
+       "rank_lexical": 3.0
+      },
+      "source_path": "proposal.md"
+     },
+     {
+      "channels": [
+       "dense",
+       "lexical"
+      ],
+      "chunk_id": "ck_49456d6af8b43865f42896f7",
+      "excerpt_sha": "af1863b0cf9a0632",
+      "expanded_sha": "",
+      "rank": 3,
+      "scores": {
+       "fusion_score": 0.031514,
+       "rank_dense": 5.0,
+       "rank_lexical": 2.0
+      },
+      "source_path": "registrations.csv"
+     },
+     {
+      "channels": [
+       "dense",
+       "lexical"
+      ],
+      "chunk_id": "ck_18869a5586f0fde9ffb58756",
+      "excerpt_sha": "26170d136d828463",
+      "expanded_sha": "",
+      "rank": 4,
+      "scores": {
+       "fusion_score": 0.03125,
+       "rank_dense": 4.0,
+       "rank_lexical": 4.0
+      },
+      "source_path": "proposal.md"
+     },
+     {
+      "channels": [
+       "dense",
+       "lexical"
+      ],
+      "chunk_id": "ck_a59e4a9c7a969506ba9d264d",
+      "excerpt_sha": "e7f196aa1d0123b6",
+      "expanded_sha": "",
+      "rank": 5,
+      "scores": {
+       "fusion_score": 0.030798,
+       "rank_dense": 3.0,
+       "rank_lexical": 7.0
+      },
+      "source_path": "progress_report.md"
+     }
+    ],
+    "verdict": {
+     "enabled": false,
+     "signal": "",
+     "sufficient": true,
+     "threshold": null,
+     "top_score": null
+    },
+    "warnings": []
+   },
+   "q05": {
+    "index_generation": "g_7f0b15d76fcac5c5",
+    "query_id": "q_b49de51e83207f02",
+    "results": [
+     {
+      "channels": [
+       "dense",
+       "lexical"
+      ],
+      "chunk_id": "ck_6123907e05fc0b9b6f19292d",
+      "excerpt_sha": "c8458ac2ac9a25b8",
+      "expanded_sha": "",
+      "rank": 1,
+      "scores": {
+       "fusion_score": 0.032522,
+       "rank_dense": 2.0,
+       "rank_lexical": 1.0
+      },
+      "source_path": "indicators.xlsx"
+     },
+     {
+      "channels": [
+       "dense",
+       "lexical"
+      ],
+      "chunk_id": "ck_a59e4a9c7a969506ba9d264d",
+      "excerpt_sha": "e7f196aa1d0123b6",
+      "expanded_sha": "",
+      "rank": 2,
+      "scores": {
+       "fusion_score": 0.032522,
+       "rank_dense": 1.0,
+       "rank_lexical": 2.0
+      },
+      "source_path": "progress_report.md"
+     },
+     {
+      "channels": [
+       "dense",
+       "lexical"
+      ],
+      "chunk_id": "ck_550ae4febedd9d7e2f9b0010",
+      "excerpt_sha": "e458579c001e48f3",
+      "expanded_sha": "",
+      "rank": 3,
+      "scores": {
+       "fusion_score": 0.031746,
+       "rank_dense": 3.0,
+       "rank_lexical": 3.0
+      },
+      "source_path": "proposal.md"
+     },
+     {
+      "channels": [
+       "dense",
+       "lexical"
+      ],
+      "chunk_id": "ck_df38c5a0b4bcc935b701e5b7",
+      "excerpt_sha": "069838c289b57172",
+      "expanded_sha": "",
+      "rank": 4,
+      "scores": {
+       "fusion_score": 0.030777,
+       "rank_dense": 6.0,
+       "rank_lexical": 4.0
+      },
+      "source_path": "proposal.md"
+     },
+     {
+      "channels": [
+       "dense",
+       "lexical"
+      ],
+      "chunk_id": "ck_7e2469605b94344b853971a4",
+      "excerpt_sha": "ad8269dc5e69162b",
+      "expanded_sha": "",
+      "rank": 5,
+      "scores": {
+       "fusion_score": 0.030769,
+       "rank_dense": 5.0,
+       "rank_lexical": 5.0
+      },
+      "source_path": "progress_report.md"
+     }
+    ],
+    "verdict": {
+     "enabled": false,
+     "signal": "",
+     "sufficient": true,
+     "threshold": null,
+     "top_score": null
+    },
+    "warnings": []
+   },
+   "q06": {
+    "index_generation": "g_7f0b15d76fcac5c5",
+    "query_id": "q_628c982a84fe28f3",
+    "results": [
+     {
+      "channels": [
+       "dense",
+       "lexical"
+      ],
+      "chunk_id": "ck_550ae4febedd9d7e2f9b0010",
+      "excerpt_sha": "e458579c001e48f3",
+      "expanded_sha": "",
+      "rank": 1,
+      "scores": {
+       "fusion_score": 0.032787,
+       "rank_dense": 1.0,
+       "rank_lexical": 1.0
+      },
+      "source_path": "proposal.md"
+     },
+     {
+      "channels": [
+       "dense",
+       "lexical"
+      ],
+      "chunk_id": "ck_6123907e05fc0b9b6f19292d",
+      "excerpt_sha": "c8458ac2ac9a25b8",
+      "expanded_sha": "",
+      "rank": 2,
+      "scores": {
+       "fusion_score": 0.031754,
+       "rank_dense": 4.0,
+       "rank_lexical": 2.0
+      },
+      "source_path": "indicators.xlsx"
+     },
+     {
+      "channels": [
+       "dense",
+       "lexical"
+      ],
+      "chunk_id": "ck_7e2469605b94344b853971a4",
+      "excerpt_sha": "ad8269dc5e69162b",
+      "expanded_sha": "",
+      "rank": 3,
+      "scores": {
+       "fusion_score": 0.031754,
+       "rank_dense": 2.0,
+       "rank_lexical": 4.0
+      },
+      "source_path": "progress_report.md"
+     },
+     {
+      "channels": [
+       "dense",
+       "lexical"
+      ],
+      "chunk_id": "ck_a59e4a9c7a969506ba9d264d",
+      "excerpt_sha": "e7f196aa1d0123b6",
+      "expanded_sha": "",
+      "rank": 4,
+      "scores": {
+       "fusion_score": 0.031746,
+       "rank_dense": 3.0,
+       "rank_lexical": 3.0
+      },
+      "source_path": "progress_report.md"
+     },
+     {
+      "channels": [
+       "dense",
+       "lexical"
+      ],
+      "chunk_id": "ck_18869a5586f0fde9ffb58756",
+      "excerpt_sha": "26170d136d828463",
+      "expanded_sha": "",
+      "rank": 5,
+      "scores": {
+       "fusion_score": 0.030536,
+       "rank_dense": 6.0,
+       "rank_lexical": 5.0
+      },
+      "source_path": "proposal.md"
+     }
+    ],
+    "verdict": {
+     "enabled": false,
+     "signal": "",
+     "sufficient": true,
+     "threshold": null,
+     "top_score": null
+    },
+    "warnings": []
+   },
+   "q07": {
+    "index_generation": "g_7f0b15d76fcac5c5",
+    "query_id": "q_ee2ffcd221d1ea82",
+    "results": [
+     {
+      "channels": [
+       "dense",
+       "lexical"
+      ],
+      "chunk_id": "ck_a11c632474ffa3356194ab5d",
+      "excerpt_sha": "e1e170dc8951d7ad",
+      "expanded_sha": "",
+      "rank": 1,
+      "scores": {
+       "fusion_score": 0.032787,
+       "rank_dense": 1.0,
+       "rank_lexical": 1.0
+      },
+      "source_path": "memo_bg.md"
+     },
+     {
+      "channels": [
+       "dense"
+      ],
+      "chunk_id": "ck_df38c5a0b4bcc935b701e5b7",
+      "excerpt_sha": "069838c289b57172",
+      "expanded_sha": "",
+      "rank": 2,
+      "scores": {
+       "fusion_score": 0.016129,
+       "rank_dense": 2.0
+      },
+      "source_path": "proposal.md"
+     },
+     {
+      "channels": [
+       "dense"
+      ],
+      "chunk_id": "ck_a59e4a9c7a969506ba9d264d",
+      "excerpt_sha": "e7f196aa1d0123b6",
+      "expanded_sha": "",
+      "rank": 3,
+      "scores": {
+       "fusion_score": 0.015873,
+       "rank_dense": 3.0
+      },
+      "source_path": "progress_report.md"
+     },
+     {
+      "channels": [
+       "dense"
+      ],
+      "chunk_id": "ck_550ae4febedd9d7e2f9b0010",
+      "excerpt_sha": "e458579c001e48f3",
+      "expanded_sha": "",
+      "rank": 4,
+      "scores": {
+       "fusion_score": 0.015625,
+       "rank_dense": 4.0
+      },
+      "source_path": "proposal.md"
+     },
+     {
+      "channels": [
+       "dense"
+      ],
+      "chunk_id": "ck_6123907e05fc0b9b6f19292d",
+      "excerpt_sha": "c8458ac2ac9a25b8",
+      "expanded_sha": "",
+      "rank": 5,
+      "scores": {
+       "fusion_score": 0.015385,
+       "rank_dense": 5.0
+      },
+      "source_path": "indicators.xlsx"
+     }
+    ],
+    "verdict": {
+     "enabled": false,
+     "signal": "",
+     "sufficient": true,
+     "threshold": null,
+     "top_score": null
+    },
+    "warnings": []
+   },
+   "q08": {
+    "index_generation": "g_7f0b15d76fcac5c5",
+    "query_id": "q_ffe478da7352a77d",
+    "results": [
+     {
+      "channels": [
+       "dense",
+       "lexical"
+      ],
+      "chunk_id": "ck_a11c632474ffa3356194ab5d",
+      "excerpt_sha": "e1e170dc8951d7ad",
+      "expanded_sha": "",
+      "rank": 1,
+      "scores": {
+       "fusion_score": 0.032787,
+       "rank_dense": 1.0,
+       "rank_lexical": 1.0
+      },
+      "source_path": "memo_bg.md"
+     },
+     {
+      "channels": [
+       "dense"
+      ],
+      "chunk_id": "ck_df38c5a0b4bcc935b701e5b7",
+      "excerpt_sha": "069838c289b57172",
+      "expanded_sha": "",
+      "rank": 2,
+      "scores": {
+       "fusion_score": 0.016129,
+       "rank_dense": 2.0
+      },
+      "source_path": "proposal.md"
+     },
+     {
+      "channels": [
+       "dense"
+      ],
+      "chunk_id": "ck_a59e4a9c7a969506ba9d264d",
+      "excerpt_sha": "e7f196aa1d0123b6",
+      "expanded_sha": "",
+      "rank": 3,
+      "scores": {
+       "fusion_score": 0.015873,
+       "rank_dense": 3.0
+      },
+      "source_path": "progress_report.md"
+     },
+     {
+      "channels": [
+       "dense"
+      ],
+      "chunk_id": "ck_8cb9df92ed666b19ed3a5547",
+      "excerpt_sha": "a80713bffbb8fcf6",
+      "expanded_sha": "",
+      "rank": 4,
+      "scores": {
+       "fusion_score": 0.015625,
+       "rank_dense": 4.0
+      },
+      "source_path": "progress_report.md"
+     },
+     {
+      "channels": [
+       "dense"
+      ],
+      "chunk_id": "ck_6123907e05fc0b9b6f19292d",
+      "excerpt_sha": "c8458ac2ac9a25b8",
+      "expanded_sha": "",
+      "rank": 5,
+      "scores": {
+       "fusion_score": 0.015385,
+       "rank_dense": 5.0
+      },
+      "source_path": "indicators.xlsx"
+     }
+    ],
+    "verdict": {
+     "enabled": false,
+     "signal": "",
+     "sufficient": true,
+     "threshold": null,
+     "top_score": null
+    },
+    "warnings": []
+   },
+   "q09": {
+    "index_generation": "g_7f0b15d76fcac5c5",
+    "query_id": "q_42e0473c2b1c773d",
+    "results": [
+     {
+      "channels": [
+       "dense",
+       "lexical"
+      ],
+      "chunk_id": "ck_550ae4febedd9d7e2f9b0010",
+      "excerpt_sha": "e458579c001e48f3",
+      "expanded_sha": "",
+      "rank": 1,
+      "scores": {
+       "fusion_score": 0.032787,
+       "rank_dense": 1.0,
+       "rank_lexical": 1.0
+      },
+      "source_path": "proposal.md"
+     },
+     {
+      "channels": [
+       "dense",
+       "lexical"
+      ],
+      "chunk_id": "ck_6123907e05fc0b9b6f19292d",
+      "excerpt_sha": "c8458ac2ac9a25b8",
+      "expanded_sha": "",
+      "rank": 2,
+      "scores": {
+       "fusion_score": 0.032002,
+       "rank_dense": 3.0,
+       "rank_lexical": 2.0
+      },
+      "source_path": "indicators.xlsx"
+     },
+     {
+      "channels": [
+       "dense",
+       "lexical"
+      ],
+      "chunk_id": "ck_a59e4a9c7a969506ba9d264d",
+      "excerpt_sha": "e7f196aa1d0123b6",
+      "expanded_sha": "",
+      "rank": 3,
+      "scores": {
+       "fusion_score": 0.032002,
+       "rank_dense": 2.0,
+       "rank_lexical": 3.0
+      },
+      "source_path": "progress_report.md"
+     },
+     {
+      "channels": [
+       "dense"
+      ],
+      "chunk_id": "ck_18869a5586f0fde9ffb58756",
+      "excerpt_sha": "26170d136d828463",
+      "expanded_sha": "",
+      "rank": 4,
+      "scores": {
+       "fusion_score": 0.015625,
+       "rank_dense": 4.0
+      },
+      "source_path": "proposal.md"
+     },
+     {
+      "channels": [
+       "dense"
+      ],
+      "chunk_id": "ck_49456d6af8b43865f42896f7",
+      "excerpt_sha": "af1863b0cf9a0632",
+      "expanded_sha": "",
+      "rank": 5,
+      "scores": {
+       "fusion_score": 0.015385,
+       "rank_dense": 5.0
+      },
+      "source_path": "registrations.csv"
+     }
+    ],
+    "verdict": {
+     "enabled": false,
+     "signal": "",
+     "sufficient": true,
+     "threshold": null,
+     "top_score": null
+    },
+    "warnings": []
+   },
+   "q10": {
+    "index_generation": "g_7f0b15d76fcac5c5",
+    "query_id": "q_8528f874508306bf",
+    "results": [
+     {
+      "channels": [
+       "dense",
+       "lexical"
+      ],
+      "chunk_id": "ck_550ae4febedd9d7e2f9b0010",
+      "excerpt_sha": "e458579c001e48f3",
+      "expanded_sha": "",
+      "rank": 1,
+      "scores": {
+       "fusion_score": 0.032522,
+       "rank_dense": 1.0,
+       "rank_lexical": 2.0
+      },
+      "source_path": "proposal.md"
+     },
+     {
+      "channels": [
+       "dense",
+       "lexical"
+      ],
+      "chunk_id": "ck_18869a5586f0fde9ffb58756",
+      "excerpt_sha": "26170d136d828463",
+      "expanded_sha": "",
+      "rank": 2,
+      "scores": {
+       "fusion_score": 0.032002,
+       "rank_dense": 2.0,
+       "rank_lexical": 3.0
+      },
+      "source_path": "proposal.md"
+     },
+     {
+      "channels": [
+       "dense",
+       "lexical"
+      ],
+      "chunk_id": "ck_7e2469605b94344b853971a4",
+      "excerpt_sha": "ad8269dc5e69162b",
+      "expanded_sha": "",
+      "rank": 3,
+      "scores": {
+       "fusion_score": 0.031778,
+       "rank_dense": 5.0,
+       "rank_lexical": 1.0
+      },
+      "source_path": "progress_report.md"
+     },
+     {
+      "channels": [
+       "dense",
+       "lexical"
+      ],
+      "chunk_id": "ck_df38c5a0b4bcc935b701e5b7",
+      "excerpt_sha": "069838c289b57172",
+      "expanded_sha": "",
+      "rank": 4,
+      "scores": {
+       "fusion_score": 0.030777,
+       "rank_dense": 6.0,
+       "rank_lexical": 4.0
+      },
+      "source_path": "proposal.md"
+     },
+     {
+      "channels": [
+       "dense"
+      ],
+      "chunk_id": "ck_a59e4a9c7a969506ba9d264d",
+      "excerpt_sha": "e7f196aa1d0123b6",
+      "expanded_sha": "",
+      "rank": 5,
+      "scores": {
+       "fusion_score": 0.015873,
+       "rank_dense": 3.0
+      },
+      "source_path": "progress_report.md"
+     }
+    ],
+    "verdict": {
+     "enabled": false,
+     "signal": "",
+     "sufficient": true,
+     "threshold": null,
+     "top_score": null
+    },
+    "warnings": []
+   },
+   "q11": {
+    "index_generation": "g_7f0b15d76fcac5c5",
+    "query_id": "q_35098bcd827ece12",
+    "results": [
+     {
+      "channels": [
+       "dense",
+       "lexical"
+      ],
+      "chunk_id": "ck_49456d6af8b43865f42896f7",
+      "excerpt_sha": "af1863b0cf9a0632",
+      "expanded_sha": "",
+      "rank": 1,
+      "scores": {
+       "fusion_score": 0.032522,
+       "rank_dense": 2.0,
+       "rank_lexical": 1.0
+      },
+      "source_path": "registrations.csv"
+     },
+     {
+      "channels": [
+       "dense",
+       "lexical"
+      ],
+      "chunk_id": "ck_7e2469605b94344b853971a4",
+      "excerpt_sha": "ad8269dc5e69162b",
+      "expanded_sha": "",
+      "rank": 2,
+      "scores": {
+       "fusion_score": 0.032522,
+       "rank_dense": 1.0,
+       "rank_lexical": 2.0
+      },
+      "source_path": "progress_report.md"
+     },
+     {
+      "channels": [
+       "dense",
+       "lexical"
+      ],
+      "chunk_id": "ck_18869a5586f0fde9ffb58756",
+      "excerpt_sha": "26170d136d828463",
+      "expanded_sha": "",
+      "rank": 3,
+      "scores": {
+       "fusion_score": 0.031498,
+       "rank_dense": 3.0,
+       "rank_lexical": 4.0
+      },
+      "source_path": "proposal.md"
+     },
+     {
+      "channels": [
+       "dense",
+       "lexical"
+      ],
+      "chunk_id": "ck_550ae4febedd9d7e2f9b0010",
+      "excerpt_sha": "e458579c001e48f3",
+      "expanded_sha": "",
+      "rank": 4,
+      "scores": {
+       "fusion_score": 0.031258,
+       "rank_dense": 5.0,
+       "rank_lexical": 3.0
+      },
+      "source_path": "proposal.md"
+     },
+     {
+      "channels": [
+       "dense",
+       "lexical"
+      ],
+      "chunk_id": "ck_a59e4a9c7a969506ba9d264d",
+      "excerpt_sha": "e7f196aa1d0123b6",
+      "expanded_sha": "",
+      "rank": 5,
+      "scores": {
+       "fusion_score": 0.03055,
+       "rank_dense": 4.0,
+       "rank_lexical": 7.0
+      },
+      "source_path": "progress_report.md"
+     }
+    ],
+    "verdict": {
+     "enabled": false,
+     "signal": "",
+     "sufficient": true,
+     "threshold": null,
+     "top_score": null
+    },
+    "warnings": []
+   },
+   "q12": {
+    "index_generation": "g_7f0b15d76fcac5c5",
+    "query_id": "q_bc2d9ccb7e40ccf7",
+    "results": [
+     {
+      "channels": [
+       "dense",
+       "lexical"
+      ],
+      "chunk_id": "ck_df38c5a0b4bcc935b701e5b7",
+      "excerpt_sha": "069838c289b57172",
+      "expanded_sha": "",
+      "rank": 1,
+      "scores": {
+       "fusion_score": 0.032787,
+       "rank_dense": 1.0,
+       "rank_lexical": 1.0
+      },
+      "source_path": "proposal.md"
+     },
+     {
+      "channels": [
+       "dense",
+       "lexical"
+      ],
+      "chunk_id": "ck_8cb9df92ed666b19ed3a5547",
+      "excerpt_sha": "a80713bffbb8fcf6",
+      "expanded_sha": "",
+      "rank": 2,
+      "scores": {
+       "fusion_score": 0.032258,
+       "rank_dense": 2.0,
+       "rank_lexical": 2.0
+      },
+      "source_path": "progress_report.md"
+     },
+     {
+      "channels": [
+       "dense",
+       "lexical"
+      ],
+      "chunk_id": "ck_18869a5586f0fde9ffb58756",
+      "excerpt_sha": "26170d136d828463",
+      "expanded_sha": "",
+      "rank": 3,
+      "scores": {
+       "fusion_score": 0.031258,
+       "rank_dense": 3.0,
+       "rank_lexical": 5.0
+      },
+      "source_path": "proposal.md"
+     },
+     {
+      "channels": [
+       "dense",
+       "lexical"
+      ],
+      "chunk_id": "ck_7e2469605b94344b853971a4",
+      "excerpt_sha": "ad8269dc5e69162b",
+      "expanded_sha": "",
+      "rank": 4,
+      "scores": {
+       "fusion_score": 0.031025,
+       "rank_dense": 6.0,
+       "rank_lexical": 3.0
+      },
+      "source_path": "progress_report.md"
+     },
+     {
+      "channels": [
+       "dense",
+       "lexical"
+      ],
+      "chunk_id": "ck_550ae4febedd9d7e2f9b0010",
+      "excerpt_sha": "e458579c001e48f3",
+      "expanded_sha": "",
+      "rank": 5,
+      "scores": {
+       "fusion_score": 0.03055,
+       "rank_dense": 7.0,
+       "rank_lexical": 4.0
+      },
+      "source_path": "proposal.md"
+     }
+    ],
+    "verdict": {
+     "enabled": false,
+     "signal": "",
+     "sufficient": true,
+     "threshold": null,
+     "top_score": null
+    },
+    "warnings": []
+   },
+   "q13": {
+    "index_generation": "g_7f0b15d76fcac5c5",
+    "query_id": "q_b26d8001604be26e",
+    "results": [
+     {
+      "channels": [
+       "dense",
+       "lexical"
+      ],
+      "chunk_id": "ck_7e2469605b94344b853971a4",
+      "excerpt_sha": "ad8269dc5e69162b",
+      "expanded_sha": "",
+      "rank": 1,
+      "scores": {
+       "fusion_score": 0.032787,
+       "rank_dense": 1.0,
+       "rank_lexical": 1.0
+      },
+      "source_path": "progress_report.md"
+     },
+     {
+      "channels": [
+       "dense",
+       "lexical"
+      ],
+      "chunk_id": "ck_49456d6af8b43865f42896f7",
+      "excerpt_sha": "af1863b0cf9a0632",
+      "expanded_sha": "",
+      "rank": 2,
+      "scores": {
+       "fusion_score": 0.032258,
+       "rank_dense": 2.0,
+       "rank_lexical": 2.0
+      },
+      "source_path": "registrations.csv"
+     },
+     {
+      "channels": [
+       "dense",
+       "lexical"
+      ],
+      "chunk_id": "ck_18869a5586f0fde9ffb58756",
+      "excerpt_sha": "26170d136d828463",
+      "expanded_sha": "",
+      "rank": 3,
+      "scores": {
+       "fusion_score": 0.031498,
+       "rank_dense": 3.0,
+       "rank_lexical": 4.0
+      },
+      "source_path": "proposal.md"
+     },
+     {
+      "channels": [
+       "dense",
+       "lexical"
+      ],
+      "chunk_id": "ck_550ae4febedd9d7e2f9b0010",
+      "excerpt_sha": "e458579c001e48f3",
+      "expanded_sha": "",
+      "rank": 4,
+      "scores": {
+       "fusion_score": 0.031498,
+       "rank_dense": 4.0,
+       "rank_lexical": 3.0
+      },
+      "source_path": "proposal.md"
+     },
+     {
+      "channels": [
+       "dense",
+       "lexical"
+      ],
+      "chunk_id": "ck_6123907e05fc0b9b6f19292d",
+      "excerpt_sha": "c8458ac2ac9a25b8",
+      "expanded_sha": "",
+      "rank": 5,
+      "scores": {
+       "fusion_score": 0.030536,
+       "rank_dense": 6.0,
+       "rank_lexical": 5.0
+      },
+      "source_path": "indicators.xlsx"
+     }
+    ],
+    "verdict": {
+     "enabled": false,
+     "signal": "",
+     "sufficient": true,
+     "threshold": null,
+     "top_score": null
+    },
+    "warnings": []
+   },
+   "q14": {
+    "index_generation": "g_7f0b15d76fcac5c5",
+    "query_id": "q_b6fc2a980f4b8306",
+    "results": [
+     {
+      "channels": [
+       "dense"
+      ],
+      "chunk_id": "ck_49456d6af8b43865f42896f7",
+      "excerpt_sha": "af1863b0cf9a0632",
+      "expanded_sha": "",
+      "rank": 1,
+      "scores": {
+       "fusion_score": 0.016393,
+       "rank_dense": 1.0
+      },
+      "source_path": "registrations.csv"
+     },
+     {
+      "channels": [
+       "dense"
+      ],
+      "chunk_id": "ck_550ae4febedd9d7e2f9b0010",
+      "excerpt_sha": "e458579c001e48f3",
+      "expanded_sha": "",
+      "rank": 2,
+      "scores": {
+       "fusion_score": 0.016129,
+       "rank_dense": 2.0
+      },
+      "source_path": "proposal.md"
+     },
+     {
+      "channels": [
+       "dense"
+      ],
+      "chunk_id": "ck_a59e4a9c7a969506ba9d264d",
+      "excerpt_sha": "e7f196aa1d0123b6",
+      "expanded_sha": "",
+      "rank": 3,
+      "scores": {
+       "fusion_score": 0.015873,
+       "rank_dense": 3.0
+      },
+      "source_path": "progress_report.md"
+     },
+     {
+      "channels": [
+       "dense"
+      ],
+      "chunk_id": "ck_6123907e05fc0b9b6f19292d",
+      "excerpt_sha": "c8458ac2ac9a25b8",
+      "expanded_sha": "",
+      "rank": 4,
+      "scores": {
+       "fusion_score": 0.015625,
+       "rank_dense": 4.0
+      },
+      "source_path": "indicators.xlsx"
+     },
+     {
+      "channels": [
+       "dense"
+      ],
+      "chunk_id": "ck_df38c5a0b4bcc935b701e5b7",
+      "excerpt_sha": "069838c289b57172",
+      "expanded_sha": "",
+      "rank": 5,
+      "scores": {
+       "fusion_score": 0.015385,
+       "rank_dense": 5.0
+      },
+      "source_path": "proposal.md"
+     }
+    ],
+    "verdict": {
+     "enabled": false,
+     "signal": "",
+     "sufficient": true,
+     "threshold": null,
+     "top_score": null
+    },
+    "warnings": []
+   },
+   "q15": {
+    "index_generation": "g_7f0b15d76fcac5c5",
+    "query_id": "q_bd0443989ba9a11e",
+    "results": [
+     {
+      "channels": [
+       "dense",
+       "lexical"
+      ],
+      "chunk_id": "ck_6123907e05fc0b9b6f19292d",
+      "excerpt_sha": "c8458ac2ac9a25b8",
+      "expanded_sha": "",
+      "rank": 1,
+      "scores": {
+       "fusion_score": 0.032522,
+       "rank_dense": 2.0,
+       "rank_lexical": 1.0
+      },
+      "source_path": "indicators.xlsx"
+     },
+     {
+      "channels": [
+       "dense",
+       "lexical"
+      ],
+      "chunk_id": "ck_a59e4a9c7a969506ba9d264d",
+      "excerpt_sha": "e7f196aa1d0123b6",
+      "expanded_sha": "",
+      "rank": 2,
+      "scores": {
+       "fusion_score": 0.032522,
+       "rank_dense": 1.0,
+       "rank_lexical": 2.0
+      },
+      "source_path": "progress_report.md"
+     },
+     {
+      "channels": [
+       "dense",
+       "lexical"
+      ],
+      "chunk_id": "ck_550ae4febedd9d7e2f9b0010",
+      "excerpt_sha": "e458579c001e48f3",
+      "expanded_sha": "",
+      "rank": 3,
+      "scores": {
+       "fusion_score": 0.031258,
+       "rank_dense": 5.0,
+       "rank_lexical": 3.0
+      },
+      "source_path": "proposal.md"
+     },
+     {
+      "channels": [
+       "dense"
+      ],
+      "chunk_id": "ck_8cb9df92ed666b19ed3a5547",
+      "excerpt_sha": "a80713bffbb8fcf6",
+      "expanded_sha": "",
+      "rank": 4,
+      "scores": {
+       "fusion_score": 0.015873,
+       "rank_dense": 3.0
+      },
+      "source_path": "progress_report.md"
+     },
+     {
+      "channels": [
+       "dense"
+      ],
+      "chunk_id": "ck_df38c5a0b4bcc935b701e5b7",
+      "excerpt_sha": "069838c289b57172",
+      "expanded_sha": "",
+      "rank": 5,
+      "scores": {
+       "fusion_score": 0.015625,
+       "rank_dense": 4.0
+      },
+      "source_path": "proposal.md"
+     }
+    ],
+    "verdict": {
+     "enabled": false,
+     "signal": "",
+     "sufficient": true,
+     "threshold": null,
+     "top_score": null
+    },
+    "warnings": []
+   }
+  },
+  "reingest": {
+   "added": 0,
+   "deleted": 0,
+   "index_generation": "g_7f0b15d76fcac5c5",
+   "modified": 0,
+   "unchanged": 6,
+   "warnings": [
+    "no changes: active generation unchanged"
+   ]
+  },
+  "status": {
+   "healthy": true,
+   "index_generation": "g_7f0b15d76fcac5c5",
+   "n_chunks": 9,
+   "n_documents": 6,
+   "states": {
+    "OCR_REQUIRED": 1,
+    "READY": 5
+   },
+   "warnings": []
+  }
+ }
+}

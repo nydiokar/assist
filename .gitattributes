@@ -1,0 +1,4 @@
+# Fixture corpora are hashed byte-for-byte (content_hash -> version/generation ids); keep them
+# identical on every OS (no CRLF conversion on Windows checkouts) so golden snapshots are portable.
+tests/fixtures/** -text
+tests/evaluation/golden/** -text

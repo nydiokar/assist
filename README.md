@@ -41,10 +41,9 @@ bug. Run `scripts/eval_agent.py` (results gitignored — they quote corpus text)
 
 ```powershell
 cd project-assistant-rag
-python -m venv .venv
-.\.venv\Scripts\python.exe -m pip install -e ".[dev]"
-.\.venv\Scripts\python.exe scripts\make_fixtures.py
-.\.venv\Scripts\python.exe -m pytest
+uv sync --frozen --extra dev            # add --extra dev-gpu for torch/docling/chroma backends
+uv run pytest tests/unit tests/integration tests/evaluation
+uv run ruff check . ; uv run ruff format --check . ; uv run pyright
 ```
 
 ## Runbook (search-only MVP, no LLM)
@@ -62,11 +61,11 @@ Single source of provider selection + tuning. Key switches:
 
 | Key | Test/dev default | Production candidate (A01) |
 |---|---|---|
-| `embedding.provider` | `hash` (offline, deterministic, 2560-dim) | `qwen3` (`Qwen/Qwen3-Embedding-4B`, 2560-dim, CUDA, install `.[qwen3]`) |
-| `vector_store.provider` | `memory` (numpy cosine, JSON-persisted) | `chroma` (install `.[chroma]`) |
-| `parsing.backend` | `native` (pypdf/python-docx/openpyxl/csv) | `docling` (install `.[docling]`) |
+| `embedding.provider` | `hash` (offline, deterministic, 2560-dim) | `qwen3` (`Qwen/Qwen3-Embedding-4B`, 2560-dim, CUDA, extra `dev-gpu`) |
+| `vector_store.provider` | `memory` (numpy cosine, JSON-persisted) | `chroma` (extra `dev-gpu`) |
+| `parsing.backend` | `native` (pypdf/python-docx/openpyxl/csv) | `docling` (extra `dev-gpu`) |
 | `retrieval.per_file_cap` | `3` | max chunks from one source in the result window; WP3 2026-10-27 measured evidence@5 peak at 3 (`null` = legacy `top_k//2`) |
-| `retrieval.rerank.enabled` | `false` | cross-encoder reranker over the fused pool (spec §7; install `.[rerank]`, pin revision) — staged, see EVAL_LOG 2026-10-27 / ledger F19 |
+| `retrieval.rerank.enabled` | `false` | cross-encoder reranker over the fused pool (spec §7; extra `dev-gpu`, pin revision) — staged, see EVAL_LOG 2026-10-27 / ledger F19 |
 
 `e5` remains an optional legacy comparator. Switching `embedding.provider`/model/dim forces a
 **new index generation** (ADR-009); the startup compatibility guard refuses writes on a mismatch.
@@ -76,7 +75,7 @@ Single source of provider selection + tuning. Key switches:
 ### Activating Qwen3-4B (requires CUDA, ~20 GB VRAM, WSL)
 
 ```powershell
-.\.venv\Scripts\python.exe -m pip install -e ".[qwen3]"
+.\.venv\Scripts\python.exe -m pip install -e ".[dev-gpu]"
 .\.venv\Scripts\python.exe scripts\feasibility_smoke.py   # A01 §E gate — must pass first
 # then pin the resolved HF revision into configs\retrieval.yaml -> embedding.qwen3.revision
 # and set embedding.provider: qwen3, vector_store.provider: chroma

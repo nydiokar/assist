@@ -1,0 +1,30 @@
+# Offline CI (v3 build plan S0.4): lint, format, and the unit/integration/evaluation tiers on the
+# synthetic fixture corpus only. No real corpus, no `live` markers, no network model servers.
+name: ci
+
+on:
+  push:
+    branches: [main, "v3/**"]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.9.5"
+          python-version: "3.12"
+      - name: Sync (frozen lock, dev extra)
+        run: uv sync --frozen --extra dev
+      - name: Ruff lint
+        run: uv run --frozen ruff check .
+      - name: Ruff format
+        run: uv run --frozen ruff format --check .
+      - name: Tests (offline)
+        run: uv run --frozen pytest tests/unit tests/integration tests/evaluation -m "not live"
