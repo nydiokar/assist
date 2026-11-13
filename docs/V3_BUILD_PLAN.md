@@ -110,7 +110,7 @@ flowchart TD
 | S3 | done | S1 | — | `7219631` | 2026-11-11 |
 | S4 | done | S2, S3 | — (OCR spot-check moved to the S5 owner gate, see log 2026-11-13) | `b48baaa` | 2026-11-13 |
 | S5 | todo | S4 | O1: owner supplied `yspdb_all/` 2026-11-13 (2 folders missing vs `yspdb/`, owner queue) | | |
-| S6 | todo | S4 | — | | |
+| S6 | done | S4 | — | `c87822e` | 2026-11-13 |
 | S7 | todo | S5, S6 | D-1 + labels + floor (O2); D-7 key (O3) for the live part only | | |
 | S8 | todo | S6 | — | | |
 | S9 | todo | S8 | T1/T2 (O4) for the live check only | | |
@@ -453,6 +453,15 @@ Format: `YYYY-MM-DD · Stage · event · evidence (commands + one-line results, 
   - Regression floor (S4 branch, 2026-11-13): `uv run pytest tests/unit tests/contracts tests/integration -m "not live"` → 250 passed, 4 skipped (OCR binaries absent on Windows; covered by CI job `ocr-tools`), 18 deselected; `tests/evaluation` 2 passed; lint-imports 11 kept; pyright 0 errors; ruff + format clean. CI `9c4801a` → success (incl. `ocr-tools`).
   - Owner gates: **O1** answered by the owner on 2026-11-13 with the extended corpus `yspdb_all/` ("this is the folder we should index"); it becomes S5's input. The **OCR spot-check** is moved into the S5 owner gate and drawn from the `yspdb_all/` run (the corpus that will actually be served), so S4 does not hold S5. The GPU permission item is resolved: the Vulkan llama-server started in this session (`local_data/llama-b11804-win-vulkan/llama-server.exe`, RX 7900 XT): 4 164 tok/s vs 99 tok/s on the CPU container (16 × 360-token batch).
 
+- 2026-11-13 · S6 · closed · branch `v3/s6-service` (`63b6dd9`, `98332f3`, `d8ca6e0`, `82ef1bc`, `2348c2d`, merge of `main` `b212ed6`, `c87822e`). Checks (S6 worktree, all extras synced):
+  - `uv run python -X utf8 scripts/smoke_mcp.py --fixture` → TOOLS = the 6 tools, PROJECTS `[('demo', 6)]`, 5 passages in `untrusted_data` envelopes, `SMOKE: PASS`.
+  - Load (A04 wording): `pytest tests/integration/test_service_http.py -k "concurrent_searches or bounded_queue" -s` ×12 → 12/12 passed; 20 concurrent searches during an ingest, p95 3.26–5.43 s, max ≤ 5.55 s, first-try refusals 2–3, 0 failed calls after one `Retry-After`; ≥ 17 waiting → 503 + `Retry-After: 2` with a JSON-RPC body "assist is busy …". **Rework round 1:** before `c87822e` the test failed ≈ 1 in 5 (the transport-level 503 reached the MCP client as a bare "Server returned an error response"); root cause and fix in A04.
+  - Degraded mode: `pytest tests/integration/test_service_degraded_live.py -m live` → 2 passed (103 s): rerank container stopped → `degraded:["rerank"]`; embed stopped → `["dense"]`; both → lexical-only, flagged; `/healthz` reflects each; containers healthy again afterwards. Fixture variants in `test_service_http.py` green.
+  - Injection fixture verbatim inside the untrusted envelope: `test_injection_fixture_is_returned_verbatim_inside_the_envelope` green.
+  - `/metrics`: `test_healthz_and_metrics` asserts all 9 spec §6.10 names. Admin isolation (`deploy/dev/compose.service.yaml`, image built from this branch): probe-agent `/healthz: 200`, `admin(dns): 000 unreachable`, `admin(ip): 000 unreachable`; probe-knowledge `admin: 200`.
+  - Invalid project id → typed MCP error: `test_tools_search_envelope_and_invalid_project` green.
+  - Regression floor: unit+contracts+integration 259 passed, 4 skipped (OCR binaries; CI job), 20 deselected (live); evaluation 2 passed; lint-imports 11 kept; pyright 0 errors (needs `--extra serve --extra dev-gpu`, otherwise 9 missing-import errors); ruff + format clean.
+
 ## 6. Owner queue and open issues
 
 **Owner queue** (the agent writes here when it stops; the owner clears entries):
@@ -463,6 +472,6 @@ Format: `YYYY-MM-DD · Stage · event · evidence (commands + one-line results, 
 
 - 2026-11-11 · S6/B1 · **Queries degrade to lexical while a full ingest saturates the single embed server.** Measured with the live service test during the YP full ingest: the query embedding waited behind the ingest's batches, timed out, and the search ran `degraded: ["dense"]`. This is correct degraded behaviour, but on a 4-core host the client would get reduced-mode answers during every large ingest. Options for S8/B1: (a) give the ingest a lower `--parallel` share or throttle its batch rate; (b) a second small embed instance (or one reserved slot) for queries; (c) accept it for the initial build only (incremental runs are small). Proposed: (a) + (c), decided with the B1 numbers.
 
-- 2026-11-11 · S6 · **Two S6 exit checks conflict for a true burst.** "20 concurrent `search_project` calls during an ingest → no errors" vs "the 17th waiting request gets a 503" (spec §6.3: ≤ 16 waiting). Measured (`tests/integration/test_service_http.py`, scratch probe): each store call takes ~11 ms, but 20 MCP clients started together put **17–18 calls in flight**, so 1–3 are refused by design (`assist is busy`, HTTP 503 + `Retry-After: 2` at the transport). No SQLite thread errors; with one retry after `Retry-After` all 20 succeed. **Proposed amendment (A04):** the load check becomes "20 concurrent calls, client honours `Retry-After` once → no failures; first-try refusals reported". Alternative: raise `max_waiting` to ≥ 20 (contradicts §6.3's 16). Until decided, the S6 load check is recorded as measured, not as passed.
+- ~~2026-11-11 · S6 · Two S6 exit checks conflict for a true burst.~~ **Resolved 2026-11-13 by `docs/AMENDMENT_A04.md`** (spec §6.3 backpressure wins over the plan wording; owner may reverse by raising `service.max_waiting`).
 
 - 2026-11-11 · S1 · *Plan wording vs code (resolved by recording, no behaviour change).* S1 task 2 asks for the property "cap: never more than the cap per file". The per-file cap deliberately **refills** the window from over-cap candidates when it would otherwise be short (WP3 2026-10-27 design: never return fewer than `window` results when candidates exist), so the literal property is false by design. `tests/unit/test_core_properties.py::test_cap_order_length_and_refill_rule` encodes the real contract: order preserved, length = min(window, candidates), and a file exceeds the cap **only** when every under-cap candidate is already in the window. Proposed amendment: reword the S1 property in the plan. Owner may instead ask for a strict cap (that would be a behaviour change and needs a measured eval).
