@@ -109,11 +109,11 @@ flowchart TD
 | S2 | done | S1 | — | `54d7ece` | 2026-11-11 |
 | S3 | done | S1 | — | `7219631` | 2026-11-11 |
 | S4 | done | S2, S3 | — (OCR spot-check moved to the S5 owner gate, see log 2026-11-13) | `b48baaa` | 2026-11-13 |
-| S5 | todo | S4 | O1: owner supplied `yspdb_all/` 2026-11-13 (2 folders missing vs `yspdb/`, owner queue) | | |
+| S5 | active (paused: GPU servers killed by host memory pressure, see log) | S4 | O1: owner supplied `yspdb_all/` 2026-11-13 (2 folders missing vs `yspdb/`, owner queue) | | |
 | S6 | done | S4 | — | `c87822e` | 2026-11-13 |
-| S7 | todo | S5, S6 | D-1 + labels + floor (O2); D-7 key (O3) for the live part only | | |
+| S7 | todo (checks pre-verified on `v3/s7-eval` 2026-11-13, waits for S5) | S5, S6 | D-1 + labels + floor (O2); D-7 key (O3) for the live part only | | |
 | S8 | done | S6 | — | `034f6a9` | 2026-11-13 |
-| S9 | todo | S8 | T1/T2 (O4) for the live check only | | |
+| S9 | awaiting-owner (X4 worker placement + O4) | S8 | T1/T2 (O4) for the live check only | | |
 | S10 | todo | S7, S9 | VM bought (O5) | | |
 | S11 | todo | S10 | D-2, D-4, D-5, D-6, D-8, C1–C5 (O6) | | |
 
@@ -471,6 +471,9 @@ Format: `YYYY-MM-DD · Stage · event · evidence (commands + one-line results, 
   - Regression floor: unit+contracts+integration 267 passed, 4 skipped (OCR binaries), 21 deselected (live); evaluation 2 passed; lint-imports 11 kept; pyright 0; ruff + format clean.
   - Not exercised: the GHCR release workflow (runs on a pushed tag = a publish; left for the first release).
 
+- 2026-11-13 · S5 · progress (not closed) · branch `v3/s5-e1` (`34c92db` duplicate collapse + F24, `281db1a` encrypted PDFs + PARSER_VERSION in fingerprint, `34facae` E1 configs + untrack real question sets, `43d0c45`/`c4a19f4` relabel, `5b99dcd` E1 tooling, `9d1fb5b` owner queue). Done: pilot (X6) 24 min dry run, 1491 in scope, 11 323 chunks; gold v3 relabelled, 51 scored questions, `validate_labels` 0 problems; Q4_K_M + Q6_K GGUFs fetched, sha256 OK; tokenizer counts identical across Q8_0/Q6_K/Q4_K_M/CPU. **Interrupted:** the Q8_0 GPU ingest (`assist-yp-all-q8`, volume `assist_yp_all_q8_state`) was embedding when Claude Code's memory-pressure reaper killed the Vulkan llama-servers on 8091–8093 and the ingest client; the container then aborts on the systemic embed failure (nothing published; embeddings already cached are kept). S7 pre-verified in its worktree: floor 280 passed, its 13 exit-check tests pass (pushed, not merged).
+  - Resume: start one GPU server at a time (`local_data/llama-b11804-win-vulkan/llama-server.exe --model models/Qwen3-Embedding-4B-<Q>.gguf --embedding --pooling last --ctx-size 10240 --parallel 4 --batch-size 2560 --ubatch-size 2560 --n-gpu-layers 99 --device Vulkan0 --host 127.0.0.1 --port 8091`), re-run the Q8 ingest (same `docker run` with `ingest-corpus`, cache resumes), then eval (`scripts/eval_yp.py` in the container, `--questions eval/yp_questions_v3.jsonl`), copy `/state/cache` into the Q6/Q4/reference states, run those, `scripts/e1_compare.py`, `scripts/parity_builds.py` (GPU 8091 vs CPU 8081), `scripts/bench_e1_latency.py` with the limited containers, then fill `docs/E1_REPORT.md`.
+
 ## 6. Owner queue and open issues
 
 **Owner queue** (the agent writes here when it stops; the owner clears entries):
@@ -481,6 +484,8 @@ Format: `YYYY-MM-DD · Stage · event · evidence (commands + one-line results, 
 - 2026-11-13 · S5 · **Near-duplicates kept, please confirm:** `Copy of Overview_Debate 2025.xlsx` (older version, word ratio 0.984; you kept it in `yspdb/` too) and `National Meeting Yambol/Декларация НС Младежко участие - …/ДЕКЛАРАЦИЯ - НС Младежко участие.docx` vs `.pdf` (0.966; the PDF has 129 more words, maybe the final text). Excluded by curation (same choice as your 2026-10-17 clean-up): `KA154-YOU-E2373104.pdf` (0.9936 vs the DOCX). Exact duplicates (157 occurrences) are collapsed automatically. Options per file: keep / exclude (one line in `configs/yp_all_*.yaml` `ingest.exclude_paths`). **Recommendation:** exclude the older `Copy of Overview_Debate 2025.xlsx`; keep both declaration files until you say which is final.
 - 2026-11-13 · S9 · **Decide where the AI-Team worker runs on the client host (blocks S9 T3–T7, T10) + T1/T2 (O4).** See the S9 open issue below. Options: (1) re-sanction `deploy/compose.worker.yaml` for the single-tenant client host (AI-Team change: drop the NON-CANONICAL header for that profile, keep the PM2 native worker canonical on your PC); (2) run the native PM2 worker on the client host and amend the spec (loses read-only root, `cap_drop`, proxy-only egress, which §8.3 relies on). **Recommendation: (1).** Independently, T1 (the `project_assistant` role + tool grant) and T2 (role doc) are yours; the grant test in S9 is written against whatever T1 decides.
 
+
+- 2026-11-13 · S5 · **Restart the GPU embed server so E1 can continue.** The host ran low on memory; Claude Code killed the four background llama-server processes (Q8_0/Q6_K/Q4_K_M on 8091–8093) and the ingest client. The agent will not restart them unasked. Options: (1) say "resume E1" and the agent runs **one** GPU server at a time (≈5 GB VRAM, little host RAM) instead of three at once; (2) start it yourself (command in the S5 log entry) and tell the agent; (3) set `CLAUDE_CODE_DISABLE_BG_SHELL_PRESSURE_REAP=1` when launching Claude Code if you want long runs never reaped. **Recommendation: (1)**, and close other memory-heavy apps during the ~1 h of runs.
 
 **Open issues** (spec/code contradictions, X4):
 
