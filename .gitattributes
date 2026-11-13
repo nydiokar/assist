@@ -2,3 +2,9 @@
 # identical on every OS (no CRLF conversion on Windows checkouts) so golden snapshots are portable.
 tests/fixtures/** -text
 tests/evaluation/golden/** -text
+
+# Files mounted into or executed by Linux containers/hosts: LF on every checkout (a CRLF
+# sync.sh fails with "set: illegal option -" in the rclone image; S8 2026-11-13).
+deploy/** text eol=lf
+*.sh text eol=lf
+Makefile text eol=lf

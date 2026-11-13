@@ -86,7 +86,9 @@ def build_http_server(api: ServiceApi, executor: StoreExecutor, cfg: ServiceConf
         try:
             return await executor.run(fn, deadline)
         except Overloaded as e:
-            raise ToolError(f"assist is busy ({e}); retry in a few seconds") from e
+            raise ToolError(
+                f"assist is busy ({e}); retry in a few seconds"
+            ) from e  # = BUSY_MESSAGE
         except DeadlineExceeded as e:
             raise ToolError(f"assist timed out: {e}") from e
         except StoreError as e:
