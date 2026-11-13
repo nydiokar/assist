@@ -4,6 +4,8 @@ For every answerable question, each expected source is re-found in the new corpu
   1. same relative path, all expected substrings present          -> kept
   2. else any parseable file whose text contains ALL substrings    -> moved (best name match first)
   3. else                                                          -> unresolved (owner decides)
+Unresolved questions and filesystem questions whose folder is gone are left out of the scored
+file and listed in the change list only.
 Each kept/moved source gets `expect_source_hashes[path] = sha256` (spec §6.8.4). Filesystem and
 no-answer questions are carried over; filesystem folders are re-checked for existence.
 
@@ -106,7 +108,8 @@ def main() -> None:
             continue
         if q["kind"] == "filesystem":
             present = [p for p in olds if p in dirs]
-            out_rows.append(q)
+            if len(present) == len(olds):  # a missing folder is not scored; listed for the owner
+                out_rows.append(q)
             changes.append(
                 LabelChange(
                     id=q["id"],
@@ -135,10 +138,7 @@ def main() -> None:
                         note="uncovered: " + "; ".join(uncovered),
                     )
                 )
-                out_rows.append(
-                    {**q, "reviewed": False, "note": "S5: expected evidence not in yspdb_all"}
-                )
-                continue
+                continue  # not scored; listed for the owner
             missing = [p for p in olds if p not in texts] or olds
             best = max(
                 hits, key=lambda r: (max(_name_score(o, r) for o in missing), -r.count("/"), r)
