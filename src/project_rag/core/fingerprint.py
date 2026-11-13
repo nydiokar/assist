@@ -12,7 +12,7 @@ from collections.abc import Iterable
 from ..domain.config import ChunkingConfig, ClassificationConfig, ParsingConfig
 from .chunking import CHUNKER_VERSION
 
-PARSER_VERSION = "native_v1"
+PARSER_VERSION = "native_v2"  # v2: permissions-only encrypted PDFs are parsed (S5)
 
 
 def _sha(raw: str) -> str:
@@ -44,6 +44,7 @@ def pipeline_fingerprint(
     return "|".join(
         [
             CHUNKER_VERSION,
+            PARSER_VERSION,  # a parser change must re-derive an unchanged corpus (S5)
             parsing.model_dump_json(),  # backend + OCR/antiword switches and thresholds (S4)
             chunking.model_dump_json(),
             classification.model_dump_json(),

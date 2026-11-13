@@ -696,3 +696,26 @@ All behaviour-neutral (golden snapshot byte-identical to S0, `git diff 36b1ec9 -
   where the owner already decided the same case before; everything else goes to the owner queue.
 - **Bug found on the way: F24** (stale source path from the content-keyed parse cache). Fixed
   in the same change.
+- **Permissions-only encrypted PDFs are parsed** (`parse_native`, `PARSER_VERSION` native_v2).
+  The pilot quarantined 93 PDFs as "encrypted": all are YouthPass certificates under
+  `National Meeting Yambol/Participants_NMYP/YouthPasses/` (92 individual + 1 combined, 186 pages).
+  Measured: 93/93 open with the empty user password and have a text layer (pypdf `decrypt("")`),
+  i.e. they carry only owner permissions and open in any viewer without a password. Now: empty
+  password tried first (diagnostic `encrypted PDF opened with the empty user password`); a real
+  user password still quarantines (`encrypted PDF (user password required)`). `pypdf[crypto]`
+  declared (AES; `cryptography` was only transitive). Watch item for E1: 92 near-identical
+  certificates plus the combined file may crowd generic event queries; measured, not pre-empted.
+- **`PARSER_VERSION` is part of the pipeline fingerprint.** It keyed the parse cache but not the
+  generation id, so a parser change on an unchanged corpus hit the idempotency short-circuit
+  (`prior == new` generation) and never reached the index. Golden snapshot regenerated: diff =
+  66 leaves, `index_generation` (36) and `query_id` (30) only.
+- **Curation list for `yspdb_all/`** (`configs/yp_all_*.yaml` `ingest.exclude_paths`):
+  `KA154-YOU-E2373104.pdf` (the proposal DOCX's PDF export, word ratio 0.9936; mirrors the
+  owner's 2026-10-17 choice). Not excluded, listed for the owner: `Copy of Overview_Debate
+  2025.xlsx` (0.984, older version, kept in `yspdb/` too) and the declaration
+  `ДЕКЛАРАЦИЯ - НС Младежко участие.docx`/`.pdf` (0.966, the PDF has 129 more words).
+- **Pilot (X6), 2026-11-13** (dry run in `assist:dev`, parse + OCR + chunk, no embeddings):
+  1500 discovered, 9 excluded (media), 1491 in scope → READY 531, DUPLICATE 157, NO_TEXT 696
+  (photos), QUARANTINED 93 (fixed above), UNSUPPORTED 14 (6 `.heic`, 2 `.webp`, 2 `.pptx`, 4
+  extensionless/`.conf`); 11 323 chunks, 0 truncated; 24 min (discover 87 s, parse+OCR 1126 s,
+  chunk 219 s). Embedding on the GPU build at ~4.1k tok/s → well under the plan's hours.

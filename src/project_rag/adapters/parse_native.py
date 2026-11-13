@@ -98,10 +98,21 @@ class PdfParser:
                 state=DocState.FAILED,
                 diagnostics=[f"pdf open failed: {e}"],
             )
+        notes: list[str] = []
         if reader.is_encrypted:
-            return ParsedDocument(
-                source_path=source_path, state=DocState.QUARANTINED, diagnostics=["encrypted PDF"]
-            )
+            # Permissions-only encryption (an owner password, empty user password) opens in any
+            # viewer without asking; only a real user password quarantines (S5, DECISIONS).
+            try:
+                opened = bool(reader.decrypt(""))
+            except Exception:  # noqa: BLE001 - unsupported crypto -> quarantine below
+                opened = False
+            if not opened:
+                return ParsedDocument(
+                    source_path=source_path,
+                    state=DocState.QUARANTINED,
+                    diagnostics=["encrypted PDF (user password required)"],
+                )
+            notes.append("encrypted PDF opened with the empty user password")
         blocks: list[Block] = []
         total_chars = 0
         for pageno, page in enumerate(reader.pages, start=1):
@@ -133,7 +144,9 @@ class PdfParser:
                 state=DocState.OCR_REQUIRED,
                 diagnostics=["likely scanned PDF: negligible extractable text"],
             )
-        return ParsedDocument(source_path=source_path, state=DocState.PARSED, blocks=blocks)
+        return ParsedDocument(
+            source_path=source_path, state=DocState.PARSED, blocks=blocks, diagnostics=notes
+        )
 
 
 class DocxParser:
