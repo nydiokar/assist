@@ -220,6 +220,12 @@ class IngestConfig(_Cfg):
         ]
     )
     max_file_bytes: int = 200_000_000
+    # Curation list: exact relative paths kept out of the index (e.g. a PDF export of a DOCX that
+    # is already indexed). Each entry should carry its reason in the deployment config comments.
+    exclude_paths: list[str] = Field(default_factory=lambda: [])
+    # Exact duplicates (same SHA-256) inside one project: index one canonical occurrence, record
+    # the others as DUPLICATE with a pointer (S5, DECISIONS 2026-11-13).
+    collapse_exact_duplicates: bool = True
     # A run aborts (nothing published, previous generation stays) when embedding fails for at
     # least `abort_min_failures` documents AND more than this fraction of those needing vectors.
     max_embed_failure_fraction: float = 0.25

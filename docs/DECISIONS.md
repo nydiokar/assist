@@ -661,3 +661,38 @@ All behaviour-neutral (golden snapshot byte-identical to S0, `git diff 36b1ec9 -
   Kept/NO_TEXT: 40/60 → 74/70; **15/65 → 86/58**; 15/60 → 87/57; 30/70 → 77/67. 65 drops the
   one 54-conf partial poster title and the 58–64 junk. The owner spot-check (10 OCR'd docs) is
   the S4 owner gate.
+
+## 2026-11-13 — S5 corpus preparation: extended YP corpus `yspdb_all/`, exact-duplicate collapse
+
+- **Input.** The owner supplied `yspdb_all/` on 2026-11-13 as the folder to index (answers O1).
+  Measured (sha256 walk, script kept in the session scratchpad): 1503 files / 10.0 GB (vs 334 /
+  3.6 GB in `yspdb/`); 400 text-bearing (`.docx` 163, `.pdf` 179, `.xlsx` 50, `.doc` 4, `.pptx`
+  2, `.txt` 2) vs 172; 1081 images (876 event photos under `National Meeting Yambol/Photos_NMYP`).
+  **Not a superset:** `04. Сборник с Добри практики/` (65 files incl. the good-practice handbook)
+  and `Youth Studios/` (6) are absent; the proposal is present as `KA154-YOU-E2373104.docx` +
+  `.pdf` again (the owner removed exactly that pair from `yspdb/` on 2026-10-17). Drive re-export
+  changed the bytes of 87 same-path documents, so cross-folder comparison must be by text, not hash.
+  `yspdb_all/` is read-only like `yspdb/` (gitignored and dockerignored in `b48baaa`).
+- **Exact duplicates are collapsed inside a project** (`ingest.collapse_exact_duplicates`,
+  default on). v1 §4.1 says "identify duplicates by content hash, but retain each source
+  occurrence and its access/project associations". Inside one project the access association is
+  identical, so every occurrence is **recorded** in the catalog (state `DUPLICATE`, diagnostics
+  `duplicate of <canonical>`, `RunReport.duplicate_of`) and only the canonical one is parsed,
+  chunked and embedded. Across projects nothing is collapsed. Why: 99 same-bytes groups (159
+  extra copies; 14 of them PDFs, i.e. the same third-party resource packs in 2–4 folders) would
+  otherwise fill several of the 8 result slots with identical passages, and the per-file cap does
+  not see them as one file. Canonical rule (`core.ingest_policy.exact_duplicates`): not a
+  `Copy of`/`Копие`/`(n)` name → not under a `classification.reference_prefixes` folder (so a copy
+  used as project material keeps `project_record`) → shallowest → shortest → lexicographic.
+  Order-independent (hypothesis test). Deleting the canonical promotes the next copy on the next
+  run. A collapsed duplicate is part of the generation identity (`hash+path=>canonical`), so a
+  corpus without duplicates keeps its generation ids (golden snapshot unchanged).
+  Coverage counts distinct documents (DUPLICATE excluded from numerator and denominator).
+  Known limit: citations name the canonical path only; the other locations are in the catalog
+  and run report, not in the result envelope.
+- **Near-duplicates** (same text, different bytes: a DOCX and its PDF export, an older `Copy of`
+  workbook) stay a known limitation (F4). For this corpus they are handled by the new curation
+  list `ingest.exclude_paths` (exact relative paths, reason in a config comment), applied only
+  where the owner already decided the same case before; everything else goes to the owner queue.
+- **Bug found on the way: F24** (stale source path from the content-keyed parse cache). Fixed
+  in the same change.

@@ -31,6 +31,9 @@ class DocState(StrEnum):
     QUARANTINED = "QUARANTINED"
     OCR_REQUIRED = "OCR_REQUIRED"
     NO_TEXT = "NO_TEXT"  # OCR ran (or the file is an image) and kept no usable text (S4)
+    # Same bytes as another file of the same project: the occurrence is recorded with a pointer
+    # to the canonical copy, which alone is indexed (S5, DECISIONS 2026-11-13; v1 §4.1).
+    DUPLICATE = "DUPLICATE"
 
 
 class BlockType(StrEnum):
@@ -226,11 +229,12 @@ class RunReport(Frozen):
     n_excluded: int = 0
     n_in_scope: int = 0
     counts_by_state: dict[str, int] = Field(default_factory=dict)
-    coverage_pct: float = 0.0  # READY / in-scope documents
+    coverage_pct: float = 0.0  # READY / distinct in-scope documents (duplicates not counted)
     failed: list[FailedDoc] = Field(default_factory=list)  # FAILED + NO_TEXT now
     newly_failed: list[FailedDoc] = Field(default_factory=list)  # not failing in the prior run
     ocr_indexed: list[str] = Field(default_factory=list)  # READY via OCR
     antiword_indexed: list[str] = Field(default_factory=list)  # READY via antiword
+    duplicate_of: dict[str, str] = Field(default_factory=dict)  # occurrence -> canonical path
     embeddings_computed: int = 0
     embeddings_cached: int = 0
     stage_seconds: dict[str, float] = Field(default_factory=dict)

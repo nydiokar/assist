@@ -38,6 +38,7 @@ from ..core.ingest_policy import (
     counts_by_state,
     coverage_pct,
     embed_abort_reason,
+    exact_duplicates,
     exclusion_reason,
     failed_docs,
     newly_failed,
@@ -104,6 +105,15 @@ class StageRunner:
         cached = self._store.get_parse(key)
         if cached is not None:
             self.parse_hits += 1
+            # The key is content-only: bind the artifact to THIS occurrence, or a renamed file or
+            # a same-bytes copy would cite the path it was first parsed under (F24).
+            if cached.source_path != source_path or cached.doc.source_path != source_path:
+                return cached.model_copy(
+                    update={
+                        "source_path": source_path,
+                        "doc": cached.doc.model_copy(update={"source_path": source_path}),
+                    }
+                )
             return cached
         self.parse_misses += 1
         doc = registry.parse(abs_path, source_path, ext)
@@ -130,7 +140,10 @@ class StageRunner:
         key = chunk_key(parse_art.artifact_id, chunk_cfg)
         lineage = chunk_lineage_key(key, project_id, source_id, version_id)
         cached = self._store.get_chunk(self._project_id, lineage)
-        if cached is not None:
+        # Chunks cached before the F24 fix may carry a stale source_path: treat them as a miss.
+        if cached is not None and all(
+            c.source_path == parse_art.doc.source_path for c in cached.chunks
+        ):
             self.chunk_hits += 1
             return cached
         self.chunk_misses += 1
@@ -225,12 +238,26 @@ class IngestService:
             excluded = [(d, r) for d in listed if (r := exclusion_reason(d, self._cfg.ingest))]
             excluded_paths = {d.source_path for d, _ in excluded}
             discovered = [d for d in listed if d.source_path not in excluded_paths]
+            duplicate_of = (
+                exact_duplicates(discovered, tuple(self._cfg.classification.reference_prefixes))
+                if self._cfg.ingest.collapse_exact_duplicates
+                else {}
+            )
         supported = self._parser.supported_extensions()
         pipeline = pipeline_fingerprint(
             self._cfg.parsing, self._cfg.chunking, self._cfg.classification, profile.key()
         )
+        # A collapsed duplicate changes what is indexed, so it is part of the generation identity
+        # (a corpus without duplicates keeps the ids it had before S5).
         new_gen = generation_id(
-            project_id, [d.content_hash + d.source_path for d in discovered], pipeline
+            project_id,
+            [
+                d.content_hash
+                + d.source_path
+                + (f"=>{duplicate_of[d.source_path]}" if d.source_path in duplicate_of else "")
+                for d in discovered
+            ],
+            pipeline,
         )
         prior_gen = self._catalog.active_generation(project_id)
         prior_hashes = self._catalog.prior_hashes(project_id, prior_gen) if prior_gen else {}
@@ -304,6 +331,18 @@ class IngestService:
         for d in discovered:
             sid = source_id(d.source_path)
             vid = version_id(d.content_hash, self._cfg.parsing.backend)
+
+            if d.source_path in duplicate_of:
+                files.append(
+                    FileReport(
+                        source_path=d.source_path,
+                        state=DocState.DUPLICATE,
+                        source_id=sid,
+                        version_id=vid,
+                        diagnostics=[f"duplicate of {duplicate_of[d.source_path]}"],
+                    )
+                )
+                continue
 
             if d.ext not in supported:
                 files.append(
@@ -530,6 +569,11 @@ class IngestService:
             newly_failed=newly_failed(current_failed, prior_states),
             ocr_indexed=[f.source_path for f in ready if any("ocr_" in x for x in f.diagnostics)],
             antiword_indexed=[f.source_path for f in ready if "parser=antiword" in f.diagnostics],
+            duplicate_of={
+                f.source_path: f.diagnostics[0].removeprefix("duplicate of ")
+                for f in files
+                if f.state == DocState.DUPLICATE and f.diagnostics
+            },
             embeddings_computed=embed_stats[0],
             embeddings_cached=embed_stats[1],
             stage_seconds=run.seconds(),
