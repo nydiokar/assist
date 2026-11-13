@@ -147,6 +147,25 @@ async def _mcp_call(
             return bool(res.is_error), text
 
 
+async def _mcp_call_or_busy(base: str, tool: str, args: dict[str, object]) -> tuple[bool, str]:
+    """`_mcp_call`, but the transport-level busy answer (HTTP 503 + Retry-After with a JSON-RPC
+    error body) comes back as `(True, message)` like the tool-level one."""
+    from mcp.shared.exceptions import MCPError
+
+    try:
+        return await _mcp_call(base, tool, args)
+    except BaseExceptionGroup as eg:
+        match, _rest = eg.split(MCPError)
+        if match is None:
+            raise
+        leaf: BaseException = match
+        while isinstance(leaf, BaseExceptionGroup):
+            leaf = leaf.exceptions[0]
+        if "assist is busy" not in str(leaf):
+            raise
+        return True, str(leaf)
+
+
 async def _list_tools(base: str) -> list[str]:
     from mcp import ClientSession
     from mcp.client.streamable_http import streamable_http_client
@@ -297,6 +316,9 @@ def test_bounded_queue_returns_503(running: tuple[Runtime, str, str]) -> None:
     try:
         r = httpx.post(f"{public}/mcp", json={}, headers={"Authorization": f"Bearer {TOKEN}"})
         assert r.status_code == 503 and r.headers["Retry-After"] == "2"
+        err = r.json()["error"]  # JSON-RPC shape, surfaced verbatim by MCP clients
+        assert r.json()["jsonrpc"] == "2.0" and "assist is busy" in err["message"]
+        assert err["data"]["retry_after_s"] == 2.0
     finally:
         rt.executor._pending -= 17
         gate.set()
@@ -321,7 +343,7 @@ def test_concurrent_searches_during_ingest(
         nonlocal busy_first_try
         t0 = time.perf_counter()
         for attempt in range(2):  # a client honouring the busy/Retry-After signal once
-            err, text = await _mcp_call(
+            err, text = await _mcp_call_or_busy(
                 public,
                 "search_project",
                 {"project_id": "green-villages", "query": "community gardens"},

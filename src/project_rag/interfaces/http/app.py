@@ -27,6 +27,9 @@ Receive = Callable[[], Awaitable[MutableMapping[str, Any]]]
 Send = Callable[[MutableMapping[str, Any]], Awaitable[None]]
 
 
+BUSY_MESSAGE = "assist is busy ({detail}); retry in a few seconds"
+
+
 class ServiceOps(ServiceApi, Protocol):
     def health(self) -> dict[str, str]: ...
 
@@ -65,8 +68,18 @@ class _Guard:
                     await JSONResponse({"error": "unauthorized"}, 401)(scope, receive, send)
                     return
                 if self._executor is not None and self._executor.saturated:
+                    # A JSON-RPC error body: MCP clients surface it verbatim at a non-2xx status,
+                    # so the agent reads "busy, retry" instead of a bare transport failure.
                     await JSONResponse(
-                        {"error": "busy", "detail": "store queue full"},
+                        {
+                            "jsonrpc": "2.0",
+                            "id": None,
+                            "error": {
+                                "code": -32000,
+                                "message": BUSY_MESSAGE.format(detail="store queue full"),
+                                "data": {"retry_after_s": float(self._retry_after)},
+                            },
+                        },
                         503,
                         headers={"Retry-After": self._retry_after},
                     )(scope, receive, send)
