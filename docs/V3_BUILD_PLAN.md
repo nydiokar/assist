@@ -108,8 +108,8 @@ flowchart TD
 | S1 | done | S0 | — | `5ad1e55` | 2026-11-11 |
 | S2 | done | S1 | — | `54d7ece` | 2026-11-11 |
 | S3 | done | S1 | — | `7219631` | 2026-11-11 |
-| S4 | todo | S2, S3 | — | | |
-| S5 | todo | S4 | missing files added (O1) | | |
+| S4 | done | S2, S3 | — (OCR spot-check moved to the S5 owner gate, see log 2026-11-13) | `b48baaa` | 2026-11-13 |
+| S5 | todo | S4 | O1: owner supplied `yspdb_all/` 2026-11-13 (2 folders missing vs `yspdb/`, owner queue) | | |
 | S6 | todo | S4 | — | | |
 | S7 | todo | S5, S6 | D-1 + labels + floor (O2); D-7 key (O3) for the live part only | | |
 | S8 | todo | S6 | — | | |
@@ -443,12 +443,21 @@ Format: `YYYY-MM-DD · Stage · event · evidence (commands + one-line results, 
   - Faults: respx `uv run pytest tests/unit/test_openai_compat_adapters.py` → 17 passed (timeout→`ProviderTimeout` after 3 tries, refused→`ProviderUnavailable`, 5xx retried then recovered, 400 not retried, wrong dim / NaN / missing items → `ProviderContractViolation`). Live `tests/integration/test_provider_faults_live.py` → 2 passed (`docker compose stop embed|rerank` → `ProviderUnavailable`; restart → served again).
   - End-to-end: `python -m project_rag.cli --config configs/dev_llama_server.yaml ingest|search` on the fixture corpus → BG query "Какъв е номерът на гранта?" ranks the EN grant-number passage first (rerank 0.152, next 0.0004).
   - Regression floor: unit+contracts+integration 239 passed (18 live deselected), evaluation 2 passed, lint-imports 11 kept, pyright 0. CI `7219631` → success (225 passed, 16 chroma skips).
+- 2026-11-11 · S4 · progress (not closed) · branch `v3/s4-ingestion-v2` (`c43df52` isolation/OCR/antiword/run report, `7936562` registry, `b849f54` dev image + OCR tool tests, `1331e8d`/`b995685`/`9135704` thresholds, golden, CI). Done so far: fault-injection tests (corrupt PDF, OCR crash, embed timeout each isolated; run publishes; systemic embed outage aborts and keeps the previous generation), rename/delete/idempotency tests on fixtures, OCR thresholds tuned on YP (15 chars / 65 conf), CI green incl. a Debian `ocr-tools` job with the real binaries. **YP full ingest started 17:47 in `assist:dev`** (`ingest-corpus`, Q8_0 CPU llama-server, 12 threads): pilot 104 tok/s → ~5.9 h extrapolated for 2.21 M tokens (X6 procedure; within the plan's "hours"). GPU build blocked by permission (owner queue). Parallel prep while it runs (branches, not merged, close only after S4): S6 `v3/s6-service`, S8 `v3/s8-packaging`, S7 `v3/s7-eval`.
+
+- 2026-11-13 · S4 · closed · branch `v3/s4-ingestion-v2` (`c43df52`, `7936562`, `b849f54`, `7c54c8c`, `1331e8d`, `b995685`, `9135704`, `b48baaa`). Checks:
+  - Fault injection: `tests/integration` isolation tests (corrupt PDF, OCR crash, embed timeout → that document `FAILED`/`NO_TEXT`, run publishes; systemic embed outage aborts, previous generation kept) → in the floor below, green.
+  - **YP full ingest** (`docker start -a assist-yp-ingest`: `assist:dev`, `ingest-corpus`, CPU llama-server b11804 Q8_0, corpus `yspdb/` ro) finished 2026-11-11 21:59 UTC after 6 h 12 min: 334 discovered, 13 excluded (media), 321 in scope → READY 262, NO_TEXT 58 (all `ocr_image`, event photos below the 15 chars / 65 conf keep rule), UNSUPPORTED 1 (`.conf`); coverage **81.6 %**; generation `g_5a5ebfc4c437a0c5`; 5872 embeddings; stage seconds discover 21 / parse 197 / chunk 192 / embed 23 336 / publish 10. **Newly indexed vs the prototype:** 89 documents by OCR (images and scanned PDFs, all `UNSUPPORTED`/`OCR_REQUIRED` in the prototype) and 4 legacy `.doc` by antiword. Report kept local (`local_data/`, docker volume `assist_v3_yp_state`).
+  - Idempotency on the real corpus: the same container re-run unchanged (2026-11-13) → prior = new = `g_5a5ebfc4c437a0c5`, `published: false`, 0 embeddings computed, 20.8 s (discover only). Fixture test also green.
+  - Rename / delete tests (fixture): green in the floor.
+  - Regression floor (S4 branch, 2026-11-13): `uv run pytest tests/unit tests/contracts tests/integration -m "not live"` → 250 passed, 4 skipped (OCR binaries absent on Windows; covered by CI job `ocr-tools`), 18 deselected; `tests/evaluation` 2 passed; lint-imports 11 kept; pyright 0 errors; ruff + format clean. CI `9c4801a` → success (incl. `ocr-tools`).
+  - Owner gates: **O1** answered by the owner on 2026-11-13 with the extended corpus `yspdb_all/` ("this is the folder we should index"); it becomes S5's input. The **OCR spot-check** is moved into the S5 owner gate and drawn from the `yspdb_all/` run (the corpus that will actually be served), so S4 does not hold S5. The GPU permission item is resolved: the Vulkan llama-server started in this session (`local_data/llama-b11804-win-vulkan/llama-server.exe`, RX 7900 XT): 4 164 tok/s vs 99 tok/s on the CPU container (16 × 360-token batch).
 
 ## 6. Owner queue and open issues
 
 **Owner queue** (the agent writes here when it stops; the owner clears entries):
 
-- 2026-11-11 · S4/S5 · **Permission: run the GPU llama.cpp build on this PC.** The official ggml-org release `llama-b11804-bin-win-vulkan-x64.zip` (same build as the pinned CPU image; sha256 `db9ab319…87d5` verified against the GitHub release digest) is unpacked in `local_data/llama-b11804-win-vulkan/`; `llama-server.exe --list-devices` sees the RX 7900 XT. Starting it as a server was blocked by the session's permission policy ("code from external"). Needed for (a) a fast initial YP build in S4 (optional; the CPU container works, only slower) and (b) **S5 task 4, the GPU-vs-CPU parity check, which cannot run without it.** Options: (1) allow it, e.g. a permission rule for `local_data/llama-b11804-win-vulkan/llama-server.exe`, or run it yourself: `local_data\llama-b11804-win-vulkan\llama-server.exe --model models\Qwen3-Embedding-4B-Q8_0.gguf --embedding --pooling last --ctx-size 10240 --parallel 4 --batch-size 2560 --ubatch-size 2560 --n-gpu-layers 99 --device Vulkan0 --host 127.0.0.1 --port 8091`; (2) skip the GPU path: every build runs on CPU, and S5 drops task 4 (the host builds its own index, as the spec allows when parity is not shown). **Recommendation: (1).** It is the spec's stated plan (§6.2 E1 step 4) and saves hours per E1 re-index.
+- ~~2026-11-11 · S4/S5 · Permission: run the GPU llama.cpp build on this PC.~~ **Resolved 2026-11-13**: the server started in this session; see the S4 close entry.
 
 **Open issues** (spec/code contradictions, X4):
 

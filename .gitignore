@@ -11,6 +11,7 @@ htmlcov/
 eval/results/
 # Real NGO files must never be committed; only synthetic fixtures under tests/fixtures/.
 yspdb/
+yspdb_all/
 drive-download-*.zip
 # Holdout final-report corpus for Task D report-section questions — real NGO content, no egress.
 holdout-report/
