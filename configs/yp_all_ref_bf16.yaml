@@ -1,0 +1,80 @@
+# S5/E1 REFERENCE: the extended YP corpus `yspdb_all/` embedded with torch bf16 Qwen3-Embedding-4B
+# (pinned rev 5cf2132, the prototype's production profile) on the RX 7900 XT, WSL ROCm venv.
+# Run in WSL (AGENTS.md GPU rules); corpus root ~/yp_all_corpus/"Youth Participation" -> yspdb_all.
+# State on WSL ext4, parse/chunk cache seeded from the Q8_0 run (parsing section identical).
+# Reranker: the same served Q8_0 bge-reranker as the quant runs (Docker Desktop, localhost:8082).
+schema_version: 1
+
+embedding:
+  provider: qwen3
+  threads: 8
+  qwen3:
+    model: "Qwen/Qwen3-Embedding-4B"
+    revision: "5cf2132abc99cad020ac570b19d031efec650f2b"
+    dim: 2560
+    normalize: true
+    vector_storage_dtype: float32
+    inference_dtype: bfloat16
+    device: cuda
+    max_input_tokens: 2048
+    query_prompt_name: query
+    query_prompt_version: qwen3_query_v1
+    tokenizer_padding_side: left
+    batch_size: 16
+
+parsing:
+  backend: native
+  detect_scanned_pdf: true
+  antiword: true
+  ocr:
+    enabled: true
+    languages: bul+eng
+    min_chars: 15          # tuned on the YP OCR survey (DECISIONS 2026-11-11)
+    min_mean_conf: 65.0    # tuned on the YP OCR survey (DECISIONS 2026-11-11)
+
+vector_store:
+  provider: chroma
+  collection: yp_all_ref_bf16
+  distance: cosine
+  persist_path: /home/gorila/assist_state/yp_all_ref/chroma
+
+lexical_store:
+  path: /home/gorila/assist_state/yp_all_ref/store.sqlite3
+
+chunking:
+  target_tokens: 500
+  max_tokens: 2048
+  overlap_tokens: 0
+  table_rows_per_chunk: 20
+
+retrieval:
+  top_k: 8
+  candidates_per_channel: 16
+  fusion: {method: rrf, k: 60}
+  per_file_cap: 3
+  max_source_chars: 6000
+  rerank:
+    enabled: true
+    provider: openai_compat
+    top_n: 12
+    openai_compat:
+      base_url: http://127.0.0.1:8082
+      gguf_sha256: a43c7c9b11a4c1517e5bf95151960e1621d1b72f7a493364b01e386cf1aaa1d3
+      score_transform: sigmoid
+  abstention:
+    enabled: true
+    signal: rerank_score
+    min_top_score: 0.26
+    suppress_on_insufficient: true
+
+security: {max_query_chars: 2000, max_result_excerpt_chars: 1200}
+
+classification:
+  reference_prefixes: ["Youth Participation Resources/"]
+
+ingest:
+  collapse_exact_duplicates: true
+  exclude_paths:
+    # PDF export of the proposal DOCX (parsed-text word ratio 0.9936). Same choice as the owner's
+    # 2026-10-17 clean-up of yspdb/ (kept the DOCX). DECISIONS 2026-11-13.
+    - KA154-YOU-E2373104.pdf

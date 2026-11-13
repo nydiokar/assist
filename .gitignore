@@ -36,3 +36,5 @@ models/
 # Real secrets for the host stack.
 deploy/.env
 deploy/.last_good
+# Real question sets quote the corpus (v3 plan §1.5): local only. Synthetic sets live in eval/archive/.
+eval/yp_*.jsonl
