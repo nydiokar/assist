@@ -112,7 +112,7 @@ flowchart TD
 | S5 | todo | S4 | O1: owner supplied `yspdb_all/` 2026-11-13 (2 folders missing vs `yspdb/`, owner queue) | | |
 | S6 | done | S4 | — | `c87822e` | 2026-11-13 |
 | S7 | todo | S5, S6 | D-1 + labels + floor (O2); D-7 key (O3) for the live part only | | |
-| S8 | todo | S6 | — | | |
+| S8 | done | S6 | — | `034f6a9` | 2026-11-13 |
 | S9 | todo | S8 | T1/T2 (O4) for the live check only | | |
 | S10 | todo | S7, S9 | VM bought (O5) | | |
 | S11 | todo | S10 | D-2, D-4, D-5, D-6, D-8, C1–C5 (O6) | | |
@@ -461,6 +461,15 @@ Format: `YYYY-MM-DD · Stage · event · evidence (commands + one-line results, 
   - `/metrics`: `test_healthz_and_metrics` asserts all 9 spec §6.10 names. Admin isolation (`deploy/dev/compose.service.yaml`, image built from this branch): probe-agent `/healthz: 200`, `admin(dns): 000 unreachable`, `admin(ip): 000 unreachable`; probe-knowledge `admin: 200`.
   - Invalid project id → typed MCP error: `test_tools_search_envelope_and_invalid_project` green.
   - Regression floor: unit+contracts+integration 259 passed, 4 skipped (OCR binaries; CI job), 20 deselected (live); evaluation 2 passed; lint-imports 11 kept; pyright 0 errors (needs `--extra serve --extra dev-gpu`, otherwise 9 missing-import errors); ruff + format clean.
+
+- 2026-11-13 · S8 · closed · branch `v3/s8-packaging` (`29b3260`, `d75770d`, merge of `main` `bca0529`, `034f6a9`). Checks (no `make` on this PC: recipe lines run directly, `ASSIST_MCP_TOKEN` passed via the environment, image `assist:s8test` built from this branch):
+  - `docker compose -f deploy/compose.yaml up -d --wait` (models volume seeded with the Q8_0 embedder + Q8_0 reranker) → assist, embed, rerank, proxy, kuma all `healthy` within ~30 s. Limits applied (`docker inspect`): assist 1 CPU / 2 GiB, read-only root, uid 10001; embed 3 / 6 GiB; rerank 2 / 1.5 GB; proxy 0.5 / 768 MiB; kuma 0.5 / 512 MiB.
+  - Egress: from a throwaway container on `assist_agent`, `CONNECT example.com` via the proxy → **403** (`TCP_DENIED/403 … CONNECT example.com:443` in `access.log`); `api.anthropic.com` → tunnel 200 (HTTP 404 from their root; `TCP_TUNNEL/200`); direct `example.com` → no route. From `assist_knowledge`: direct → no egress; the proxy is unreachable. (Kuma's own update check to `uptime.kuma.pet` is denied too, by design.)
+  - Start-up refusals: `tests/unit/test_startup_refusals.py` → hash embedder, missing GGUF, mismatched GGUF sha256 (and missing token) each refuse; matching sha passes. Green in the floor.
+  - Sync: `pytest tests/integration/test_sync_script_live.py -m live` → passed (pinned rclone image, local-path remote: changes trigger `/admin/ingest`, an unchanged re-run does not, a mass deletion trips `--max-delete` and `/corpus` is untouched). **Rework round 1:** it first failed with `set: illegal option -`: `sync.sh` was CRLF in a Windows worktree (`core.autocrlf`); fixed by `.gitattributes` (`deploy/**`, `*.sh`, `Makefile` → `eol=lf`) in `034f6a9`.
+  - Backup/restore: fixture corpus loaded into the `corpus` volume and ingested through `/admin/ingest` (real Q8_0 CPU embedder, 13 s) → `state_backup.py backup` in the container, `docker cp`, `state_backup.py restore` into a scratch dir → `integrity: ok`, `user_version` 6, counts identical (1 project, 6 documents, 9 chunks, 1 run report). An MCP smoke from the agent network against the stack → `SMOKE: PASS`, top rerank 0.999.
+  - Regression floor: unit+contracts+integration 267 passed, 4 skipped (OCR binaries), 21 deselected (live); evaluation 2 passed; lint-imports 11 kept; pyright 0; ruff + format clean.
+  - Not exercised: the GHCR release workflow (runs on a pushed tag = a publish; left for the first release).
 
 ## 6. Owner queue and open issues
 
