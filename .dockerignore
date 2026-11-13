@@ -1,5 +1,6 @@
 # Never send corpus, state, models or venvs into the build context.
 yspdb/
+yspdb_all/
 holdout-report/
 local_data/
 models/
