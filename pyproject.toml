@@ -28,7 +28,11 @@ dependencies = [
 serve = [
     # D-3 (S2): Chroma is the vector store. The stdio/HTTP MCP interface (S6) needs `mcp`.
     "chromadb>=0.5,<2",
-    "mcp>=1.2",
+    "mcp>=2.3,<3",
+    # S6 service: ASGI app (admin API, /healthz, /metrics) with the MCP Streamable HTTP app mounted.
+    "fastapi>=0.115,<1",
+    "uvicorn>=0.30,<1",
+    "prometheus-client>=0.20,<1",
 ]
 dev = [
     "pytest>=8,<9",
@@ -38,8 +42,11 @@ dev = [
     "import-linter>=2.1,<3",
     "hypothesis>=6.100,<7",
     "respx>=0.21,<1",
-    # stdio MCP server (project_rag.mcp_server) — light; lets its unit test run in CI.
-    "mcp>=1.2",
+    # MCP server/client + the S6 service stack, so their tests run in CI.
+    "mcp>=2.3,<3",
+    "fastapi>=0.115,<1",
+    "uvicorn>=0.30,<1",
+    "prometheus-client>=0.20,<1",
 ]
 dev-gpu = [
     # A01 dense reference: Qwen3-Embedding-4B (needs transformers>=4.51 per model card).

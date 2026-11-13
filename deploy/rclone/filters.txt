@@ -1,0 +1,12 @@
+# rclone filters (D-9 media out; mirrors configs `ingest.exclude_*`). First match wins.
+- .sync/**
+- *.{mp4,MP4,mov,MOV,m4a,M4A,mp3,MP3,wav,WAV,avi,AVI,mkv,MKV,webm,WEBM,m4v,M4V,wmv,WMV}
+- ~$*
+- .~*
+- *.tmp
+- *.lock
+- *~
+- Thumbs.db
+- desktop.ini
+- .DS_Store
++ **

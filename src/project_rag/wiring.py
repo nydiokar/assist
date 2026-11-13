@@ -10,9 +10,13 @@ from .adapters.sqlite.db import SqliteDb
 from .domain.config import Config, EmbeddingConfig, RerankConfig, VectorStoreConfig
 from .ports.cache import EmbeddingCache
 from .ports.catalog import Catalog
+from .ports.clock import Clock
+from .ports.corpus import CorpusReader
 from .ports.embedder import Embedder
+from .ports.feedback import FeedbackSink
 from .ports.lexical import LexicalIndex
 from .ports.reranker import Reranker
+from .ports.telemetry import Telemetry
 from .ports.vector import VectorIndex
 from .services.ingest import IngestService
 from .services.registry import ProjectRegistryService
@@ -24,6 +28,15 @@ def load_config(path: str | Path | None = None) -> Config:
     from .adapters.config_yaml import load_config as _load
 
     return _load(path)
+
+
+def load_settings(base: str | Path, overlay: str | Path | None = None) -> Config:
+    """Base YAML + per-host overlay + secrets from the environment (spec §6.7, R7)."""
+    import os
+
+    from .adapters.config_yaml import load_layered
+
+    return load_layered(base, overlay, env=dict(os.environ))
 
 
 def build_embedder(cfg: EmbeddingConfig) -> Embedder:
@@ -91,6 +104,10 @@ class Services:
     lexical: LexicalIndex
     catalog: Catalog
     db: SqliteDb
+    clock: Clock
+    registry_corpus: CorpusReader
+    reranker: Reranker | None = None
+    feedback: FeedbackSink | None = None
     gc_removed: tuple[tuple[str, str], ...] = ()
 
     def close(self) -> None:
@@ -99,7 +116,13 @@ class Services:
         self.db.close()
 
 
-def build(config: Config, *, collect_garbage: bool = True) -> Services:
+def build(
+    config: Config,
+    *,
+    collect_garbage: bool = True,
+    telemetry: Telemetry | None = None,
+    feedback: bool = False,
+) -> Services:
     """Wire every port to its adapter. `collect_garbage` runs the S2 startup GC (single writer:
     do not build a second writer against a store another process is ingesting into)."""
     from .adapters.clock_system import SystemClock, UuidIdGen
@@ -113,6 +136,7 @@ def build(config: Config, *, collect_garbage: bool = True) -> Services:
     from .services.parsing import OcrAwareParser
 
     db = SqliteDb(config.lexical_store.path)
+    clock = SystemClock()
     embedder = build_embedder(config.embedding)
     vector = build_vector_store(config.vector_store, db)
     lexical = Fts5LexicalIndex(db)
@@ -143,15 +167,21 @@ def build(config: Config, *, collect_garbage: bool = True) -> Services:
         artifacts=FsArtifactStore(cache_root),
         open_embedding_cache=open_embedding_cache,
         store=db,
-        clock=SystemClock(),
+        clock=clock,
         ids=UuidIdGen(),
         reports=JsonReportWriter(cache_root.parent / "runs"),
     )
     removed = tuple(ingest.collect_garbage()) if collect_garbage else ()
+    reranker = build_reranker(config.retrieval.rerank)
+    sink: FeedbackSink | None = None
+    if feedback:
+        from .adapters.feedback_sqlite import SqliteFeedbackSink
+
+        sink = SqliteFeedbackSink(db)
     search = SearchService(
         config,
         embedder=embedder,
-        reranker=build_reranker(config.retrieval.rerank),
+        reranker=reranker,
         vector=vector,
         lexical=lexical,
         catalog=catalog,
@@ -159,6 +189,9 @@ def build(config: Config, *, collect_garbage: bool = True) -> Services:
         # Query time re-reads sources without OCR (open_source / context expansion fall back to
         # the stored excerpt for OCR'd documents).
         parser=registry,
+        telemetry=telemetry,
+        feedback=sink,
+        clock=clock,
     )
     return Services(
         config=config,
@@ -170,5 +203,9 @@ def build(config: Config, *, collect_garbage: bool = True) -> Services:
         lexical=lexical,
         catalog=catalog,
         db=db,
+        clock=clock,
+        registry_corpus=corpus,
+        reranker=reranker,
+        feedback=sink,
         gc_removed=removed,
     )

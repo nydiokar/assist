@@ -11,3 +11,6 @@ class NullTelemetry:
 
     def count(self, name: str, labels: Mapping[str, str] | None = None) -> None:
         return None
+
+    def gauge(self, name: str, value: float, labels: Mapping[str, str] | None = None) -> None:
+        return None

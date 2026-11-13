@@ -32,3 +32,7 @@ scripts/_*.jsonl
 
 # Pinned GGUF model files (downloaded by scripts/fetch_models.py; multi-GB, never in git).
 models/
+
+# Real secrets for the host stack.
+deploy/.env
+deploy/.last_good

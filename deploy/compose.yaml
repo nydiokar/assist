@@ -1,0 +1,131 @@
+# Host stack (spec A03 §4.1, §8.3). `make up` (see Makefile). Container paths are fixed:
+# /corpus, /state, /models, /config. Secrets come from .env (deploy/.env.example).
+# Networks: knowledge = assist + model servers, no internet; agent = MCP listener + (S9) worker,
+# egress only via the proxy; ops = Kuma + assist admin listener; edge = proxy's way out.
+# AI-Team images are referenced by tag (profile ai-team, S9); their files are not copied.
+name: assist
+
+x-limits: &limits
+  restart: unless-stopped
+  logging:
+    driver: json-file
+    options: {max-size: "10m", max-file: "5"}
+
+networks:
+  edge: {}
+  agent:
+    internal: true
+  knowledge:
+    internal: true
+  ops:
+    internal: true
+    ipam:
+      config:
+        - subnet: 172.31.20.0/24
+
+volumes:
+  corpus: {}
+  assist-state: {}
+  models: {}
+  kuma-data: {}
+  rclone-config: {}
+
+services:
+  assist:
+    <<: *limits
+    image: ${ASSIST_IMAGE:-assist:dev}
+    entrypoint: ["python", "-m", "project_rag.serve", "--config", "/app/configs/base.yaml", "--overlay", "/config/deployment.yaml"]
+    read_only: true
+    tmpfs: ["/tmp:size=512m"]
+    environment:
+      ASSIST_MCP_TOKEN: ${ASSIST_MCP_TOKEN:?set ASSIST_MCP_TOKEN in .env}
+      ASSIST_HOSTED_EMBED_API_KEY: ${ASSIST_HOSTED_EMBED_API_KEY:-}
+    volumes:
+      - corpus:/corpus:ro
+      - assist-state:/state
+      - models:/models:ro
+      - ${DEPLOYMENT_YAML:-./deployment.example.yaml}:/config/deployment.yaml:ro
+    networks:
+      agent: {}
+      knowledge: {}
+      ops:
+        ipv4_address: 172.31.20.10  # admin listener binds here only (service.admin_host)
+    depends_on:
+      embed: {condition: service_healthy}
+      rerank: {condition: service_healthy}
+    cpus: ${ASSIST_CPUS:-1.0}
+    mem_limit: ${ASSIST_MEM:-2g}
+
+  embed:
+    <<: *limits
+    image: ghcr.io/ggml-org/llama.cpp:server-b11804@sha256:8c74db29f1a2bef3f0a331b52c4d6214601dfceed4bee0b94cc48b3b23ff257d
+    command: ["--model", "/models/${EMBED_GGUF:-Qwen3-Embedding-4B-Q8_0.gguf}", "--embedding", "--pooling", "last",
+              "--ctx-size", "10240", "--parallel", "4", "--batch-size", "2560", "--ubatch-size", "2560",
+              "--threads", "${EMBED_THREADS:-3}", "--host", "0.0.0.0", "--port", "8080"]
+    volumes: ["models:/models:ro"]
+    networks: [knowledge]
+    healthcheck: &llama_health
+      test: ["CMD", "curl", "-fsS", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 60s
+    cpus: ${EMBED_CPUS:-3.0}
+    mem_limit: ${EMBED_MEM:-6g}
+
+  rerank:
+    <<: *limits
+    image: ghcr.io/ggml-org/llama.cpp:server-b11804@sha256:8c74db29f1a2bef3f0a331b52c4d6214601dfceed4bee0b94cc48b3b23ff257d
+    command: ["--model", "/models/${RERANK_GGUF:-bge-reranker-v2-m3-Q8_0.gguf}", "--reranking",
+              "--ctx-size", "8192", "--parallel", "4", "--batch-size", "2048", "--ubatch-size", "2048",
+              "--threads", "${RERANK_THREADS:-2}", "--host", "0.0.0.0", "--port", "8080"]
+    volumes: ["models:/models:ro"]
+    networks: [knowledge]
+    healthcheck: *llama_health
+    cpus: ${RERANK_CPUS:-2.0}
+    mem_limit: ${RERANK_MEM:-1500m}
+
+  proxy:
+    <<: *limits
+    image: ubuntu/squid:6.10-24.10_beta@sha256:c9f5212b147a766529c7b026e2bebed37b998d33d0066b658596af5eba7cc65c
+    volumes:
+      - ./squid/squid.conf:/etc/squid/squid.conf:ro
+      - ./squid/allowlist.txt:/etc/squid/allowlist.txt:ro
+    networks: [edge, agent, ops]
+    healthcheck:
+      test: ["CMD-SHELL", "squid -k check || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    cpus: 0.5
+    mem_limit: 768m  # squid 6 peaks ~0.7 GB RSS at start
+
+  kuma:
+    <<: *limits
+    image: louislam/uptime-kuma:1.23.16@sha256:431fee3be822b04861cf0e35daf4beef6b7cb37391c5f26c3ad6e12ce280fe18
+    environment:
+      HTTPS_PROXY: http://proxy:3128
+      HTTP_PROXY: http://proxy:3128
+      NO_PROXY: assist,172.31.20.10,localhost
+    volumes: ["kuma-data:/app/data"]
+    networks: [ops]
+    ports: ["127.0.0.1:3001:3001"]  # reach it over Tailscale/SSH tunnel only
+    cpus: 0.5
+    mem_limit: 512m
+
+  sync:
+    # One-shot; the systemd timer runs `make sync` every 15 min (deploy/systemd).
+    image: rclone/rclone:1.68.2@sha256:74c51b8817e5431bd6d7ed27cb2a50d8ee78d77f6807b72a41ef6f898845942b
+    profiles: [sync]
+    entrypoint: ["sh", "/deploy/rclone/sync.sh"]
+    environment:
+      RCLONE_REMOTE: ${RCLONE_REMOTE:-gdrive:Projects}
+      ADMIN_URL: http://172.31.20.10:8001
+      KUMA_PUSH_URL: ${KUMA_SYNC_PUSH_URL:-}
+      HTTPS_PROXY: http://proxy:3128
+      NO_PROXY: 172.31.20.10,kuma
+    volumes:
+      - corpus:/corpus
+      - rclone-config:/config/rclone
+      - ./rclone:/deploy/rclone:ro
+    networks: [ops, edge]

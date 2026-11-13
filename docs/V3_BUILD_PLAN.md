@@ -110,9 +110,9 @@ flowchart TD
 | S3 | done | S1 | — | `7219631` | 2026-11-11 |
 | S4 | done | S2, S3 | — (OCR spot-check moved to the S5 owner gate, see log 2026-11-13) | `b48baaa` | 2026-11-13 |
 | S5 | todo | S4 | O1: owner supplied `yspdb_all/` 2026-11-13 (2 folders missing vs `yspdb/`, owner queue) | | |
-| S6 | todo | S4 | — | | |
+| S6 | done | S4 | — | `c87822e` | 2026-11-13 |
 | S7 | todo | S5, S6 | D-1 + labels + floor (O2); D-7 key (O3) for the live part only | | |
-| S8 | todo | S6 | — | | |
+| S8 | done | S6 | — | `034f6a9` | 2026-11-13 |
 | S9 | todo | S8 | T1/T2 (O4) for the live check only | | |
 | S10 | todo | S7, S9 | VM bought (O5) | | |
 | S11 | todo | S10 | D-2, D-4, D-5, D-6, D-8, C1–C5 (O6) | | |
@@ -453,6 +453,24 @@ Format: `YYYY-MM-DD · Stage · event · evidence (commands + one-line results, 
   - Regression floor (S4 branch, 2026-11-13): `uv run pytest tests/unit tests/contracts tests/integration -m "not live"` → 250 passed, 4 skipped (OCR binaries absent on Windows; covered by CI job `ocr-tools`), 18 deselected; `tests/evaluation` 2 passed; lint-imports 11 kept; pyright 0 errors; ruff + format clean. CI `9c4801a` → success (incl. `ocr-tools`).
   - Owner gates: **O1** answered by the owner on 2026-11-13 with the extended corpus `yspdb_all/` ("this is the folder we should index"); it becomes S5's input. The **OCR spot-check** is moved into the S5 owner gate and drawn from the `yspdb_all/` run (the corpus that will actually be served), so S4 does not hold S5. The GPU permission item is resolved: the Vulkan llama-server started in this session (`local_data/llama-b11804-win-vulkan/llama-server.exe`, RX 7900 XT): 4 164 tok/s vs 99 tok/s on the CPU container (16 × 360-token batch).
 
+- 2026-11-13 · S6 · closed · branch `v3/s6-service` (`63b6dd9`, `98332f3`, `d8ca6e0`, `82ef1bc`, `2348c2d`, merge of `main` `b212ed6`, `c87822e`). Checks (S6 worktree, all extras synced):
+  - `uv run python -X utf8 scripts/smoke_mcp.py --fixture` → TOOLS = the 6 tools, PROJECTS `[('demo', 6)]`, 5 passages in `untrusted_data` envelopes, `SMOKE: PASS`.
+  - Load (A04 wording): `pytest tests/integration/test_service_http.py -k "concurrent_searches or bounded_queue" -s` ×12 → 12/12 passed; 20 concurrent searches during an ingest, p95 3.26–5.43 s, max ≤ 5.55 s, first-try refusals 2–3, 0 failed calls after one `Retry-After`; ≥ 17 waiting → 503 + `Retry-After: 2` with a JSON-RPC body "assist is busy …". **Rework round 1:** before `c87822e` the test failed ≈ 1 in 5 (the transport-level 503 reached the MCP client as a bare "Server returned an error response"); root cause and fix in A04.
+  - Degraded mode: `pytest tests/integration/test_service_degraded_live.py -m live` → 2 passed (103 s): rerank container stopped → `degraded:["rerank"]`; embed stopped → `["dense"]`; both → lexical-only, flagged; `/healthz` reflects each; containers healthy again afterwards. Fixture variants in `test_service_http.py` green.
+  - Injection fixture verbatim inside the untrusted envelope: `test_injection_fixture_is_returned_verbatim_inside_the_envelope` green.
+  - `/metrics`: `test_healthz_and_metrics` asserts all 9 spec §6.10 names. Admin isolation (`deploy/dev/compose.service.yaml`, image built from this branch): probe-agent `/healthz: 200`, `admin(dns): 000 unreachable`, `admin(ip): 000 unreachable`; probe-knowledge `admin: 200`.
+  - Invalid project id → typed MCP error: `test_tools_search_envelope_and_invalid_project` green.
+  - Regression floor: unit+contracts+integration 259 passed, 4 skipped (OCR binaries; CI job), 20 deselected (live); evaluation 2 passed; lint-imports 11 kept; pyright 0 errors (needs `--extra serve --extra dev-gpu`, otherwise 9 missing-import errors); ruff + format clean.
+
+- 2026-11-13 · S8 · closed · branch `v3/s8-packaging` (`29b3260`, `d75770d`, merge of `main` `bca0529`, `034f6a9`). Checks (no `make` on this PC: recipe lines run directly, `ASSIST_MCP_TOKEN` passed via the environment, image `assist:s8test` built from this branch):
+  - `docker compose -f deploy/compose.yaml up -d --wait` (models volume seeded with the Q8_0 embedder + Q8_0 reranker) → assist, embed, rerank, proxy, kuma all `healthy` within ~30 s. Limits applied (`docker inspect`): assist 1 CPU / 2 GiB, read-only root, uid 10001; embed 3 / 6 GiB; rerank 2 / 1.5 GB; proxy 0.5 / 768 MiB; kuma 0.5 / 512 MiB.
+  - Egress: from a throwaway container on `assist_agent`, `CONNECT example.com` via the proxy → **403** (`TCP_DENIED/403 … CONNECT example.com:443` in `access.log`); `api.anthropic.com` → tunnel 200 (HTTP 404 from their root; `TCP_TUNNEL/200`); direct `example.com` → no route. From `assist_knowledge`: direct → no egress; the proxy is unreachable. (Kuma's own update check to `uptime.kuma.pet` is denied too, by design.)
+  - Start-up refusals: `tests/unit/test_startup_refusals.py` → hash embedder, missing GGUF, mismatched GGUF sha256 (and missing token) each refuse; matching sha passes. Green in the floor.
+  - Sync: `pytest tests/integration/test_sync_script_live.py -m live` → passed (pinned rclone image, local-path remote: changes trigger `/admin/ingest`, an unchanged re-run does not, a mass deletion trips `--max-delete` and `/corpus` is untouched). **Rework round 1:** it first failed with `set: illegal option -`: `sync.sh` was CRLF in a Windows worktree (`core.autocrlf`); fixed by `.gitattributes` (`deploy/**`, `*.sh`, `Makefile` → `eol=lf`) in `034f6a9`.
+  - Backup/restore: fixture corpus loaded into the `corpus` volume and ingested through `/admin/ingest` (real Q8_0 CPU embedder, 13 s) → `state_backup.py backup` in the container, `docker cp`, `state_backup.py restore` into a scratch dir → `integrity: ok`, `user_version` 6, counts identical (1 project, 6 documents, 9 chunks, 1 run report). An MCP smoke from the agent network against the stack → `SMOKE: PASS`, top rerank 0.999.
+  - Regression floor: unit+contracts+integration 267 passed, 4 skipped (OCR binaries), 21 deselected (live); evaluation 2 passed; lint-imports 11 kept; pyright 0; ruff + format clean.
+  - Not exercised: the GHCR release workflow (runs on a pushed tag = a publish; left for the first release).
+
 ## 6. Owner queue and open issues
 
 **Owner queue** (the agent writes here when it stops; the owner clears entries):
@@ -460,5 +478,9 @@ Format: `YYYY-MM-DD · Stage · event · evidence (commands + one-line results, 
 - ~~2026-11-11 · S4/S5 · Permission: run the GPU llama.cpp build on this PC.~~ **Resolved 2026-11-13**: the server started in this session; see the S4 close entry.
 
 **Open issues** (spec/code contradictions, X4):
+
+- 2026-11-11 · S6/B1 · **Queries degrade to lexical while a full ingest saturates the single embed server.** Measured with the live service test during the YP full ingest: the query embedding waited behind the ingest's batches, timed out, and the search ran `degraded: ["dense"]`. This is correct degraded behaviour, but on a 4-core host the client would get reduced-mode answers during every large ingest. Options for S8/B1: (a) give the ingest a lower `--parallel` share or throttle its batch rate; (b) a second small embed instance (or one reserved slot) for queries; (c) accept it for the initial build only (incremental runs are small). Proposed: (a) + (c), decided with the B1 numbers.
+
+- ~~2026-11-11 · S6 · Two S6 exit checks conflict for a true burst.~~ **Resolved 2026-11-13 by `docs/AMENDMENT_A04.md`** (spec §6.3 backpressure wins over the plan wording; owner may reverse by raising `service.max_waiting`).
 
 - 2026-11-11 · S1 · *Plan wording vs code (resolved by recording, no behaviour change).* S1 task 2 asks for the property "cap: never more than the cap per file". The per-file cap deliberately **refills** the window from over-cap candidates when it would otherwise be short (WP3 2026-10-27 design: never return fewer than `window` results when candidates exist), so the literal property is false by design. `tests/unit/test_core_properties.py::test_cap_order_length_and_refill_rule` encodes the real contract: order preserved, length = min(window, candidates), and a file exceeds the cap **only** when every under-cap candidate is already in the window. Proposed amendment: reword the S1 property in the plan. Owner may instead ask for a strict cap (that would be a behaviour change and needs a measured eval).

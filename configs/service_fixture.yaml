@@ -1,0 +1,11 @@
+# S6 compose test profile: the service on the synthetic fixture corpus with the hash embedder
+# (needs ASSIST_ALLOW_DEV_PROFILE=1). The admin listener binds only to assist's address on the
+# `knowledge` network (deploy/dev/compose.service.yaml), so the `agent` network cannot reach it.
+vector_store: {provider: sqlite_vec, persist_path: ""}
+lexical_store: {path: /state/store.sqlite3}
+service:
+  corpus_root: /corpus
+  mcp_host: 0.0.0.0
+  mcp_port: 8000
+  admin_host: 172.31.10.10
+  admin_port: 8001
